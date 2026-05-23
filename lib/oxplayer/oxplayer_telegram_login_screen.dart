@@ -376,8 +376,7 @@ class _OxplayerTelegramLoginScreenState
     if (_tdSession != null) {
       try {
         await OxplayerTelegramTdSession.initPlugin();
-        await _tdSession!.initClient();
-        await _tdSession!.abandonStaleInteractiveAuthIfNeeded();
+        await _bootstrapTdSessionForLogin();
         _startTdListenersOnce();
         if (await _tdSession!.trySilentRestore()) {
           if (!mounted) return;
@@ -398,6 +397,22 @@ class _OxplayerTelegramLoginScreenState
         fromRoute.isNotEmpty) {
       _handledRouteInitData = true;
       await _completeSignInWithInitData(fromRoute);
+    }
+  }
+
+  /// TDLib web init can fatal on corrupt IndexedDB; one local reset + retry before QR.
+  Future<void> _bootstrapTdSessionForLogin() async {
+    final session = _tdSession;
+    if (session == null) return;
+    try {
+      await session.initClient();
+      await session.abandonStaleInteractiveAuthIfNeeded();
+    } catch (e) {
+      if (!kIsWeb) rethrow;
+      oxEnvLog('OxplayerTelegramLoginScreen TDLib init failed; resetting web session: $e');
+      await session.resetLocalSessionForQrLogin();
+      await session.initClient();
+      await session.abandonStaleInteractiveAuthIfNeeded();
     }
   }
 

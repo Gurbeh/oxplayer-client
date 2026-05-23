@@ -45,7 +45,6 @@ String _jsonEncodeTdFunction(td.TdFunction fn) {
   return jsonEncode(m);
 }
 
-const _kDownloadConnectionsCount = 16;
 const _kMaxGetMeRetries = 2;
 
 TelegramTdlibFacade? _webActiveFacade;
@@ -104,6 +103,9 @@ class TelegramTdlibFacade implements TdTelegramClient {
 
   bool _webJsAlive = false;
   int _webSessionEpoch = 0;
+  /// Blocks [getAuthorizationState] polling while [setTdlibParameters] is in flight (tdweb WASM crash).
+  bool _authPollPaused = false;
+  int _tdwebInitFatalRecoveryAttempts = 0;
   /// Set when tdweb posts [updateFatalError] (not modeled as a typed [TdObject]).
   bool _receivedTdlibFatal = false;
 
@@ -126,7 +128,6 @@ class TelegramTdlibFacade implements TdTelegramClient {
   int? _pendingApiId;
   String? _pendingApiHash;
   bool _paramsSent = false;
-  bool _transportTuningApplied = false;
   bool _awaitingGetMeAfterReady = false;
   int _getMeRetryCount = 0;
   final _updates = StreamController<Map<String, dynamic>>.broadcast();
@@ -232,11 +233,24 @@ class TelegramTdlibFacade implements TdTelegramClient {
   }
 
   void _handleTdwebUpdateFatalError(Map<String, dynamic> map) {
-    _receivedTdlibFatal = true;
     final msg = _formatTdwebFatalPayload(map);
     _lastTdlibFatalDetail = msg;
     if (kDebugMode) debugPrint('TDLib fatal: $msg');
     _tdlog('TDLib web ← updateFatalError: $msg');
+
+    final canRecoverFromInitFatal =
+        !_hasReachedAuthorizationWaitPhoneNumber &&
+        _tdwebInitFatalRecoveryAttempts < 1 &&
+        _pendingApiId != null &&
+        _pendingApiHash != null &&
+        _webJsAlive;
+    if (canRecoverFromInitFatal) {
+      _tdwebInitFatalRecoveryAttempts += 1;
+      unawaited(_recoverTdwebAfterInitFatal());
+      return;
+    }
+
+    _receivedTdlibFatal = true;
     final lower = msg.toLowerCase();
     final runningDiffFatal =
         lower.contains('running_get_difference_') ||
@@ -548,6 +562,8 @@ class TelegramTdlibFacade implements TdTelegramClient {
     _unsupportedAuthWire = null;
     _databaseEncryptionKeyApplied = '';
     _databaseEncryptionKeyProbeSent = false;
+    _authPollPaused = false;
+    _tdwebInitFatalRecoveryAttempts = 0;
 
     if (sessionString.isNotEmpty && kDebugMode) {
       if (kDebugMode) {
@@ -561,7 +577,6 @@ class TelegramTdlibFacade implements TdTelegramClient {
     _pendingApiHash = apiHash;
     _paramsSent = false;
     _hasReachedAuthorizationWaitPhoneNumber = false;
-    _transportTuningApplied = false;
     _awaitingGetMeAfterReady = false;
     _getMeRetryCount = 0;
     if (_authCompleter.isCompleted) {
@@ -604,6 +619,9 @@ class TelegramTdlibFacade implements TdTelegramClient {
       if (!_webJsAlive || _receivedTdlibFatal || _unsupportedAuthWire != null) {
         return;
       }
+      if (_authPollPaused) {
+        continue;
+      }
       try {
         _tdlog('TDLib web boot poll[$i] → getAuthorizationState…');
         final r = await _sendAuthProbe(const td.GetAuthorizationState());
@@ -637,6 +655,9 @@ class TelegramTdlibFacade implements TdTelegramClient {
       await Future<void>.delayed(const Duration(milliseconds: 300));
       if (!_webJsAlive || _receivedTdlibFatal || _unsupportedAuthWire != null) {
         return;
+      }
+      if (_authPollPaused) {
+        continue;
       }
       try {
         _tdlog('TDLib web QR poll[$i] → getAuthorizationState…');
@@ -807,6 +828,7 @@ class TelegramTdlibFacade implements TdTelegramClient {
       final apiHash = _pendingApiHash;
       if (apiId == null || apiHash == null) return;
       _paramsSent = true;
+      _authPollPaused = true;
       const encKey = '';
       _databaseEncryptionKeyApplied = encKey;
       _enginePost(
@@ -827,8 +849,12 @@ class TelegramTdlibFacade implements TdTelegramClient {
           applicationVersion: '1.0.0',
         ),
       );
-      _applyTransportTuning();
-    } else if (state is td.AuthorizationStateWaitPhoneNumber) {
+      return;
+    }
+
+    _authPollPaused = false;
+
+    if (state is td.AuthorizationStateWaitPhoneNumber) {
       _hasReachedAuthorizationWaitPhoneNumber = true;
       authDebugDedup('tdlib_auth_state', AuthDebugLevel.info, 'TDLib auth state: WaitPhoneNumber.');
       _failEnsureAuthorizedIfPending('WaitPhoneNumber');
@@ -1001,22 +1027,45 @@ class TelegramTdlibFacade implements TdTelegramClient {
     }
   }
 
-  void _applyTransportTuning() {
-    if (!_webJsAlive || _transportTuningApplied) return;
-    _transportTuningApplied = true;
-    _enginePost(
-      const td.SetOption(
-        name: 'download_connections_count',
-        value: td.OptionValueInteger(value: _kDownloadConnectionsCount),
-      ),
+  /// One retry with a new [instanceName] / IndexedDB after WASM init fatals.
+  Future<void> _recoverTdwebAfterInitFatal() async {
+    final apiId = _pendingApiId;
+    final apiHash = _pendingApiHash;
+    if (apiId == null || apiHash == null) {
+      _receivedTdlibFatal = true;
+      return;
+    }
+    _tdlog(
+      'TDLib web: init fatal — recreating tdweb client '
+      '(epoch ${_webSessionEpoch + 1}, fresh IndexedDB)',
     );
-    _enginePost(
-      const td.SetOption(
-        name: 'network_type',
-        value: td.OptionValueString(value: 'wifi'),
-      ),
-    );
-    _enginePost(const td.SetNetworkType(type: td.NetworkTypeWiFi()));
+    _receivedTdlibFatal = false;
+    _paramsSent = false;
+    _authPollPaused = false;
+    _hasReachedAuthorizationWaitPhoneNumber = false;
+    await _shutdownClient();
+    _webSessionEpoch += 1;
+    if (_authCompleter.isCompleted) {
+      _authCompleter = Completer<void>();
+    }
+    _registerDartPushHandler();
+    _webJsAlive = true;
+    try {
+      await _jsCreateClient();
+      await _jsWaitTdwebInited();
+      _singletonOwner = this;
+      unawaited(_bootstrapAuthorizationStatePolling());
+    } catch (e) {
+      _receivedTdlibFatal = true;
+      _webJsAlive = false;
+      if (!_functionErrors.isClosed) {
+        _functionErrors.add(
+          'Telegram web client failed to restart after a TDLib error: $e. '
+          'Clear site data for this origin and reload.',
+        );
+      }
+      _tdlog('TDLib web recoverTdwebAfterInitFatal failed: $e');
+    }
   }
 
   Future<void> _shutdownClient() async {
@@ -1046,7 +1095,6 @@ class TelegramTdlibFacade implements TdTelegramClient {
     _webJsAlive = false;
     _paramsSent = false;
     _hasReachedAuthorizationWaitPhoneNumber = false;
-    _transportTuningApplied = false;
     _awaitingGetMeAfterReady = false;
     _getMeRetryCount = 0;
     _pendingApiId = null;
@@ -1158,7 +1206,6 @@ class TelegramTdlibFacade implements TdTelegramClient {
   Future<void> forceDestroyAfterLogOut() async {
     await _shutdownClient();
     _paramsSent = false;
-    _transportTuningApplied = false;
     _awaitingGetMeAfterReady = false;
     _getMeRetryCount = 0;
     _pendingApiId = null;

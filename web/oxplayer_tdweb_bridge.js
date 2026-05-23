@@ -559,7 +559,10 @@
       }).catch(function (e) {
         var msg = errorToMessage(e);
         streamWarn('send failed ' + (qt || '?') + ' ' + msg);
-        throw new Error(msg);
+        if (e && e['@type'] === 'error') {
+          return JSON.stringify(e);
+        }
+        return JSON.stringify({ '@type': 'error', 'code': 500, 'message': msg });
       });
     },
 

@@ -21,6 +21,11 @@ class BackgroundDownloader extends _$BackgroundDownloader {
 
   @override
   FileDownloader build() {
+    if (kIsWeb) {
+      // background_downloader uses path_provider (unsupported on web).
+      return FileDownloader();
+    }
+
     ref.onDispose(
       () => updateListener.cancel(),
     );

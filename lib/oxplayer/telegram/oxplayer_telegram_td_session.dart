@@ -46,6 +46,37 @@ String _debugUrlKind(String? url) {
   return 'non_https len=${value.length}';
 }
 
+/// Resolves [botUser] to the private bot chat used for WebApp URL RPCs.
+///
+/// On web, [SearchPublicChat] already returns that chat; [CreatePrivateChat] can
+/// crash tdweb with "memory access out of bounds".
+Future<td_api.Chat> _resolveBotPrivateChatForWebApp(
+  TelegramTdlibFacade td,
+  String botUser,
+) async {
+  td_api.Chat? resolved;
+
+  final res = await td.send(td_api.SearchPublicChat(username: botUser));
+  if (res is td_api.Chat && res.type is td_api.ChatTypePrivate) {
+    resolved = res;
+  }
+
+  if (resolved == null) {
+    throw StateError('Cannot resolve BOT_USERNAME to a private chat with the bot.');
+  }
+  if (kIsWeb) {
+    return resolved;
+  }
+  final botUserId = (resolved.type as td_api.ChatTypePrivate).userId;
+  final privateChat = await td.send(
+    td_api.CreatePrivateChat(userId: botUserId, force: false),
+  );
+  if (privateChat is! td_api.Chat) {
+    throw StateError('Failed to create private chat with bot');
+  }
+  return privateChat;
+}
+
 const _kOxDeviceIdPrefsKey = 'oxplayer_td_device_id';
 
 /// TDLib-backed Telegram login + the same backend `/auth/telegram` bridge as oxplayer-android.
@@ -365,17 +396,7 @@ final class OxplayerTelegramTdSession {
     if (botUser == null || botUser.isEmpty) {
       return null;
     }
-    final resolved = await _td.send(td_api.SearchPublicChat(username: botUser));
-    if (resolved is! td_api.Chat || resolved.type is! td_api.ChatTypePrivate) {
-      return null;
-    }
-    final botUserId = (resolved.type as td_api.ChatTypePrivate).userId;
-    final privateChat = await _td.send(
-      td_api.CreatePrivateChat(userId: botUserId, force: false),
-    );
-    if (privateChat is! td_api.Chat) {
-      return null;
-    }
+    final privateChat = await _resolveBotPrivateChatForWebApp(_td, botUser);
     return privateChat.id;
   }
 
@@ -423,19 +444,8 @@ final class OxplayerTelegramTdSession {
       throw StateError('BOT_USERNAME (or OXPLAYER_BOT_USERNAME) is not configured.');
     }
 
-    final resolved =
-        await _td.send(td_api.SearchPublicChat(username: botUser));
-    if (resolved is! td_api.Chat || resolved.type is! td_api.ChatTypePrivate) {
-      throw StateError('Cannot resolve BOT_USERNAME to a private chat with the bot.');
-    }
-    final botUserId = (resolved.type as td_api.ChatTypePrivate).userId;
-
-    final privateChat = await _td.send(
-      td_api.CreatePrivateChat(userId: botUserId, force: false),
-    );
-    if (privateChat is! td_api.Chat) {
-      throw StateError('Failed to create private chat with bot');
-    }
+    final privateChat = await _resolveBotPrivateChatForWebApp(_td, botUser);
+    final botUserId = (privateChat.type as td_api.ChatTypePrivate).userId;
 
     String? webAppUrl;
     td_api.TdError? shortNameError;

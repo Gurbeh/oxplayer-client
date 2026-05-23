@@ -83,27 +83,7 @@ bool _canTryTelegramDirectOnWeb({
   return videoOk && audioOk;
 }
 
-/// Web: Telegram files over ~20MB cannot use Bot API [getFile] on the server proxy; prefer tdweb (MTProto) in-browser.
-Future<String> _oxTelegramPlayUrlOnWeb({
-  required Ref ref,
-  required String oxLocatorUri,
-  required String serverPlaybackUrl,
-}) async {
-  final tdweb = await resolveOxplayerTelegramLocatorToPlayableUrl(
-    oxplayerLocatorUri: oxLocatorUri,
-    ref: ref,
-  );
-  if (tdweb != null && tdweb.isNotEmpty) {
-    _oxPlaybackWebModelLog(
-      'web tdweb stream OK scheme=${Uri.tryParse(tdweb)?.scheme ?? "?"} len=${tdweb.length}',
-    );
-    return tdweb;
-  }
-  _oxPlaybackWebModelLog(
-    'web tdweb unavailable; server /Videos/.../stream proxy (Bot API, files typically must be under ~20MB)',
-  );
-  return serverPlaybackUrl;
-}
+
 
 class Media {
   final String url;
@@ -594,13 +574,7 @@ class PlaybackModelHelper {
             mediaPath != null &&
             _isOxTelegramLocator(mediaPath)) {
           libraryMediaFileId = parseOxplayerTelegramMediaId(mediaPath);
-          if (kIsWeb) {
-            playUrl = await _oxTelegramPlayUrlOnWeb(
-              ref: ref,
-              oxLocatorUri: mediaPath,
-              serverPlaybackUrl: playbackUrl,
-            );
-          } else if (webCanTryTelegramDirect) {
+          if (webCanTryTelegramDirect) {
             _oxPlaybackWebModelLog(
               'resolving locator mediaPath=$mediaPath libraryMediaFileId=$libraryMediaFileId videoCodec=${videoCodec ?? "null"} audioCodec=${audioCodec ?? "null"}',
             );
@@ -610,7 +584,7 @@ class PlaybackModelHelper {
             );
             if (resolved == null) {
               _oxPlaybackWebModelLog(
-                'resolver returned null for $mediaPath; using server playback URL on web=${kIsWeb}',
+                'resolver returned null for $mediaPath; using server playback URL on web=$kIsWeb',
               );
               if (!kIsWeb) return null;
             } else {
@@ -799,13 +773,7 @@ class PlaybackModelHelper {
           mediaPath != null &&
           _isOxTelegramLocator(mediaPath)) {
         libraryMediaFileId = parseOxplayerTelegramMediaId(mediaPath);
-        if (kIsWeb) {
-          playUrl = await _oxTelegramPlayUrlOnWeb(
-            ref: ref,
-            oxLocatorUri: mediaPath,
-            serverPlaybackUrl: directPlay,
-          );
-        } else if (webCanTryTelegramDirect) {
+        if (webCanTryTelegramDirect) {
           _oxPlaybackWebModelLog(
             'resolving locator (setStreams) mediaPath=$mediaPath libraryMediaFileId=$libraryMediaFileId videoCodec=${videoCodec ?? "null"} audioCodec=${audioCodec ?? "null"}',
           );
@@ -815,7 +783,7 @@ class PlaybackModelHelper {
           );
           if (resolved == null) {
             _oxPlaybackWebModelLog(
-              'resolver returned null for setStreams $mediaPath; using server playback URL on web=${kIsWeb}',
+              'resolver returned null for setStreams $mediaPath; using server playback URL on web=$kIsWeb',
             );
             if (!kIsWeb) return;
           } else {

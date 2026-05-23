@@ -406,7 +406,7 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     );
     ref.read(playBackModel)?.dispose();
     final nextUrl = model.media?.url ?? '';
-    final nextUsesOxLoopback = nextUrl.contains('127.0.0.1');
+    final nextUsesOxLoopback = nextUrl.contains('127.0.0.1') || nextUrl.contains('__ox_tdweb_stream');
     _oxPlaybackWebLog(
       'notifier.loadPlaybackItem stopWithPlaybackOptions releaseCache=${!nextUsesOxLoopback}',
     );

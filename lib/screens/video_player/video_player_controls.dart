@@ -221,14 +221,10 @@ class _DesktopControlsState extends ConsumerState<DesktopControls> {
       alignment: Alignment.center,
       child: AnimatedScale(
         curve: Curves.easeInOutCubicEmphasized,
-        scale: playing
-            ? 0
-            : buffering
-                ? 0
-                : 1,
+        scale: playing ? 0 : 1,
         duration: const Duration(milliseconds: 250),
         child: IconButton.outlined(
-          onPressed: () => ref.read(videoPlayerProvider).play(),
+          onPressed: () => ref.read(videoPlayerProvider).playOrPause(),
           isSelected: true,
           iconSize: 65,
           tooltip: "Resume video",

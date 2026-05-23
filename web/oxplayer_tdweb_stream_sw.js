@@ -8,6 +8,7 @@ self.addEventListener('activate', function (event) {
 });
 
 var streamLogKey = '[OX_TG_WEB_STREAM]';
+var servedMoovTokens = {};
 // Browser media elements often don't decode until a 206 response completes.
 // Keep each response small and let the player request the next byte range.
 var responseChunkBytes = 4 * 1024 * 1024;
@@ -67,10 +68,13 @@ function askClient(client, message, transfer) {
 self.addEventListener('fetch', function (event) {
   var url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
-  if (!url.pathname.startsWith('/__ox_tdweb_stream/')) return;
+  var streamIdx = url.pathname.indexOf('__ox_tdweb_stream');
+  if (streamIdx < 0) return;
 
   event.respondWith((async function () {
-    var token = url.pathname.split('/').filter(Boolean)[1];
+    var parts = url.pathname.split('/');
+    var tokenIdx = parts.indexOf('__ox_tdweb_stream') + 1;
+    var token = parts[tokenIdx];
     if (!token) return new Response('missing token', { status: 400 });
 
     var client = event.clientId ? await self.clients.get(event.clientId) : null;
@@ -131,22 +135,16 @@ self.addEventListener('fetch', function (event) {
       maxChunk = Math.min(size, tailFetchBytes);
     }
     if (range.openEnded || span > maxChunk) {
-      // Only align to tail for explicit suffix/tail requests.
-      // For bytes=0- or no Range header, keep head bytes.
-      var tailRequest = (!!range.suffix || (range.openEnded && range.start > 0)) && tailMoovKnown;
-      if (tailRequest && range.end >= size - 1) {
-        range.start = Math.max(0, range.end - maxChunk + 1);
-      } else {
-        range.end = Math.min(range.start + maxChunk - 1, size - 1);
-      }
+      // For all seek requests, we must strictly respect range.start.
+      // Modifying range.start creates a disjoint Content-Range which Chrome rejects
+      // with PIPELINE_ERROR_READ: FFmpegDemuxer: data source error.
+      range.end = Math.min(range.start + maxChunk - 1, size - 1);
       range.partial = true;
       streamLog(
         'cap range token=' + token +
           ' req=' + requestedStart + '-' + requestedEnd +
           ' capped=' + range.start + '-' + range.end +
-          ' maxChunk=' + maxChunk +
-          ' tailMoovKnown=' + String(tailMoovKnown) +
-          (tailRequest ? ' (tail-aligned)' : ' (start-aligned)'),
+          ' maxChunk=' + maxChunk
       );
     }
 
