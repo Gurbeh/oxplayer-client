@@ -53,12 +53,12 @@ Future<td.File?> _prepareFileForTdwebStreaming(TdlibFacade tdlib, td.File source
       fileId: source.id,
       priority: 32,
       offset: 0,
-      limit: 4 * 1024 * 1024,
+      limit: 1 * 1024 * 1024,
       synchronous: false,
     ));
   } catch (_) {}
 
-  final deadline = DateTime.now().add(const Duration(seconds: 24));
+  final deadline = DateTime.now().add(const Duration(seconds: 12));
   while (DateTime.now().isBefore(deadline)) {
     final obj = await tdlib.send(td.GetFile(fileId: source.id));
     if (obj is! td.File) return null;
@@ -70,7 +70,7 @@ Future<td.File?> _prepareFileForTdwebStreaming(TdlibFacade tdlib, td.File source
           'offset=${obj.local.downloadOffset} prefix=${obj.local.downloadedPrefixSize} '
           'downloaded=${obj.local.downloadedSize} total=$total',
     );
-    if (path.isNotEmpty && obj.local.downloadOffset == 0 && obj.local.downloadedPrefixSize >= 512 * 1024) {
+    if (path.isNotEmpty && obj.local.downloadOffset == 0 && obj.local.downloadedPrefixSize >= 256 * 1024) {
       return obj;
     }
     await Future<void>.delayed(const Duration(milliseconds: 350));

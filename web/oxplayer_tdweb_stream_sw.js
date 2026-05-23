@@ -11,7 +11,7 @@ var streamLogKey = '[OX_TG_WEB_STREAM]';
 var servedMoovTokens = {};
 // Browser media elements often don't decode until a 206 response completes.
 // Keep each response small and let the player request the next byte range.
-var responseChunkBytes = 4 * 1024 * 1024;
+var responseChunkBytes = 2 * 1024 * 1024;
 var readChunkBytes = 512 * 1024;
 
 function streamLog(message) {
@@ -131,8 +131,10 @@ self.addEventListener('fetch', function (event) {
     var requestedEnd = range.end;
     var span = range.end - range.start + 1;
     var maxChunk = responseChunkBytes;
-    if (range.end >= size - 1 && tailFetchBytes > maxChunk) {
-      maxChunk = Math.min(size, tailFetchBytes);
+    // Allow up to 64MB for tail requests so Chrome's FFmpegDemuxer gets the entire moov atom
+    // in one go without disjoint range errors.
+    if (range.end >= size - 1) {
+      maxChunk = Math.max(maxChunk, Math.min(size, 64 * 1024 * 1024));
     }
     if (range.openEnded || span > maxChunk) {
       // For all seek requests, we must strictly respect range.start.

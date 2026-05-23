@@ -250,7 +250,7 @@
       synchronous: false,
     }, 5000, 'downloadFile');
 
-    var deadline = Date.now() + 20000;
+    var deadline = Date.now() + 12000;
     while (Date.now() < deadline) {
       await new Promise(function (resolve) { setTimeout(resolve, 250); });
       bytes = await readCachedFilePart(file, offset, count);
@@ -663,13 +663,20 @@
       if (codec) {
         streamLog('stream codec sniff → ' + codec + (codec === 'hevc' ? ' (needs HEVC in browser)' : ''));
       }
-      var layout = await probeMoovAndAudioForWeb(
-        { token: token, fileId: fileId, path: path, size: size, mime: file.mime },
-        size,
-      );
-      file.tailFetchBytes = layout.tailFetchBytes;
-      file.webPlaybackRisk = layout.webPlaybackRisk;
-      var audioCodec = layout.audioCodec;
+      // Lightweight codec/risk sniff from the 64KB probe — no heavy moov/tail scanning.
+      // Chrome's <video> handles moov discovery via its own byte-range seeks.
+      var audioCodec = sniffAudioCodecFromBytes(probe);
+      var webPlaybackRisk = null;
+      if (audioCodec === 'ac3' || audioCodec === 'eac3') {
+        webPlaybackRisk = audioCodec;
+      }
+      if (sniffFragmentedMp4(probe)) {
+        webPlaybackRisk = webPlaybackRisk || 'fragmented_mp4';
+        streamLog('stream fragmented MP4 (moof) — Chrome progressive <video> often fails');
+      }
+      file.tailFetchBytes = 0;
+      file.tailMoovKnown = false;
+      file.webPlaybackRisk = webPlaybackRisk;
       if (audioCodec) {
         file.audioCodec = audioCodec;
         streamLog(
@@ -679,24 +686,9 @@
               : ''),
         );
       }
-      var moov = layout.moov;
-      file.tailMoovKnown = !!moov;
-      if (moov) {
-        streamLog(
-          'stream moov start=' + moov.start +
-            ' size=' + moov.size +
-            ' tailFetch=' + file.tailFetchBytes +
-            ' probedTail=' + layout.probedBytes,
-        );
-      } else {
-        streamLog(
-          'stream moov not found (head+tail probed=' + layout.probedBytes + '); tailFetch=' + file.tailFetchBytes +
-            (layout.webPlaybackRisk ? ' risk=' + layout.webPlaybackRisk : ''),
-        );
-      }
-      if (layout.fragmented) {
-        streamLog('stream fragmented MP4 (moof) — Chrome progressive <video> often fails');
-      }
+      streamLog(
+        'stream skip heavy moov probe — Chrome will range-seek for moov on demand',
+      );
       streamFiles[token] = file;
       var extFromMime = 'mp4';
       if (file.mime.indexOf('matroska') >= 0 || file.mime === 'video/x-matroska') {
@@ -717,12 +709,12 @@
       var url = new URL('__ox_tdweb_stream/' + token + '/' + safeName, document.baseURI).href;
       streamLog(
         'stream URL ready token=' + token + ' size=' + size + ' mime=' + file.mime +
-          (file.webPlaybackRisk ? ' webPlaybackRisk=' + file.webPlaybackRisk : ''),
+          (webPlaybackRisk ? ' webPlaybackRisk=' + webPlaybackRisk : ''),
       );
       return JSON.stringify({
         url: url,
         sniffedMime: file.mime,
-        webPlaybackRisk: file.webPlaybackRisk || null,
+        webPlaybackRisk: webPlaybackRisk || null,
       });
     },
   };
