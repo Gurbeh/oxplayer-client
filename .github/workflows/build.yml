@@ -136,7 +136,10 @@ jobs:
       SENTRY_PROFILES_SAMPLE_RATE: ${{ secrets.SENTRY_PROFILES_SAMPLE_RATE || vars.SENTRY_PROFILES_SAMPLE_RATE }}
       SENTRY_DEBUG: ${{ secrets.SENTRY_DEBUG || vars.SENTRY_DEBUG }}
     steps:
+      # Full history so sentry_dart_plugin can associate commits with releases (see pubspec ignore_missing).
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - id: meta
         shell: bash

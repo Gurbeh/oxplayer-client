@@ -215,6 +215,8 @@ sentry:
   upload_debug_symbols: true
   upload_sources: true
   symbols_path: build/debug-info
+  # CI uses shallow clones; skip failing when the previous release commit is not in history.
+  ignore_missing: true
 
 flutter:
   # The following line ensures that the Material Icons font is
