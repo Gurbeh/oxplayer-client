@@ -1,12 +1,12 @@
 # OXPlayer marketing site
 
-Next.js static site for [OXPlayer](https://github.com/Aryan-mor/oxplayer-client). Deployed to GitHub Pages on push to `main`.
+Next.js static site for [OXPlayer](https://github.com/Gurbeh/oxplayer-client). Deployed to GitHub Pages on push to `main`.
 
 | URL | Purpose |
 |-----|---------|
-| https://aryan-mor.github.io/oxplayer-client/ | Landing page |
-| https://aryan-mor.github.io/oxplayer-client/privacy-policy.html | Play Store privacy URL (static HTML) |
-| https://aryan-mor.github.io/oxplayer-client/privacy-policy/ | Same policy in the site UI |
+| https://gurbeh.github.io/oxplayer-client/ | Landing page |
+| https://gurbeh.github.io/oxplayer-client/privacy-policy.html | Play Store privacy URL (static HTML) |
+| https://gurbeh.github.io/oxplayer-client/privacy-policy/ | Same policy in the site UI |
 
 ## Develop
 

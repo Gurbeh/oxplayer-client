@@ -8,7 +8,7 @@ import ComingSoonModal from "./ComingSoonModal";
 import { useState } from "react";
 
 const supportUrl = "https://t.me/OXPlayerBot";
-const issuesUrl = "https://github.com/Aryan-mor/oxplayer-client/issues";
+const issuesUrl = "https://github.com/Gurbeh/oxplayer-client/issues";
 
 export const platforms = [
   {

@@ -1,6 +1,6 @@
 # Marketing site + Privacy Policy (Google Play) on GitHub Pages.
-# Site: https://aryan-mor.github.io/oxplayer-client/
-# Privacy: https://aryan-mor.github.io/oxplayer-client/privacy-policy.html
+# Site: https://gurbeh.github.io/oxplayer-client/
+# Privacy: https://gurbeh.github.io/oxplayer-client/privacy-policy.html
 name: Deploy website (GitHub Pages)
 
 on:
