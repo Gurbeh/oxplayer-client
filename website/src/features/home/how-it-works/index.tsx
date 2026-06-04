@@ -1,11 +1,14 @@
+import type { ReactNode } from "react";
 import Container from "@/components/ui/Container";
 import Heading from "@/components/ui/Heading";
 import Paragraph from "@/components/ui/Paragraph";
+import TelegramBotLink from "@/components/ui/TelegramBotLink";
 import Image from "next/image";
+import { OXPLAYER_BOT } from "@/config/bots";
 import { assetPath } from "@/config/site";
 import { GlowDot } from "../hero";
 
-const Card = ({ title, titlePosstion = "left", img, des }: any) => {
+const Card = ({ title, img, des }: { title: string; img: string; des: ReactNode }) => {
   return (
     <div className="flex flex-col md:items-center z-10 relative">
       <div className="h-2 bg-gradient-to-r from-primary to-secondary absolute top-10 left-[90px] w-[110%] -z-30 rounded-full md:hidden"></div>
@@ -72,15 +75,25 @@ const HowItWorks = () => {
             {/* <div className="h-2 bg-gradient-to-r from-primary to-secondary absolute top-20 left-[100px] w-[95%] z-0 rounded-full hidden md:block"></div> */}
 
             <Card
-              title="Connect To Telegram"
+              title="Sync with our bot"
               img={assetPath("/images/FT-5.png")}
-              des="Sign in with your Telegram account and securely connect OXPlayer to access your personal media library."
+              des={
+                <>
+                  Your library syncs through <TelegramBotLink {...OXPLAYER_BOT} /> only — open the bot in Telegram and connect
+                  OXPlayer. We never ask for your password or read your private chats.
+                </>
+              }
             />
 
             <Card
               title="Send Movie to Bot"
               img={assetPath("/images/FT-7.png")}
-              des="Upload a movie or video file to the OXPlayer Bot and let it automatically process your content."
+              des={
+                <>
+                  Send a video or movie file to <TelegramBotLink {...OXPLAYER_BOT} />. The bot processes your upload and adds it to
+                  your library with posters and metadata.
+                </>
+              }
             />
 
             <Card

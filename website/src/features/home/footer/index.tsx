@@ -6,8 +6,8 @@ import { FaAndroid, FaApple, FaLinux, FaWindows, FaGlobe } from "react-icons/fa"
 import Link from "next/link";
 import ComingSoonModal from "./ComingSoonModal";
 import { useState } from "react";
+import { SUPPORT_BOT } from "@/config/bots";
 
-const supportUrl = "https://t.me/OXPlayerBot";
 const issuesUrl = "https://github.com/Gurbeh/oxplayer-client/issues";
 
 export const platforms = [
@@ -19,7 +19,7 @@ export const platforms = [
   {
     icon: <FaApple className="text-3xl" />,
     label: "iOS",
-    isAvailable: true,
+    isAvailable: false,
   },
   {
     icon: <FaWindows className="text-3xl" />,
@@ -34,7 +34,7 @@ export const platforms = [
   {
     icon: <FaGlobe className="text-3xl" />,
     label: "Web",
-    isAvailable: true,
+    isAvailable: false,
   },
 ];
 
@@ -91,9 +91,9 @@ const Footer = () => {
 
         <ul className="flex flex-wrap justify-center gap-2 sm:gap-7 mt-20">
           <li>
-            <a href={supportUrl} target="_blank" rel="noopener noreferrer">
+            <a href={SUPPORT_BOT.url} target="_blank" rel="noopener noreferrer">
               <Paragraph size="sm" className="!text-gray-400 cursor-pointer hover:!text-primary transition-all duration-300">
-                Support
+                Support (@{SUPPORT_BOT.username})
               </Paragraph>
             </a>
           </li>

@@ -1,38 +1,65 @@
+import type { ReactNode } from "react";
 import Container from "@/components/ui/Container";
 import Heading from "@/components/ui/Heading";
+import TelegramBotLink from "@/components/ui/TelegramBotLink";
+import { OXPLAYER_BOT, SUPPORT_BOT } from "@/config/bots";
 
-const faqs = [
+const faqs: { q: string; a: ReactNode }[] = [
   {
     q: "What is OXPlayer?",
-    a: "OXPlayer is a Telegram-powered video manager and streaming app that helps you organize, browse, and watch your personal video collection through a beautiful Netflix-style interface.",
+    a: "OXPlayer is a personal media library app with a Netflix-style interface. You sync through our Telegram bot and stream videos you upload yourself — we do not host or sell movies.",
   },
   {
-    q: "Do I need a Telegram account to use OXPlayer?",
-    a: "Yes. OXPlayer requires an active Telegram account for authentication and video management. You can sign in using your Telegram account and connect your personal media library.",
+    q: "How do I connect Telegram?",
+    a: (
+      <>
+        Sync only with <TelegramBotLink {...OXPLAYER_BOT} />. Open the bot in Telegram, sign in to the OXPlayer app with Telegram&apos;s
+        official authorization, and your library stays linked to your account. We never ask for your Telegram password or access your
+        private chats.
+      </>
+    ),
   },
   {
     q: "How do I add movies and videos?",
-    a: "Simply send a video or movie file to the OXPlayer Telegram Bot. The bot processes the content, gathers metadata, and automatically adds it to your OXPlayer library when indexing is complete.",
+    a: (
+      <>
+        Send a video file to <TelegramBotLink {...OXPLAYER_BOT} />. After the bot finishes processing, the title appears in your OXPlayer
+        library with posters and metadata.
+      </>
+    ),
   },
   {
     q: "Does OXPlayer provide movies or TV shows?",
-    a: "No. OXPlayer does not host, sell, or distribute any media content. The app only helps you organize and stream videos that you personally upload through Telegram.",
+    a: "No. OXPlayer does not host, sell, or distribute content. It only organizes and plays videos that you personally send to the bot.",
+  },
+  {
+    q: "Which platforms are available?",
+    a: "Android is available now. iOS and Web are coming soon. Windows and Linux are on the roadmap.",
   },
   {
     q: "Can I continue watching from where I left off?",
-    a: "Yes. OXPlayer automatically tracks your watch progress and allows you to resume playback from the exact point where you stopped watching.",
+    a: "Yes. Watch progress is saved to your account so you can resume where you stopped.",
   },
   {
-    q: "Are my favorites and watchlists synchronized?",
-    a: "Yes. Your favorites, watchlists, viewing history, and playback progress are synchronized with your account so you can access them whenever you sign in again.",
+    q: "Are favorites and watchlists synced?",
+    a: "Yes. Favorites, watchlists, history, and playback progress stay tied to your OXPlayer account when you sign in again.",
   },
   {
-    q: "Is my content private and secure?",
-    a: "Your library is linked to your personal Telegram account. OXPlayer focuses on providing a secure and personalized viewing experience while keeping your content accessible only to your account.",
+    q: "Is my content private?",
+    a: (
+      <>
+        Your library belongs to your account. Only media you send to <TelegramBotLink {...OXPLAYER_BOT} /> is indexed — not your other
+        Telegram messages or files.
+      </>
+    ),
   },
   {
-    q: "What features does OXPlayer offer?",
-    a: "OXPlayer includes a personal media library, rich movie metadata, smart search, favorites, watchlists, subtitle preferences, resume playback, and a modern streaming experience inspired by leading media platforms.",
+    q: "How do I get help?",
+    a: (
+      <>
+        Message our support bot <TelegramBotLink {...SUPPORT_BOT} /> on Telegram for questions or issues.
+      </>
+    ),
   },
 ];
 
@@ -45,15 +72,12 @@ const FAQ = () => {
             FAQ
           </Heading>
 
-          {/* FAQ List */}
           <div className="max-w-3xl mx-auto space-y-4">
             {faqs.map((item, i) => (
               <div key={i} tabIndex={0} className="collapse collapse-arrow border  bg-slate-900 border-slate-700">
                 <div className="collapse-title text-lg font-medium">{item.q}</div>
 
-                <div className="collapse-content">
-                  <p className="text-base-content/80">{item.a}</p>
-                </div>
+                <div className="collapse-content text-base-content/80 leading-relaxed">{item.a}</div>
               </div>
             ))}
           </div>
