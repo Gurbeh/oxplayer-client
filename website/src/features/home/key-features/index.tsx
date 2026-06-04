@@ -58,7 +58,7 @@ const Box = ({ title, titlePosstion = "left", img, des }: any) => {
 
 const KeyFeatures = () => {
   return (
-    <section className="relative pt-24 lg:pt-40">
+    <section className="relative pt-12 lg:pt-20">
       <Container>
         <Box
           title="Personal Media Library"

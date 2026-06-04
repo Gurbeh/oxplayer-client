@@ -1,14 +1,22 @@
-import type { ReactNode } from "react";
 import Container from "@/components/ui/Container";
 import Heading from "@/components/ui/Heading";
 import Paragraph from "@/components/ui/Paragraph";
 import TelegramBotLink from "@/components/ui/TelegramBotLink";
-import Image from "next/image";
 import { OXPLAYER_BOT } from "@/config/bots";
 import { assetPath } from "@/config/site";
+import Image from "next/image";
+import type { ReactNode } from "react";
 import { GlowDot } from "../hero";
 
-const Card = ({ title, img, des }: { title: string; img: string; des: ReactNode }) => {
+const Card = ({
+  title,
+  img,
+  des,
+}: {
+  title: string;
+  img: string;
+  des: ReactNode;
+}) => {
   return (
     <div className="flex flex-col md:items-center z-10 relative">
       <div className="h-2 bg-gradient-to-r from-primary to-secondary absolute top-10 left-[90px] w-[110%] -z-30 rounded-full md:hidden"></div>
@@ -31,22 +39,77 @@ const Card = ({ title, img, des }: { title: string; img: string; des: ReactNode 
 
 const HowItWorks = () => {
   return (
-    <section id="how-it-works" className="relative pt-24 lg:pt-40 overflow-hidden">
+    <section
+      id="how-it-works"
+      className="relative pt-24 lg:pt-40 overflow-hidden"
+    >
       {/* Glow Dots */}
-      <GlowDot size="xs" color="cyan" className="bottom-96 left-[4%] !blur-none" />
-      <GlowDot size="xs" color="cyan" className="bottom-80 left-[2%] !blur-none" />
-      <GlowDot size="md" color="cyan" className="bottom-32 left-[5%] !blur-none" />
-      <GlowDot size="sm" color="cyan" className="bottom-48 left-[10%] !blur-none" />
-      <GlowDot size="lg" color="cyan" className="bottom-64 left-[7%] !blur-none" />
-      <GlowDot size="sm" color="cyan" className="bottom-80 left-[5%] !blur-none" />
-      <GlowDot size="md" color="cyan" className="bottom-60 left-[2%] !blur-none" />
+      <GlowDot
+        size="xs"
+        color="cyan"
+        className="bottom-96 left-[4%] !blur-none"
+      />
+      <GlowDot
+        size="xs"
+        color="cyan"
+        className="bottom-80 left-[2%] !blur-none"
+      />
+      <GlowDot
+        size="md"
+        color="cyan"
+        className="bottom-32 left-[5%] !blur-none"
+      />
+      <GlowDot
+        size="sm"
+        color="cyan"
+        className="bottom-48 left-[10%] !blur-none"
+      />
+      <GlowDot
+        size="lg"
+        color="cyan"
+        className="bottom-64 left-[7%] !blur-none"
+      />
+      <GlowDot
+        size="sm"
+        color="cyan"
+        className="bottom-80 left-[5%] !blur-none"
+      />
+      <GlowDot
+        size="md"
+        color="cyan"
+        className="bottom-60 left-[2%] !blur-none"
+      />
 
-      <GlowDot size="sm" color="purple" className="top-[405px] right-[10%] !blur-none" />
-      <GlowDot size="sm" color="purple" className="top-96 right-[2%] !blur-none" />
-      <GlowDot size="sm" color="purple" className="top-60 right-[5%] !blur-none" />
-      <GlowDot size="md" color="purple" className="top-64 right-[10%] !blur-none" />
-      <GlowDot size="md" color="purple" className="top-80 right-[4%] !blur-none" />
-      <GlowDot size="lg" color="purple" className="top-40 right-[5%] !blur-none" />
+      <GlowDot
+        size="sm"
+        color="purple"
+        className="top-[405px] right-[10%] !blur-none"
+      />
+      <GlowDot
+        size="sm"
+        color="purple"
+        className="top-96 right-[2%] !blur-none"
+      />
+      <GlowDot
+        size="sm"
+        color="purple"
+        className="top-60 right-[5%] !blur-none"
+      />
+      <GlowDot
+        size="md"
+        color="purple"
+        className="top-64 right-[10%] !blur-none"
+      />
+      <GlowDot
+        size="md"
+        color="purple"
+        className="top-80 right-[4%] !blur-none"
+      />
+      <GlowDot
+        size="lg"
+        color="purple"
+        className="top-40 right-[5%] !blur-none"
+      />
 
       {/* 🔵 Primary Gradient (Top Left) */}
       <div className="absolute bottom-10 -left-40 w-[420px] h-[520px] bg-primary opacity-30 blur-3xl rounded-full z-0" />
@@ -65,7 +128,8 @@ const HowItWorks = () => {
           <div
             className="absolute top-20 bottom-40 -right-3 border-y-8 border-r-8 w-[90%] hidden md:block"
             style={{
-              borderImage: "linear-gradient(to right, var(--color-primary), #FF6900, var(--color-secondary)) 1",
+              borderImage:
+                "linear-gradient(to right, var(--color-primary), #FF6900, var(--color-secondary)) 1",
             }}
           ></div>
 
@@ -79,8 +143,10 @@ const HowItWorks = () => {
               img={assetPath("/images/FT-5.png")}
               des={
                 <>
-                  Your library syncs through <TelegramBotLink {...OXPLAYER_BOT} /> only — open the bot in Telegram and connect
-                  OXPlayer. We never ask for your password or read your private chats.
+                  Your library syncs through{" "}
+                  <TelegramBotLink {...OXPLAYER_BOT} /> only open the bot in
+                  Telegram and connect OXPlayer. We never ask for your password
+                  or read your private chats.
                 </>
               }
             />
@@ -90,8 +156,9 @@ const HowItWorks = () => {
               img={assetPath("/images/FT-7.png")}
               des={
                 <>
-                  Send a video or movie file to <TelegramBotLink {...OXPLAYER_BOT} />. The bot processes your upload and adds it to
-                  your library with posters and metadata.
+                  Send a video or movie file to{" "}
+                  <TelegramBotLink {...OXPLAYER_BOT} />. The bot processes your
+                  upload and adds it to your library with posters and metadata.
                 </>
               }
             />
@@ -112,9 +179,22 @@ const HowItWorks = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-20 md:gap-7 md:mt-10 relative">
             {/* <div className="h-2 bg-gradient-to-r from-secondary to-primary absolute top-[162px] left-[100px] w-[95%] z-0 rounded-full hidden md:block"></div> */}
 
-            {[assetPath("/images/H-1.png"), assetPath("/images/H-2.png"), assetPath("/images/ss-2.png"), assetPath("/images/H-3.png")].map((item, index) => (
-              <div key={index} className="relative w-full h-[230px] md:h-[300px] z-10">
-                <Image src={item} alt={`movie-scene-${index + 1}`} fill className="object-contain" />
+            {[
+              assetPath("/images/H-1.png"),
+              assetPath("/images/H-2.png"),
+              assetPath("/images/ss-2.png"),
+              assetPath("/images/H-3.png"),
+            ].map((item, index) => (
+              <div
+                key={index}
+                className="relative w-full h-[230px] md:h-[300px] z-10"
+              >
+                <Image
+                  src={item}
+                  alt={`movie-scene-${index + 1}`}
+                  fill
+                  className="object-contain"
+                />
               </div>
             ))}
           </div>

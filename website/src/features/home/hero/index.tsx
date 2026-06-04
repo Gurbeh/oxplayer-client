@@ -5,8 +5,6 @@ import Heading from "@/components/ui/Heading";
 import Paragraph from "@/components/ui/Paragraph";
 import Image from "next/image";
 import { Fragment } from "react";
-import TelegramBotLink from "@/components/ui/TelegramBotLink";
-import { OXPLAYER_BOT } from "@/config/bots";
 import { assetPath } from "@/config/site";
 
 export const GlowDot = ({
@@ -105,15 +103,10 @@ const Hero = () => {
             Organize . Watch . Enjoy
           </Heading>
 
-          <div className="max-w-[900px] mt-5 mx-auto space-y-3">
+          <div className="max-w-[900px] mt-5 mx-auto">
             <Paragraph align="center" className="text-gray-400">
               Transform your Telegram videos into a beautiful Netflix-style library. Organize movies and shows, resume playback, create
               watchlists, and enjoy seamless streaming from one powerful app.
-            </Paragraph>
-            <Paragraph align="center" size="sm" className="text-gray-500 max-w-2xl mx-auto">
-              <span className="text-primary font-medium">Your Telegram stays yours.</span> Sync only through{" "}
-              <TelegramBotLink {...OXPLAYER_BOT} className="text-primary hover:underline font-medium" /> — we never ask for your password
-              or read your private chats. Only media you send to the bot is added to your library.
             </Paragraph>
           </div>
 

@@ -1,5 +1,6 @@
 import Hero from "./hero";
 import AppShowcase from "./app-showcase/AppShowcase";
+import TelegramPrivacyNote from "./TelegramPrivacyNote";
 import KeyFeatures from "./key-features";
 import HowItWorks from "./how-it-works";
 import WhyOX from "./why-ox";
@@ -12,6 +13,7 @@ const Home = () => {
     <div className="min-h-screen">
       <Hero />
       <AppShowcase />
+      <TelegramPrivacyNote />
       <KeyFeatures />
       <HowItWorks />
       <WhyOX />

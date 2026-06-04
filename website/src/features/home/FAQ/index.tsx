@@ -1,21 +1,22 @@
-import type { ReactNode } from "react";
 import Container from "@/components/ui/Container";
 import Heading from "@/components/ui/Heading";
 import TelegramBotLink from "@/components/ui/TelegramBotLink";
 import { OXPLAYER_BOT, SUPPORT_BOT } from "@/config/bots";
+import type { ReactNode } from "react";
 
 const faqs: { q: string; a: ReactNode }[] = [
   {
     q: "What is OXPlayer?",
-    a: "OXPlayer is a personal media library app with a Netflix-style interface. You sync through our Telegram bot and stream videos you upload yourself — we do not host or sell movies.",
+    a: "OXPlayer is a personal media library app with a Netflix-style interface. You sync through our Telegram bot and stream videos you upload yourself we do not host or sell movies.",
   },
   {
     q: "How do I connect Telegram?",
     a: (
       <>
-        Sync only with <TelegramBotLink {...OXPLAYER_BOT} />. Open the bot in Telegram, sign in to the OXPlayer app with Telegram&apos;s
-        official authorization, and your library stays linked to your account. We never ask for your Telegram password or access your
-        private chats.
+        Sync only with <TelegramBotLink {...OXPLAYER_BOT} />. Open the bot in
+        Telegram, sign in to the OXPlayer app with Telegram&apos;s official
+        authorization, and your library stays linked to your account. We never
+        ask for your Telegram password or access your private chats.
       </>
     ),
   },
@@ -23,8 +24,9 @@ const faqs: { q: string; a: ReactNode }[] = [
     q: "How do I add movies and videos?",
     a: (
       <>
-        Send a video file to <TelegramBotLink {...OXPLAYER_BOT} />. After the bot finishes processing, the title appears in your OXPlayer
-        library with posters and metadata.
+        Send a video file to <TelegramBotLink {...OXPLAYER_BOT} />. After the
+        bot finishes processing, the title appears in your OXPlayer library with
+        posters and metadata.
       </>
     ),
   },
@@ -48,8 +50,9 @@ const faqs: { q: string; a: ReactNode }[] = [
     q: "Is my content private?",
     a: (
       <>
-        Your library belongs to your account. Only media you send to <TelegramBotLink {...OXPLAYER_BOT} /> is indexed — not your other
-        Telegram messages or files.
+        Your library belongs to your account. Only media you send to{" "}
+        <TelegramBotLink {...OXPLAYER_BOT} /> is indexed not your other Telegram
+        messages or files.
       </>
     ),
   },
@@ -57,7 +60,8 @@ const faqs: { q: string; a: ReactNode }[] = [
     q: "How do I get help?",
     a: (
       <>
-        Message our support bot <TelegramBotLink {...SUPPORT_BOT} /> on Telegram for questions or issues.
+        Message our support bot <TelegramBotLink {...SUPPORT_BOT} /> on Telegram
+        for questions or issues.
       </>
     ),
   },
@@ -74,10 +78,18 @@ const FAQ = () => {
 
           <div className="max-w-3xl mx-auto space-y-4">
             {faqs.map((item, i) => (
-              <div key={i} tabIndex={0} className="collapse collapse-arrow border  bg-slate-900 border-slate-700">
-                <div className="collapse-title text-lg font-medium">{item.q}</div>
+              <div
+                key={i}
+                tabIndex={0}
+                className="collapse collapse-arrow border  bg-slate-900 border-slate-700"
+              >
+                <div className="collapse-title text-lg font-medium">
+                  {item.q}
+                </div>
 
-                <div className="collapse-content text-base-content/80 leading-relaxed">{item.a}</div>
+                <div className="collapse-content text-base-content/80 leading-relaxed">
+                  {item.a}
+                </div>
               </div>
             ))}
           </div>
