@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { assetPath } from "@/utils/assetPath";
+import { assetPath } from "@/config/site";
 
 const AppShowcase = () => {
   return (

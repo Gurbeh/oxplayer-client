@@ -9,7 +9,7 @@ import Container from "@/components/ui/Container";
 import { FaStar } from "react-icons/fa";
 import Paragraph from "@/components/ui/Paragraph";
 
-import { assetPath } from "@/utils/assetPath";
+import { assetPath } from "@/config/site";
 import "../home.css";
 
 const data = [

@@ -2,7 +2,7 @@ import Container from "@/components/ui/Container";
 import Heading from "@/components/ui/Heading";
 import Paragraph from "@/components/ui/Paragraph";
 import Image from "next/image";
-import { assetPath } from "@/utils/assetPath";
+import { assetPath } from "@/config/site";
 
 const Box = ({ title, titlePosstion = "left", img, des }: any) => {
   return (

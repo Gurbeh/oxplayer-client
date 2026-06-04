@@ -5,7 +5,7 @@ import Heading from "@/components/ui/Heading";
 import Paragraph from "@/components/ui/Paragraph";
 import Image from "next/image";
 import { Fragment } from "react";
-import { assetPath } from "@/utils/assetPath";
+import { assetPath } from "@/config/site";
 
 export const GlowDot = ({
   size = "md",
