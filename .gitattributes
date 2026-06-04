@@ -1,5 +1,2 @@
 # Auto detect text files and perform LF normalization
 * text=auto
-
-# CI / Docker bash entrypoints must stay LF-only
-tool/tdlib/*.sh text eol=lf

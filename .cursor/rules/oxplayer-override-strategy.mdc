@@ -22,7 +22,6 @@ Do **not** scatter OX logic across `lib/screens/`, `lib/providers/`, `lib/widget
 lib/
   oxplayer/               ← OX-only code
     providers/            ← OX + Riverpod API state (new; see "Riverpod" below)
-    telegram/             ← TDLib / Telegram session helpers
     oxplayer_config.dart  ← OxplayerConfig.isEnabled flag
     oxplayer_env.dart     ← all env/config values
     oxplayer_bootstrap.dart ← startup hooks
@@ -48,7 +47,6 @@ For **new or refactored** OX code that calls the OX server (`/me/chats*`, future
 ### Patterns to follow
 
 - Prefer **`@riverpod` + `part '*.g.dart'`** for anything that fetches, paginates, or must **invalidate** after an action (e.g. ingest) — use `ref.invalidate(...)` on a **family** provider or bump a `AsyncNotifier` instead of ad-hoc `StateProvider` counters when the refactor is done.
-- **TDLib** (sessions, `GetMessage`) can stay in `oxplayer/telegram/`; **snapshot** the results in Riverpod when the UI needs a reactive list.
 - The **“API on the server”** rule *below* still applies: wrong or missing DTOs are fixed in `oxplayer/apps/api/`, not papered over in a Riverpod layer.
 
 ## Patching upstream files

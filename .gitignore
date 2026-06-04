@@ -88,22 +88,7 @@ dart_defines.dev.json
 # Cursor — local-only agent rules
 .cursor/rules/*.local.mdc
 
-# TDLib wasm (npm tdweb dist — run scripts/sync-tdweb.mjs; fetch_artifacts may extract dist/)
-web/tdweb/dist/
-web/tdweb/tdweb.js
-web/tdweb/*.wasm
-web/tdweb/*.mem
-web/tdweb/*worker*.js
-web/tdweb/.from_fetch_artifacts
-
-# TDLib Android JSON client — hydrated via fetch_artifacts.dart (do not commit binaries)
-android/app/src/main/jniLibs/**/*.so
-
-# npm (pinned tdweb — see package.json)
 node_modules/
 
-# TDLib artifact registry credentials (see tool/tdlib/artifact_config.example.yaml)
-tool/tdlib/artifact_config.yaml
-
-# TDLib Dart API — generated from td_api.tl (CI/local: dart run tool/generator/generate.dart --fetch)
+# Legacy TDLib Dart codegen (app no longer uses TDLib; ignore local leftovers)
 lib/td_api_generated/

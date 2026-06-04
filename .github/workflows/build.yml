@@ -194,21 +194,6 @@ jobs:
 
       - run: flutter pub get
 
-      # lib/td_api_generated/ is gitignored — clean runners need codegen before Dart compile.
-      - name: TDLib Dart codegen (td_api types)
-        run: dart run tool/generator/generate.dart --fetch
-
-      # jniLibs libtdjson.so per ABI — not in git; hydrate from registry/GitHub Release (see tool/tdlib/).
-      - name: TDLib native artifacts (artifact_config + jniLibs)
-        env:
-          TDLIB_ARTIFACT_BASE_URL: ${{ secrets.TDLIB_ARTIFACT_BASE_URL }}
-          TDLIB_ARTIFACT_GITHUB_REPO: ${{ secrets.TDLIB_ARTIFACT_GITHUB_REPO }}
-          TDLIB_ARTIFACT_URL_LAYOUT: ${{ secrets.TDLIB_ARTIFACT_URL_LAYOUT }}
-        run: |
-          set -euo pipefail
-          node scripts/init-artifacts-config.mjs
-          dart run tool/tdlib/fetch_artifacts.dart
-
       - uses: ./.github/actions/oxplayer-flutter-env
 
       - name: Build Android (development)

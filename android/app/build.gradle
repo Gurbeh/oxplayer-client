@@ -34,7 +34,7 @@ android {
     packaging {
         jniLibs {
             // media_kit sets extractNativeLibs=true; align with Play-safe extraction for
-            // mixed plugin .so sets (TDLib, MPV, FFmpeg) on mid-tier ARM devices.
+            // mixed plugin .so sets (MPV, FFmpeg) on mid-tier ARM devices.
             useLegacyPackaging = true
             excludes += ["lib/x86/**"]
             pickFirsts += [
@@ -76,8 +76,7 @@ android {
 
         // Do NOT set ndk.abiFilters here: `flutter build apk --split-per-abi` (CI) already
         // configures splits.abi (armeabi-v7a, arm64-v8a, x86_64) and Gradle fails if both exist.
-        // Exclude broken 32-bit x86 via packaging.jniLibs.excludes, jniLibs layout, and
-        // tool/tdlib/fetch_artifacts.dart (see tool/android/verify_native_abi_parity.dart).
+        // Exclude broken 32-bit x86 via packaging.jniLibs.excludes (see tool/android/verify_native_abi_parity.dart).
     }
 
     composeOptions {

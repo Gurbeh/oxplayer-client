@@ -1,8 +1,0 @@
-{
-  "name": "oxplayer-client",
-  "private": true,
-  "description": "OXPlayer client tooling (artifact config init).",
-  "scripts": {
-    "tdlib:bootstrap": "node ./scripts/init-artifacts-config.mjs"
-  }
-}

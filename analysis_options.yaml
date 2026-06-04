@@ -8,8 +8,6 @@ analyzer:
     - pubspec.yaml
     - packages/**
     - lib/jellyfin/**
-    - lib/td_api_generated/**
-    - tool/generator/**
     - lib/**/**.g.dart
     - lib/**/**.gr.dart
     - lib/**/**.freezed.dart

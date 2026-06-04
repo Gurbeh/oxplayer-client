@@ -145,18 +145,6 @@ subprojects { sub ->
     }
 }
 
-// tdlib 1.6.0 on pub.dev predates AGP 8's required `android { namespace ... }`.
-// Manifest package: org.naji.td.tdlib (pub-cache .../tdlib-1.6.0/android/src/main/AndroidManifest.xml).
-subprojects { subproject ->
-    subproject.plugins.withId("com.android.library") {
-        if (subproject.name != "tdlib") {
-            return
-        }
-        def androidExt = subproject.extensions.getByName("android")
-        androidExt.namespace = "org.naji.td.tdlib"
-    }
-}
-
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
