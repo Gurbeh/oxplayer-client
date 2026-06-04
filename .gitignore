@@ -1,4 +1,5 @@
 # Miscellaneous
+*ci-keystore-secrets-temp*
 *.class
 *.log
 *.pyc
