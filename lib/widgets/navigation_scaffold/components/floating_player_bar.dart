@@ -53,7 +53,7 @@ class _CurrentlyPlayingBarState extends ConsumerState<FloatingPlayerBar> {
         },
       ),
     );
-    if (AdaptiveLayout.of(context).isDesktop) {
+    if (AdaptiveLayout.of(context).isDesktop || kIsWeb) {
       final fullScreen = await windowManager.isFullScreen();
       if (fullScreen) {
         await windowManager.setFullScreen(false);

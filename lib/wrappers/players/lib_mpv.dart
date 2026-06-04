@@ -46,6 +46,8 @@ class LibMPV extends BasePlayer {
   double _preferredVolume = 100;
   int _fadeGeneration = 0;
   bool _isFading = false;
+  /// Absolute timeline offset for ox-stream remux (stream starts at ?start= but UI uses catalog clock).
+  Duration _remuxTimelineBase = Duration.zero;
   Duration get playPauseFadeDuration => const Duration(milliseconds: 175);
 
   @override
@@ -59,7 +61,7 @@ class LibMPV extends BasePlayer {
       configuration: mpv.PlayerConfiguration(
         title: "nl.jknaapen.fladder",
         libassAndroidFont: libassFallbackFont,
-        libass: settings.useLibass,
+        libass: !kIsWeb && settings.useLibass,
         bufferSize: settings.bufferSize * 1024 * 1024, // MPV uses buffer size in bytes
       ),
     );
@@ -90,6 +92,7 @@ class LibMPV extends BasePlayer {
 
   @override
   Future<void> dispose() async {
+    _remuxTimelineBase = Duration.zero;
     _fadeGeneration++;
     _cancelPlayerStreams();
     _onCompleted?.cancel();
@@ -102,6 +105,11 @@ class LibMPV extends BasePlayer {
   }
 
   void setState(PlayerState state) {
+    if (_remuxTimelineBase > Duration.zero) {
+      if (state.position < _remuxTimelineBase - const Duration(seconds: 30)) {
+        state = state.update(position: state.position + _remuxTimelineBase);
+      }
+    }
     lastState = state;
     _stateController.add(state);
   }
@@ -123,7 +131,10 @@ class LibMPV extends BasePlayer {
       }),
       player.stream.buffering.listen((value) => setState(lastState.update(buffering: value))),
       player.stream.position.listen((value) => setState(lastState.update(position: value))),
-      player.stream.duration.listen((value) => setState(lastState.update(duration: value))),
+      player.stream.duration.listen((value) {
+        if (_remuxTimelineBase > Duration.zero) return;
+        setState(lastState.update(duration: value));
+      }),
       player.stream.volume.listen((value) {
         if (!_isFading) {
           _preferredVolume = value.clamp(0.0, 100.0);
@@ -156,7 +167,7 @@ class LibMPV extends BasePlayer {
       configuration: mpv.PlayerConfiguration(
         title: "nl.jknaapen.fladder",
         libassAndroidFont: libassFallbackFont,
-        libass: _settings.useLibass,
+        libass: !kIsWeb && _settings.useLibass,
         bufferSize: _settings.bufferSize * 1024 * 1024,
       ),
     );
@@ -222,43 +233,85 @@ class LibMPV extends BasePlayer {
     ));
   }
 
+  /// ox-stream progressive remux (MPEG-TS); duration stays 0 on web until enough is buffered.
+  static bool _isOxStreamRemuxUrl(String url) =>
+      url.contains('/stream.ts') || url.contains('stream.ts?');
+
   @override
   Future<void> loadVideo(String url, bool play, {Duration startPosition = Duration.zero}) async {
     _loadCompleter = Completer<void>();
     _firstLoadAttempt = DateTime.now();
 
-    await setStartPosition(startPosition);
+    final remuxStream = kIsWeb && _isOxStreamRemuxUrl(url);
+    final serverSeek = remuxStream && url.contains('start=');
+    _remuxTimelineBase = serverSeek ? startPosition : Duration.zero;
+
+    await setStartPosition(remuxStream && serverSeek ? Duration.zero : startPosition);
 
     await _player?.open(mpv.Media(url), play: play);
 
     _retryTimer?.cancel();
     _retryTimer = null;
-    _retryTimer = RestartableTimer(
-      _currentRetryDuration,
-      () async {
-        await Future.delayed(const Duration(milliseconds: 150));
-        if (DateTime.now().isAfter(_firstLoadAttempt.add(_maxRetryDuration))) {
-          log("Max retry duration reached, stopping retries.");
-          _retryTimer?.cancel();
-          _retryTimer = null;
-        } else {
-          log("Retrying to load video $url");
-          await setStartPosition(startPosition);
-          await _player?.open(mpv.Media(url), play: play);
-          _retryTimer?.reset();
-        }
-      },
-    );
 
+    // Progressive remux is a long-lived HTTP read; reopening every 5s kills ffmpeg mid-pipe.
+    if (!remuxStream) {
+      _retryTimer = RestartableTimer(
+        _currentRetryDuration,
+        () async {
+          await Future.delayed(const Duration(milliseconds: 150));
+          if (DateTime.now().isAfter(_firstLoadAttempt.add(_maxRetryDuration))) {
+            log("Max retry duration reached, stopping retries.");
+            _retryTimer?.cancel();
+            _retryTimer = null;
+          } else {
+            log("Retrying to load video $url");
+            await setStartPosition(startPosition);
+            await _player?.open(mpv.Media(url), play: play);
+            _retryTimer?.reset();
+          }
+        },
+      );
+    }
+
+    // Wait for the player to be ready
     if (_loadCompleter?.isCompleted == false) {
       StreamSubscription? subBuffering;
       StreamSubscription? subDuration;
+      StreamSubscription? subPlaying;
+      Timer? remuxReadyTimeout;
 
       void onReady() {
         if (_loadCompleter?.isCompleted == true) return;
+        remuxReadyTimeout?.cancel();
         _finishedLoading();
         subBuffering?.cancel();
         subDuration?.cancel();
+        subPlaying?.cancel();
+      }
+
+      if (remuxStream) {
+        subPlaying = _player?.stream.playing.listen((event) {
+          if (event) {
+            if (serverSeek && startPosition > Duration.zero) {
+              setState(lastState.update(position: startPosition, buffering: false));
+            }
+            onReady();
+          }
+        });
+        remuxReadyTimeout = Timer(const Duration(seconds: 12), onReady);
+
+        // A reload (audio switch / seek) re-opens the element after an async PlaybackInfo
+        // call, so the browser drops the user-gesture and won't auto-resume. Nudge play a
+        // few times until the stream actually starts.
+        if (play) {
+          for (final delayMs in [200, 600, 1500]) {
+            Future.delayed(Duration(milliseconds: delayMs), () {
+              if (_player != null && _player?.state.playing != true) {
+                _player?.play();
+              }
+            });
+          }
+        }
       }
 
       subBuffering = _player?.stream.buffering.listen((event) {
@@ -273,6 +326,8 @@ class LibMPV extends BasePlayer {
 
     _loadCompleter?.future.then(
       (value) async {
+        // Remux URL already includes ?start= from PlaybackInfo; do not seek again on web.
+        if (serverSeek) return;
         if (startPosition != Duration.zero && (_player?.state.position.inSeconds ?? 0) < startPosition.inSeconds - 5) {
           await _player?.seek(startPosition);
         }

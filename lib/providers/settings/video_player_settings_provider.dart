@@ -30,7 +30,7 @@ class VideoPlayerSettingsProviderNotifier extends StateNotifier<VideoPlayerSetti
 
   void _initVolumeSync() async {
     // Initialize volume from system volume on mobile/supported platforms
-    if ((Platform.isAndroid || Platform.isIOS)) {
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
       VolumeController.instance.showSystemUI = false;
       final initialVolume = await VolumeController.instance.getVolume();
       state = state.copyWith(internalVolume: initialVolume * 100);
@@ -48,7 +48,7 @@ class VideoPlayerSettingsProviderNotifier extends StateNotifier<VideoPlayerSetti
 
   @override
   void dispose() {
-    if ((Platform.isAndroid || Platform.isIOS)) {
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
       VolumeController.instance.removeListener();
     }
     super.dispose();
@@ -96,7 +96,7 @@ class VideoPlayerSettingsProviderNotifier extends StateNotifier<VideoPlayerSetti
   void setVolume(double value) {
     state = state.copyWith(internalVolume: value);
     ref.read(videoPlayerProvider).setVolume(value);
-    if ((Platform.isAndroid || Platform.isIOS)) {
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
       VolumeController.instance.setVolume(value / 100);
     }
   }
@@ -105,7 +105,7 @@ class VideoPlayerSettingsProviderNotifier extends StateNotifier<VideoPlayerSetti
     final value = (state.volume + i).clamp(0, 100).toDouble();
     state = state.copyWith(internalVolume: value);
     ref.read(videoPlayerProvider).setVolume(value);
-    if ((Platform.isAndroid || Platform.isIOS)) {
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
       VolumeController.instance.setVolume(value / 100);
     }
   }

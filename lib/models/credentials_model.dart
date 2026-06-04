@@ -32,9 +32,10 @@ abstract class CredentialsModel with _$CredentialsModel {
     final application = ref.read(applicationInfoProvider);
     final leanbackMode = ref.read(argumentsStateProvider).leanBackMode;
     final os = switch (application.platform) {
-      TargetPlatform.android =>
-        leanbackMode ? "${application.platform.name.capitalize()} TV" : application.platform.name.capitalize(),
-      _ => application.platform.name.capitalize(),
+      TargetPlatform.android => kIsWeb
+          ? "${application.platform.name.capitalize()} Web"
+          : (leanbackMode ? "${application.platform.name.capitalize()} TV" : application.platform.name.capitalize()),
+      _ => !kIsWeb ? application.platform.name.capitalize() : "${application.platform.name.capitalize()} Web",
     };
     final headers = {
       'authorization':

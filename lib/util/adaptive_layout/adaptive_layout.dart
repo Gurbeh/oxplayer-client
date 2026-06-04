@@ -162,6 +162,7 @@ class _AdaptiveLayoutBuilderState extends ConsumerState<AdaptiveLayoutBuilder> {
   }
 
   bool get isDesktop {
+    if (kIsWeb) return false;
     return [
       TargetPlatform.macOS,
       TargetPlatform.windows,
@@ -219,7 +220,7 @@ class _AdaptiveLayoutBuilderState extends ConsumerState<AdaptiveLayoutBuilder> {
 
     final mediaQuery = MediaQuery.of(context);
 
-    final useAdditionalPadding = isDesktop || isAndroidTV;
+    final useAdditionalPadding = isDesktop || kIsWeb || isAndroidTV;
 
     return ValueListenableBuilder(
       valueListenable: isKeyboardOpen,

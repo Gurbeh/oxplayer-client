@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 IconData getBackIcon(BuildContext context) {
+  if (kIsWeb) {
+    // Always use 'Icons.arrow_back' as a back_button icon in web.
+    return Icons.arrow_back;
+  }
   switch (Theme.of(context).platform) {
     case TargetPlatform.android:
     case TargetPlatform.fuchsia:

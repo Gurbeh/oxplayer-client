@@ -71,6 +71,7 @@ class BackgroundDownloader extends _$BackgroundDownloader {
   }
 
   void updateTranslations(BuildContext context) async {
+    if (kIsWeb) return;
     state.configureNotification(
       running: TaskNotification(context.localized.notificationDownloadingDownloading, '{filename}\n{networkSpeed}'),
       complete: TaskNotification(context.localized.notificationDownloadingFinished, '{filename}'),

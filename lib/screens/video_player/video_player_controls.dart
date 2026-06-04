@@ -95,7 +95,7 @@ class _DesktopControlsState extends ConsumerState<DesktopControls> {
     final mediaSegments = ref.watch(playBackModel.select((value) => value?.mediaSegments));
     final player = ref.watch(videoPlayerProvider);
     final subtitleWidget = player.subtitleWidget(showOverlay, controlsKey: _bottomControlsKey);
-    final isDesktop = AdaptiveLayout.of(context).isDesktop;
+    final isDesktop = AdaptiveLayout.of(context).isDesktop || kIsWeb;
     final speedBoostEnabled = ref.watch(videoPlayerSettingsProvider.select((value) => value.enableSpeedBoost));
 
     return Listener(
@@ -123,7 +123,7 @@ class _DesktopControlsState extends ConsumerState<DesktopControls> {
             cursor: showOverlay ? SystemMouseCursors.basic : SystemMouseCursors.none,
             onExit: (event) => toggleOverlay(value: false),
             onEnter: (event) => toggleOverlay(value: true),
-            onHover: AdaptiveLayout.of(context).isDesktop ? (event) => toggleOverlay(value: true) : null,
+            onHover: AdaptiveLayout.of(context).isDesktop || kIsWeb ? (event) => toggleOverlay(value: true) : null,
             child: Stack(
               children: [
                 Positioned.fill(

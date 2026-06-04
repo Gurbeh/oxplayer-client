@@ -26,7 +26,7 @@ List<Widget> buildClientSettingsDownload(BuildContext context, WidgetRef ref, Fu
   final canSync = ref.watch(userProvider.select((value) => value?.canDownload ?? false));
 
   return [
-    if (canSync) ...[
+    if (canSync && !kIsWeb) ...[
       ...settingsListGroup(
         context,
         SettingsLabelDivider(label: context.localized.downloadsTitle),

@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:smtc_windows/smtc_windows.dart';
+import 'package:smtc_windows/smtc_windows.dart' if (dart.library.html) 'package:fladder/stubs/web/smtc_web.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:fladder/models/item_base_model.dart';
@@ -32,7 +32,8 @@ import 'package:fladder/providers/window_title_provider.dart';
 import 'package:fladder/src/video_player_helper.g.dart' hide PlaybackState;
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/wrappers/players/base_player.dart';
-import 'package:fladder/wrappers/players/lib_mdk.dart';
+import 'package:fladder/wrappers/players/lib_mdk.dart'
+    if (dart.library.html) 'package:fladder/stubs/web/lib_mdk_web.dart';
 import 'package:fladder/wrappers/players/lib_mpv.dart';
 import 'package:fladder/wrappers/players/native_player.dart';
 import 'package:fladder/wrappers/players/player_states.dart';
@@ -86,7 +87,7 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
   Future<void> init() async {
     if (!initializedWrapper) {
       initializedWrapper = true;
-      if (Platform.isAndroid) {
+      if (!kIsWeb && Platform.isAndroid) {
         VideoPlayerControlsCallback.setUp(this);
       }
       await AudioService.init(
@@ -199,7 +200,7 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
   }
 
   void _subscribePlayer() {
-    if (Platform.isWindows) {
+    if (!kIsWeb && Platform.isWindows) {
       smtc = SMTCWindows(
         config: const SMTCConfig(
           fastForwardEnabled: true,
@@ -537,12 +538,26 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
 
   @override
   Future<void> seek(Duration position) {
+    final model = ref.read(playBackModel);
+    if (kIsWeb && _isRemuxStreamUrl(model?.media?.url) && model != null) {
+      // Progressive remux (ox-stream stream.ts) has no random access; the browser can only
+      // play forward from ?start=. Re-request the stream from the target position instead of
+      // asking the player to seek (which silently fails or stalls).
+      ref.read(mediaPlaybackProvider.notifier).update(
+            (state) => state.copyWith(position: position, buffering: true),
+          );
+      unawaited(ref.read(playbackModelHelper).shouldReload(model));
+      return super.seek(position);
+    }
     _player?.seek(position);
     if (_player?.lastState.playing == false) {
       ref.read(mediaPlaybackProvider.notifier).update((state) => state.copyWith(position: position));
     }
     return super.seek(position);
   }
+
+  static bool _isRemuxStreamUrl(String? url) =>
+      url != null && (url.contains('/stream.ts') || url.contains('stream.ts?'));
 
   @override
   Future<void> setSpeed(double speed) {

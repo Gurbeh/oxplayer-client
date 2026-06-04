@@ -7,7 +7,7 @@ import 'package:macos_window_utils/macos/ns_window_button_type.dart';
 import 'package:macos_window_utils/window_manipulator.dart';
 
 void toggleMacTrafficLights(bool enable) {
-  if (!Platform.isMacOS) return;
+  if (kIsWeb || !Platform.isMacOS) return;
   final height = enable ? 10.0 : 15.0;
   final initOffset = 20.0;
   List<NSWindowButtonType> buttons = [
@@ -29,7 +29,7 @@ void toggleMacTrafficLights(bool enable) {
 
 // Disabled for now too buggy
 // void toggleMacControlsVisibility(bool enable) {
-//   if (!Platform.isMacOS) return;
+//   if (kIsWeb || !Platform.isMacOS) return;
 //   if (enable) {
 //     WindowManipulator.showCloseButton();
 //     WindowManipulator.showMiniaturizeButton();

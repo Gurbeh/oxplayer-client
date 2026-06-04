@@ -64,7 +64,7 @@ abstract class BaseAppWrapperState<T extends BaseAppWrapper> extends ConsumerSta
 
     await NotificationService.init();
 
-    if ((Platform.isAndroid || Platform.isIOS)) {
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
       try {
         await Workmanager().initialize(update_worker.callbackDispatcher);
       } catch (e) {

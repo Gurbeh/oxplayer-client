@@ -4,7 +4,8 @@ import 'package:fladder/providers/book_viewer_provider.dart';
 import 'package:fladder/providers/items/book_details_provider.dart';
 import 'package:fladder/providers/settings/book_viewer_settings_provider.dart';
 import 'package:fladder/screens/book_viewer/book_viewer_controls.dart';
-import 'package:fladder/screens/book_viewer/book_viewer_reader.dart';
+import 'package:fladder/screens/book_viewer/book_viewer_reader.dart'
+    if (dart.library.html) 'package:fladder/screens/book_viewer/book_viewer_reader_web.dart';
 import 'package:fladder/util/themes_data.dart';
 import 'package:fladder/util/throttler.dart';
 import 'package:flutter/material.dart';

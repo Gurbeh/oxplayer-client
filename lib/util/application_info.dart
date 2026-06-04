@@ -35,8 +35,8 @@ abstract class ApplicationInfo with _$ApplicationInfo {
     return switch (platform) {
       TargetPlatform.macOS => "macOS",
       TargetPlatform.iOS => "iOS",
-      TargetPlatform.android => leanbackMode ? "$label TV" : label,
-      _ => label,
+      TargetPlatform.android => kIsWeb ? "$label Web" : (leanbackMode ? "$label TV" : label),
+      _ => !kIsWeb ? label : "$label Web",
     };
   }
 

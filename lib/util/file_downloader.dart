@@ -1,7 +1,11 @@
-import 'package:url_launcher/url_launcher.dart';
+import 'package:universal_html/html.dart' as html;
 
 Future<void> downloadFile(String url) async {
-  final uri = Uri.tryParse(url);
-  if (uri == null) return;
-  await launchUrl(uri, mode: LaunchMode.externalApplication);
+  try {
+    html.AnchorElement anchorElement = html.AnchorElement(href: url);
+    anchorElement.download = url;
+    anchorElement.click();
+  } catch (e) {
+    print('Download error: $e');
+  }
 }

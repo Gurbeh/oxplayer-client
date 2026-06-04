@@ -71,6 +71,7 @@ abstract class VideoPlayerSettingsModel with _$VideoPlayerSettingsModel {
   const VideoPlayerSettingsModel._();
 
   static bool get crossfadeSupportedOnCurrentPlatform {
+    if (kIsWeb) return true;
     return switch (defaultTargetPlatform) {
       TargetPlatform.android || TargetPlatform.iOS => false,
       _ => true,
@@ -170,13 +171,16 @@ enum PlayerOptions {
 
   static Iterable<PlayerOptions> get available => leanBackMode
       ? {PlayerOptions.nativePlayer}
-      : switch (defaultTargetPlatform) {
-          TargetPlatform.android => PlayerOptions.values,
-          _ => {PlayerOptions.libMDK, PlayerOptions.libMPV},
-        };
+      : kIsWeb
+          ? {PlayerOptions.libMPV}
+          : switch (defaultTargetPlatform) {
+              TargetPlatform.android => PlayerOptions.values,
+              _ => {PlayerOptions.libMDK, PlayerOptions.libMPV},
+            };
 
   static PlayerOptions get platformDefaults {
     if (leanBackMode) return PlayerOptions.nativePlayer;
+    if (kIsWeb) return PlayerOptions.libMPV;
     return switch (defaultTargetPlatform) {
       _ => PlayerOptions.libMPV,
     };

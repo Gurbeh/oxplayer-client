@@ -93,7 +93,7 @@ class _TvPlayerControlsState extends ConsumerState<TvPlayerControls> {
             cursor: showOverlay ? SystemMouseCursors.basic : SystemMouseCursors.none,
             onExit: (event) => toggleOverlay(value: false),
             onEnter: (event) => toggleOverlay(value: true),
-            onHover: AdaptiveLayout.of(context).isDesktop ? (event) => toggleOverlay(value: true) : null,
+            onHover: AdaptiveLayout.of(context).isDesktop || kIsWeb ? (event) => toggleOverlay(value: true) : null,
             child: Stack(
               children: [
                 Positioned.fill(
