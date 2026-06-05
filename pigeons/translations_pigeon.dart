@@ -4,7 +4,7 @@ import 'package:pigeon/pigeon.dart';
   PigeonOptions(
     dartOut: 'lib/src/translations_pigeon.g.dart',
     dartOptions: DartOptions(),
-    kotlinOut: 'android/app/src/main/kotlin/nl/jknaapen/fladder/api/TranslationsPigeon.g.kt',
+    kotlinOut: 'android/app/src/main/kotlin/app/oxplayer/api/TranslationsPigeon.g.kt',
     kotlinOptions: KotlinOptions(
       includeErrorClass: false,
     ),

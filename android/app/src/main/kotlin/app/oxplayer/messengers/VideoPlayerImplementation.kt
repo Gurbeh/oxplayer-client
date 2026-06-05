@@ -1,0 +1,359 @@
+package app.oxplayer.messengers
+
+import PlayableData
+import SubtitleSettings
+import TVGuideModel
+import VideoPlayerApi
+import android.util.Log
+import android.os.Handler
+import android.os.Looper
+import androidx.core.net.toUri
+import androidx.core.os.postDelayed
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import app.oxplayer.objects.PlayerSettingsObject
+import app.oxplayer.objects.VideoPlayerObject
+import app.oxplayer.utility.clearAudioTrack
+import app.oxplayer.utility.clearSubtitleTrack
+import app.oxplayer.utility.enableSubtitles
+import app.oxplayer.utility.getAudioTracks
+import app.oxplayer.utility.getSubtitleTracks
+import app.oxplayer.utility.setInternalAudioTrack
+import app.oxplayer.utility.setInternalSubtitleTrack
+import kotlin.time.Duration.Companion.seconds
+
+private const val OX_NATIVE_PLY_TAG = "OX_NATIVE_PLY"
+
+class VideoPlayerImplementation(
+) : VideoPlayerApi {
+    var player: ExoPlayer? = null
+    val playbackData: MutableStateFlow<PlayableData?> = MutableStateFlow(null)
+
+    var subsInitialized = false
+
+    /** One-shot listener: Ox loopback + resume must load from t=0 first, then seek (see [open]). */
+    private var loopbackResumeListener: Player.Listener? = null
+
+    val isTVMode: Flow<Boolean> = playbackData.asStateFlow().map {
+        it?.mediaInfo?.playbackType == PlaybackType.TV
+    }
+
+    override fun sendPlayableModel(
+        playableData: PlayableData,
+        callback: (Result<Boolean>) -> Unit
+    ) {
+        try {
+            Log.d(
+                OX_NATIVE_PLY_TAG,
+                "sendPlayableModel title=${playableData.currentItem?.title} id=${playableData.currentItem?.id} " +
+                    "playbackType=${playableData.mediaInfo.playbackType} startMs=${playableData.startPosition} " +
+                    "urlLen=${playableData.url.length} audioTracks=${playableData.audioTracks.size} " +
+                    "subtitleTracks=${playableData.subtitleTracks.size}",
+            )
+            playbackData.value = playableData
+            callback(Result.success(true))
+            return
+        } catch (e: Exception) {
+            Log.e(OX_NATIVE_PLY_TAG, "sendPlayableModel failed", e)
+            callback(Result.success(false))
+            return
+        }
+    }
+
+    override fun sendTVGuideModel(guide: TVGuideModel, callback: (Result<Boolean>) -> Unit) {
+        try {
+            VideoPlayerObject.tvGuide.value = guide
+            callback(Result.success(true))
+        } catch (e: Exception) {
+            println("Error sending TV guide model: $e")
+            callback(Result.success(false))
+        }
+    }
+
+    override fun setSubtitleSettings(settings: SubtitleSettings) {
+        try {
+            PlayerSettingsObject.subtitleSettings.value = settings
+        } catch (e: Exception) {
+            println("Error setting subtitle settings: $e")
+        }
+    }
+
+    override fun refreshDefaultTrackSelection(callback: (Result<Boolean>) -> Unit) {
+        Handler(Looper.getMainLooper()).post {
+            try {
+                val data = playbackData.value
+                val exo = player
+                if (data == null || exo == null) {
+                    callback(Result.success(false))
+                    return@post
+                }
+                VideoPlayerObject.setAudioTrackIndex(data.defaultAudioTrack.toInt(), true)
+                VideoPlayerObject.setSubtitleTrackIndex(data.defaultSubtrack.toInt(), true)
+                exo.properlySetSubAndAudioTracks(data)
+                callback(Result.success(true))
+            } catch (e: Exception) {
+                println("Error refreshDefaultTrackSelection $e")
+                callback(Result.success(false))
+            }
+        }
+    }
+
+    override fun open(url: String, play: Boolean, callback: (Result<Boolean>) -> Unit) {
+        Handler(Looper.getMainLooper()).postDelayed(delayInMillis = 1.seconds.inWholeMilliseconds) {
+            try {
+                val exo = player
+                if (exo == null) {
+                    Log.w(
+                        OX_NATIVE_PLY_TAG,
+                        "open skip: ExoPlayer not ready yet (init will open again when host is bound)",
+                    )
+                    callback(Result.success(false))
+                    return@postDelayed
+                }
+                val pd = playbackData.value
+                Log.d(
+                    OX_NATIVE_PLY_TAG,
+                    "open enter play=$play urlLen=${url.length} hasPlaybackData=${pd != null} " +
+                        "exoPlayerNull=false",
+                )
+                pd?.let {
+                    VideoPlayerObject.setAudioTrackIndex(it.defaultAudioTrack.toInt(), true)
+                    VideoPlayerObject.setSubtitleTrackIndex(it.defaultSubtrack.toInt(), true)
+                }
+
+                val isHls = url.contains("streamMode=hls", ignoreCase = true) || url.endsWith(
+                    ".m3u8",
+                    ignoreCase = true
+                )
+                val isOxLoopback =
+                    url.contains("127.0.0.1", ignoreCase = true) && url.contains("/stream", ignoreCase = true)
+                val subTitles = playbackData.value?.subtitleTracks ?: listOf()
+                val externalSubs = subTitles.filter { it.external && !it.url.isNullOrEmpty() }
+                Log.d(
+                    OX_NATIVE_PLY_TAG,
+                    "open building MediaItem isHls=$isHls externalSubtitleCount=${externalSubs.size} " +
+                        "startPositionMs=${playbackData.value?.startPosition ?: 0L}",
+                )
+                val mediaItemBuilder = MediaItem.Builder()
+                    .setUri(url)
+                    .setTag(playbackData.value?.currentItem?.title)
+                    .setMediaId(playbackData.value?.currentItem?.id ?: "")
+                    .setSubtitleConfigurations(
+                        subTitles.filter { it.external && !it.url.isNullOrEmpty() }.map { sub ->
+                            MediaItem.SubtitleConfiguration.Builder(sub.url!!.toUri())
+                                .setMimeType(guessSubtitleMimeType(sub.url))
+                                .setLanguage(sub.languageCode)
+                                .setLabel(sub.name)
+                                .build()
+                        }
+                    )
+
+                if (isHls) {
+                    mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
+                }
+                // Do not force VIDEO_MP4 for Ox loopback: TDLib files may be Matroska or non-standard MP4;
+                // wrong MIME pins Mp4Extractor and yields EOF. Rely on loopback `Content-Type` + Exo sniffing.
+
+                val mediaItem = mediaItemBuilder.build()
+
+                val startPosition = (playbackData.value?.startPosition ?: 0L).coerceAtLeast(0L)
+
+                exo.stop()
+                exo.clearMediaItems()
+
+                loopbackResumeListener?.let { old ->
+                    try {
+                        exo.removeListener(old)
+                    } catch (_: Exception) {
+                    }
+                }
+                loopbackResumeListener = null
+
+                // Telegram TDLib loopback: starting at a large resume time makes ProgressiveMediaPeriod + Mp4Extractor
+                // issue range reads before the container is sniffed from the start → EOFException. Load from 0, then seek.
+                val deferSeekForLoopbackResume = isOxLoopback && !isHls && startPosition > 0L
+
+                if (deferSeekForLoopbackResume) {
+                    Log.d(
+                        OX_NATIVE_PLY_TAG,
+                        "open Ox loopback: resumeMs=$startPosition → prepare at 0 then seek on STATE_READY",
+                    )
+                    val resumeMs = startPosition
+                    val shouldPlay = play
+                    val listener = object : Player.Listener {
+                        override fun onPlaybackStateChanged(playbackState: Int) {
+                            if (playbackState != Player.STATE_READY) return
+                            if (loopbackResumeListener !== this) return
+                            exo.removeListener(this)
+                            loopbackResumeListener = null
+                            try {
+                                exo.seekTo(resumeMs)
+                            } catch (t: Throwable) {
+                                Log.e(OX_NATIVE_PLY_TAG, "Ox loopback deferred seek failed", t)
+                            }
+                            exo.playWhenReady = shouldPlay
+                            Log.d(OX_NATIVE_PLY_TAG, "open deferred seek done resumeMs=$resumeMs play=$shouldPlay")
+                        }
+
+                        override fun onPlayerError(error: PlaybackException) {
+                            if (loopbackResumeListener !== this) return
+                            exo.removeListener(this)
+                            loopbackResumeListener = null
+                        }
+                    }
+                    loopbackResumeListener = listener
+                    exo.addListener(listener)
+                    exo.setMediaItem(mediaItem, 0L)
+                    exo.prepare()
+                    exo.playWhenReady = false
+                } else {
+                    exo.setMediaItem(mediaItem, startPosition)
+                    exo.prepare()
+                    exo.playWhenReady = play
+                }
+                Log.d(OX_NATIVE_PLY_TAG, "open prepared playWhenReady=$play startPositionMs=$startPosition deferSeek=$deferSeekForLoopbackResume")
+                callback(Result.success(true))
+                subsInitialized = false
+                return@postDelayed
+            } catch (e: Exception) {
+                Log.e(OX_NATIVE_PLY_TAG, "open exception", e)
+                callback(Result.success(false))
+                return@postDelayed
+            }
+        }
+    }
+
+
+    override fun setLooping(looping: Boolean) {
+        player?.repeatMode = if (looping) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+    }
+
+    override fun setVolume(volume: Double) {
+        player?.volume = volume.toFloat()
+    }
+
+    override fun setPlaybackSpeed(speed: Double) {
+        player?.setPlaybackSpeed(speed.toFloat())
+    }
+
+    override fun play() {
+        player?.play()
+    }
+
+    override fun pause() {
+        player?.pause()
+    }
+
+    override fun seekTo(position: Long) {
+        player?.seekTo(position)
+    }
+
+    override fun stop() {
+        player?.stop()
+    }
+
+    fun init(exoPlayer: ExoPlayer?) {
+        player = exoPlayer
+        subsInitialized = false
+        //exoPlayer initializes after the playbackData is set for the first load
+        playbackData.value?.let { playData ->
+            VideoPlayerObject.setAudioTrackIndex(playData.defaultAudioTrack.toInt(), true)
+            VideoPlayerObject.setSubtitleTrackIndex(playData.defaultSubtrack.toInt(), true)
+            open(playData.url, true, callback = {})
+        }
+    }
+}
+
+fun guessSubtitleMimeType(fileName: String): String = when {
+    fileName.contains(".srt", ignoreCase = true) -> MimeTypes.APPLICATION_SUBRIP
+    fileName.contains(".vtt", ignoreCase = true) -> MimeTypes.TEXT_VTT
+    fileName.contains(".ass", ignoreCase = true) -> MimeTypes.TEXT_SSA
+    else -> MimeTypes.APPLICATION_SUBRIP
+}
+
+fun ExoPlayer.properlySetSubAndAudioTracks(playableData: PlayableData) {
+    if (playableData.mediaInfo.playbackType == PlaybackType.TV) {
+        // In TV mode, do not set tracks here as they are handled differently
+        return
+    }
+    val exo = this
+    try {
+        val currentSubIndex = playableData.defaultSubtrack
+        val internalSubTracks = this.getSubtitleTracks()
+        val listPos = playableData.subtitleTracks.indexOfFirst { it.index == currentSubIndex }
+        val wantedSubIndex: Int = when {
+            listPos >= 0 -> listPos - 1
+            currentSubIndex > 0 &&
+                internalSubTracks.isNotEmpty() &&
+                listPos < 0 -> {
+                // defaultSubtrack is a Jellyfin/global stream index that no longer matches any
+                // pigeon row (e.g. mux-only rebuild uses 1..n). Old logic used listPos-1 == -2
+                // and cleared subtitles — user saw "selected" in UI but nothing on screen.
+                0
+            }
+            else -> listPos - 1
+        }
+
+        if (wantedSubIndex < 0) {
+            clearSubtitleTrack()
+        } else if (wantedSubIndex >= internalSubTracks.size) {
+            // Exo text tracks not mapped yet; a later onTracksChanged will schedule again.
+        } else {
+            val subTrack = internalSubTracks[wantedSubIndex]
+            // Media3/ASS: first override often does not paint on SubtitleView until the user
+            // turns subtitles off and back on. Clear text renderer, then apply on the next
+            // frame(s) — same effect without requiring manual toggle.
+            clearSubtitleTrack()
+            Handler(Looper.getMainLooper()).post {
+                try {
+                    exo.setInternalSubtitleTrack(subTrack)
+                    Handler(Looper.getMainLooper()).post {
+                        try {
+                            exo.setInternalSubtitleTrack(subTrack)
+                        } catch (_: Exception) {
+                        }
+                    }
+                } catch (_: Exception) {
+                }
+            }
+        }
+
+        val currentAudioIndex = playableData.defaultAudioTrack
+        val indexOfAudioTrack =
+            playableData.audioTracks.indexOfFirst { it.index == currentAudioIndex }
+        val internalAudioTracks = this.getAudioTracks()
+
+        val wantedAudioIndex = indexOfAudioTrack - 1
+        // playableData.audioTracks[0] is the Jellyfin "Off" row; real streams start at index 1.
+        fun serverIndexForInternal(internalIdx: Int) {
+            playableData.audioTracks.getOrNull(internalIdx + 1)?.index?.let {
+                VideoPlayerObject.setAudioTrackIndex(it.toInt(), true)
+            }
+        }
+        if (internalAudioTracks.isEmpty()) {
+            clearAudioTrack()
+        } else if (wantedAudioIndex < 0) {
+            // Off / no match / first list slot maps to wanted -1: still pick first real track.
+            clearAudioTrack(false)
+            setInternalAudioTrack(internalAudioTracks[0])
+            serverIndexForInternal(0)
+        } else if (wantedAudioIndex >= internalAudioTracks.size) {
+            clearAudioTrack(false)
+            setInternalAudioTrack(internalAudioTracks[internalAudioTracks.lastIndex])
+            serverIndexForInternal(internalAudioTracks.lastIndex)
+        } else {
+            clearAudioTrack(false)
+            setInternalAudioTrack(internalAudioTracks[wantedAudioIndex])
+            serverIndexForInternal(wantedAudioIndex)
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}

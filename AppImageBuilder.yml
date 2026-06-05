@@ -14,7 +14,7 @@ script:
 AppDir:
   path: ./AppDir
   app_info:
-    id: de.aryanmo.oxplayer
+    id: app.oxplayer
     name: OXPlayer
     icon: oxplayer_icon_desktop
     version: latest

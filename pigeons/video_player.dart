@@ -4,7 +4,7 @@ import 'package:pigeon/pigeon.dart';
   PigeonOptions(
     dartOut: 'lib/src/video_player_helper.g.dart',
     dartOptions: DartOptions(),
-    kotlinOut: 'android/app/src/main/kotlin/de/aryanmo/oxplayer/api/VideoPlayerHelper.g.kt',
+    kotlinOut: 'android/app/src/main/kotlin/app/oxplayer/api/VideoPlayerHelper.g.kt',
     kotlinOptions: KotlinOptions(),
     dartPackageName: 'nl_jknaapen_fladder.video',
   ),

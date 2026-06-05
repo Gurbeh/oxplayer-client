@@ -6,7 +6,7 @@
 	"apps": [
 	  {
 	    "name": "OXPlayer",
-	    "bundleIdentifier": "de.aryanmo.oxplayer",
+	    "bundleIdentifier": "app.oxplayer",
 	    "developerName": "DonutWare",
 	    "localizedDescription": "Telegram media library client built with Flutter.",
 	    "iconURL": "https://github.com/DonutWare/Fladder/raw/develop/icons/fladder_macos_icon.png?raw=true",

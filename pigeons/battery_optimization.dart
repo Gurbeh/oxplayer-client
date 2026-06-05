@@ -4,7 +4,7 @@ import 'package:pigeon/pigeon.dart';
   PigeonOptions(
     dartOut: 'lib/src/battery_optimization_pigeon.g.dart',
     dartOptions: DartOptions(),
-    kotlinOut: 'android/app/src/main/kotlin/nl/jknaapen/fladder/api/BatteryOptimizationPigeon.g.kt',
+    kotlinOut: 'android/app/src/main/kotlin/app/oxplayer/api/BatteryOptimizationPigeon.g.kt',
     kotlinOptions: KotlinOptions(
       includeErrorClass: false,
     ),
