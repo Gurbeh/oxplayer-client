@@ -38,8 +38,6 @@ concurrency:
 
 env:
   NIGHTLY_TAG: nightly
-  # Set true when Play upload signing is ready (release_play_console job).
-  UPLOAD_TO_GOOGLE_PLAY: false
 
 jobs:
   check-trigger:
@@ -449,10 +447,8 @@ jobs:
       - create_release
       - build-android
     runs-on: ubuntu-latest
-    # Disabled while Play upload key / signing is being rotated — set env UPLOAD_TO_GOOGLE_PLAY: true to re-enable.
-    if: >-
-      (vars.UPLOAD_TO_GOOGLE_PLAY == 'true' || env.UPLOAD_TO_GOOGLE_PLAY == 'true')
-      && needs.fetch-info.outputs.build_type != 'development'
+    # Off by default. Re-enable: repo variable UPLOAD_TO_GOOGLE_PLAY=true (Settings → Actions → Variables).
+    if: needs.fetch-info.outputs.build_type != 'development' && vars.UPLOAD_TO_GOOGLE_PLAY == 'true'
     concurrency:
       group: google-play-upload-${{ github.repository }}
       cancel-in-progress: false
