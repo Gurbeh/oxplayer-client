@@ -38,6 +38,8 @@ concurrency:
 
 env:
   NIGHTLY_TAG: nightly
+  # Set true when Play upload signing is ready (release_play_console job).
+  UPLOAD_TO_GOOGLE_PLAY: false
 
 jobs:
   check-trigger:
@@ -100,15 +102,7 @@ jobs:
         run: |
           VERSION_LINE=$(grep '^version:' pubspec.yaml | cut -d ':' -f2 | tr -d ' ')
           VERSION_NAME="${VERSION_LINE%%+*}"
-          PUBSPEC_CODE="${VERSION_LINE#*+}"
-          RUN_NUMBER="${{ github.run_number }}"
-          # When workflow run_number lags pubspec +N (common on young workflows), use pubspec+1
-          # so we never reuse a versionCode already on Play. When run_number is ahead, use it.
-          if [ "$RUN_NUMBER" -gt "$PUBSPEC_CODE" ]; then
-            VERSION_CODE="$RUN_NUMBER"
-          else
-            VERSION_CODE=$((PUBSPEC_CODE + 1))
-          fi
+          VERSION_CODE="${VERSION_LINE#*+}"
           echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
           echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
 
@@ -124,7 +118,7 @@ jobs:
           fi
 
           echo "Base version: $VERSION_NAME"
-          echo "Version code: $VERSION_CODE (pubspec +${PUBSPEC_CODE}, run ${RUN_NUMBER})"
+          echo "Version code: $VERSION_CODE"
           echo "Flutter version: $FLUTTER_VERSION"
 
   build-android:
@@ -455,12 +449,13 @@ jobs:
       - create_release
       - build-android
     runs-on: ubuntu-latest
-    # Serialize Play API edits (push main + version tag on the same commit used to run in parallel and break uploads).
+    # Disabled while Play upload key / signing is being rotated — set env UPLOAD_TO_GOOGLE_PLAY: true to re-enable.
+    if: >-
+      (vars.UPLOAD_TO_GOOGLE_PLAY == 'true' || env.UPLOAD_TO_GOOGLE_PLAY == 'true')
+      && needs.fetch-info.outputs.build_type != 'development'
     concurrency:
       group: google-play-upload-${{ github.repository }}
       cancel-in-progress: false
-    # Job-level `if` cannot use `secrets` (GitHub rejects it). Gate upload inside steps.
-    if: needs.fetch-info.outputs.build_type != 'development'
     steps:
       - id: play_secret
         name: Check Play service account secret
