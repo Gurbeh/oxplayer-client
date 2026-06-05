@@ -129,17 +129,8 @@ jobs:
       id-token: write
       attestations: write
     env:
-      TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID || vars.TELEGRAM_API_ID }}
-      TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH || vars.TELEGRAM_API_HASH }}
       BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
       OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
-      OXPLAYER_TELEGRAM_WEBAPP_SHORT_NAME: ${{ secrets.OXPLAYER_TELEGRAM_WEBAPP_SHORT_NAME || vars.OXPLAYER_TELEGRAM_WEBAPP_SHORT_NAME }}
-      OXPLAYER_TELEGRAM_WEBAPP_URL: ${{ secrets.OXPLAYER_TELEGRAM_WEBAPP_URL || vars.OXPLAYER_TELEGRAM_WEBAPP_URL }}
-      SENTRY_DSN: ${{ secrets.SENTRY_DSN || vars.SENTRY_DSN }}
-      SENTRY_ENVIRONMENT: ${{ secrets.SENTRY_ENVIRONMENT || vars.SENTRY_ENVIRONMENT }}
-      SENTRY_TRACES_SAMPLE_RATE: ${{ secrets.SENTRY_TRACES_SAMPLE_RATE || vars.SENTRY_TRACES_SAMPLE_RATE }}
-      SENTRY_PROFILES_SAMPLE_RATE: ${{ secrets.SENTRY_PROFILES_SAMPLE_RATE || vars.SENTRY_PROFILES_SAMPLE_RATE }}
-      SENTRY_DEBUG: ${{ secrets.SENTRY_DEBUG || vars.SENTRY_DEBUG }}
     steps:
       # Full history so sentry_dart_plugin can associate commits with releases (see pubspec ignore_missing).
       - uses: actions/checkout@v5

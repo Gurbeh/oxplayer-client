@@ -7,7 +7,7 @@ runs:
       shell: bash
       run: |
         missing=()
-        for var in TELEGRAM_API_ID TELEGRAM_API_HASH BOT_USERNAME OXPLAYER_API_BASE_URL OXPLAYER_TELEGRAM_WEBAPP_SHORT_NAME OXPLAYER_TELEGRAM_WEBAPP_URL; do
+        for var in BOT_USERNAME OXPLAYER_API_BASE_URL; do
           [ -z "${!var:-}" ] && missing+=("$var")
         done
         if [ ${#missing[@]} -gt 0 ]; then
@@ -31,28 +31,9 @@ runs:
 
         keys = {
             "OXPLAYER": "true",
-            "TELEGRAM_API_ID": env_first("TELEGRAM_API_ID"),
-            "TELEGRAM_API_HASH": env_first("TELEGRAM_API_HASH"),
             "BOT_USERNAME": env_first("BOT_USERNAME"),
             "OXPLAYER_API_BASE_URL": env_first("OXPLAYER_API_BASE_URL"),
-            "OXPLAYER_TELEGRAM_WEBAPP_SHORT_NAME": env_first(
-                "OXPLAYER_TELEGRAM_WEBAPP_SHORT_NAME"
-            ),
-            "OXPLAYER_TELEGRAM_WEBAPP_URL": env_first("OXPLAYER_TELEGRAM_WEBAPP_URL"),
         }
-
-        # Optional crash reporting (same keys as assets/env/default.env). Requires SENTRY_DSN.
-        sentry_dsn = env_first("SENTRY_DSN")
-        if sentry_dsn:
-            keys["SENTRY_DSN"] = sentry_dsn
-            keys["SENTRY_ENVIRONMENT"] = env_first("SENTRY_ENVIRONMENT") or "production"
-            keys["SENTRY_TRACES_SAMPLE_RATE"] = (
-                env_first("SENTRY_TRACES_SAMPLE_RATE") or "0.1"
-            )
-            keys["SENTRY_PROFILES_SAMPLE_RATE"] = (
-                env_first("SENTRY_PROFILES_SAMPLE_RATE") or "0.1"
-            )
-            keys["SENTRY_DEBUG"] = env_first("SENTRY_DEBUG") or "0"
 
         out = Path(os.environ["RUNNER_TEMP"]) / "flutter-build-env.json"
         out.write_text(json.dumps(keys), encoding="utf-8")
