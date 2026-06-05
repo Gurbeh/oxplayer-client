@@ -102,10 +102,12 @@ jobs:
           VERSION_NAME="${VERSION_LINE%%+*}"
           PUBSPEC_CODE="${VERSION_LINE#*+}"
           RUN_NUMBER="${{ github.run_number }}"
+          # When workflow run_number lags pubspec +N (common on young workflows), use pubspec+1
+          # so we never reuse a versionCode already on Play. When run_number is ahead, use it.
           if [ "$RUN_NUMBER" -gt "$PUBSPEC_CODE" ]; then
             VERSION_CODE="$RUN_NUMBER"
           else
-            VERSION_CODE="$PUBSPEC_CODE"
+            VERSION_CODE=$((PUBSPEC_CODE + 1))
           fi
           echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
           echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
