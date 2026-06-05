@@ -85,6 +85,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version_name: ${{ steps.fetch.outputs.version_name }}
+      android_version_code: ${{ steps.fetch.outputs.android_version_code }}
       flutter_version: ${{ steps.fetch.outputs.flutter_version }}
       nightly_version: ${{ steps.fetch.outputs.nightly_version }}
       build_type: ${{ needs.check-trigger.outputs.build_type }}
@@ -97,8 +98,23 @@ jobs:
       - id: fetch
         shell: bash
         run: |
-          VERSION_NAME=$(grep '^version:' pubspec.yaml | cut -d ':' -f2 | cut -d '+' -f1 | tr -d ' ')
+          RAW_VERSION=$(grep '^version:' pubspec.yaml | cut -d ':' -f2 | tr -d ' ')
+          VERSION_NAME="${RAW_VERSION%%+*}"
+          PUBSPEC_BUILD="${RAW_VERSION#*+}"
+          if [ -z "$PUBSPEC_BUILD" ] || [ "$PUBSPEC_BUILD" = "$RAW_VERSION" ]; then
+            PUBSPEC_BUILD=0
+          fi
+          RUN_NUMBER="${{ github.run_number }}"
+          # Play requires versionCode strictly above every prior upload on any track.
+          # github.run_number alone can be far below pubspec +N (e.g. run 6 vs +146 on Play).
+          if [ "$PUBSPEC_BUILD" -gt "$RUN_NUMBER" ]; then
+            ANDROID_VERSION_CODE=$((PUBSPEC_BUILD + 1))
+          else
+            ANDROID_VERSION_CODE=$RUN_NUMBER
+          fi
           echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
+          echo "android_version_code=${ANDROID_VERSION_CODE}" >> "$GITHUB_OUTPUT"
+          echo "Android versionCode: ${ANDROID_VERSION_CODE} (pubspec +${PUBSPEC_BUILD}, run ${RUN_NUMBER})"
 
           FLUTTER_VERSION=$(jq -r '.flutter' .fvmrc)
           echo "flutter_version=${FLUTTER_VERSION}" >> "$GITHUB_OUTPUT"
@@ -205,7 +221,7 @@ jobs:
           flutter build apk --debug --split-per-abi \
             --flavor production \
             --build-name=${{ needs.fetch-info.outputs.version_name }} \
-            --build-number=${{ github.run_number }} \
+            --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
             --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
 
       - name: Build Android (release)
@@ -215,13 +231,13 @@ jobs:
             --split-debug-info=build/debug-info \
             --flavor production \
             --build-name=${{ needs.fetch-info.outputs.version_name }} \
-            --build-number=${{ github.run_number }} \
+            --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
             --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
           flutter build appbundle --release \
             --split-debug-info=build/debug-info \
             --flavor production \
             --build-name=${{ needs.fetch-info.outputs.version_name }} \
-            --build-number=${{ github.run_number }} \
+            --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
             --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
 
       - name: Upload debug symbols to Sentry
