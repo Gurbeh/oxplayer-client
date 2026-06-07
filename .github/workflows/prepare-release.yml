@@ -26,6 +26,8 @@ jobs:
           echo "build_number=${BUILD_NUMBER}" >> "$GITHUB_OUTPUT"
           echo "Version: $VERSION_NAME (Build: $BUILD_NUMBER)"
 
+          bash tool/release/validate_version.sh --for-tag
+
           if git rev-parse "v${VERSION_NAME}" >/dev/null 2>&1; then
             echo "is_new_version=false" >> "$GITHUB_OUTPUT"
             echo "Status: Version v${VERSION_NAME} is already tagged."

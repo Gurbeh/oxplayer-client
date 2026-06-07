@@ -1,0 +1,60 @@
+---
+description: OXPlayer client release and Google Play versionCode checklist
+alwaysApply: false
+globs: pubspec.yaml,.github/workflows/**,fastlane/**,tool/release/**
+---
+
+# OXPlayer release (GitHub + Google Play)
+
+## Golden rule
+
+> **Always inspect git and the Play version ledger before changing `pubspec.yaml` or tagging.**
+
+`version:` in `pubspec.yaml` is `VERSION_NAME+VERSION_CODE`. Android **versionCode** (`+` suffix) must **strictly increase** and is **never reused**. Nightly builds must **not** upload to Play.
+
+## Pre-release checklist (local)
+
+Run from repo root:
+
+```bash
+git fetch origin --tags
+git log origin/main -1 --oneline
+git tag -l 'v*' | tail -5
+grep '^version:' pubspec.yaml
+ls fastlane/metadata/android/en-US/changelogs/
+bash tool/release/validate_version.sh --for-tag   # new GitHub tag
+bash tool/release/validate_version.sh             # Play-only retry on main
+```
+
+| Check | Action |
+|-------|--------|
+| New **GitHub** release | Bump **both** name and code if needed (e.g. `0.0.4+8`). Tag `v{VERSION_NAME}` must **not** exist. |
+| **Play-only** retry (tag already published) | Bump **only** `+VERSION_CODE` on `main` (e.g. `0.0.3+8`). Do **not** re-tag. |
+| `versionCode` vs ledger | `+N` must be **>** highest numeric `fastlane/.../changelogs/N.txt`. |
+| After push to `main` | Nightly may build but **must not** upload to Play (release-only). |
+
+## Release workflow (new version)
+
+1. Commit feature/fixes on `main`.
+2. Set `pubspec.yaml` → e.g. `0.0.4+9` (`+9` > last changelog `8.txt`).
+3. Commit: `chore: bump version to 0.0.4+9`
+4. GitHub Actions → **Prepare Release** (on `main`) → creates changelog + tag `v0.0.4`.
+5. Tag push triggers **Build OXPlayer** (`build_type=release`) → GitHub Release (draft) + Play internal upload.
+6. Publish draft release on GitHub when CI is green.
+
+## Play-only upload (versionCode collision fix)
+
+When Play returns `Version code N has already been used`:
+
+1. `git fetch origin && git pull`
+2. Bump **only** build number: `0.0.3+8` (keep name if GitHub release unchanged).
+3. Add `fastlane/metadata/android/en-US/changelogs/8.txt` if missing.
+4. Push to `main`.
+5. Actions → **Build OXPlayer** → `workflow_dispatch` → `build_type=release` → branch `main`  
+   (skips GitHub release when not on a tag; uploads Play only.)
+
+## Never do
+
+- Reuse a `versionCode` already in Play or in `changelogs/*.txt`.
+- Tag `v0.0.3` twice or release without running `validate_version.sh`.
+- Rely on nightly/main push for Play uploads.

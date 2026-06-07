@@ -119,6 +119,11 @@ jobs:
           echo "Version code: $VERSION_CODE"
           echo "Flutter version: $FLUTTER_VERSION"
 
+      - name: Validate pubspec version (release / Play)
+        if: needs.check-trigger.outputs.build_type == 'release'
+        shell: bash
+        run: bash tool/release/validate_version.sh
+
   build-android:
     needs: [fetch-info]
     runs-on: ubuntu-latest
@@ -285,7 +290,9 @@ jobs:
       - fetch-info
       - build-android
     runs-on: ubuntu-latest
-    if: needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly'
+    if: |
+      needs.fetch-info.outputs.build_type == 'nightly' ||
+      (needs.fetch-info.outputs.build_type == 'release' && startsWith(github.ref, 'refs/tags/v'))
     permissions:
       contents: write
     steps:
@@ -437,11 +444,11 @@ jobs:
     name: Upload AAB to Google Play
     needs:
       - fetch-info
-      - create_release
       - build-android
     runs-on: ubuntu-latest
-    # Off by default. Re-enable: repo variable UPLOAD_TO_GOOGLE_PLAY=true (Settings → Actions → Variables).
-    if: needs.fetch-info.outputs.build_type != 'development' && vars.UPLOAD_TO_GOOGLE_PLAY == 'true'
+    # Release builds only — nightly must not consume versionCode on Play.
+    # Re-enable: repo variable UPLOAD_TO_GOOGLE_PLAY=true (Settings → Actions → Variables).
+    if: needs.fetch-info.outputs.build_type == 'release' && vars.UPLOAD_TO_GOOGLE_PLAY == 'true'
     concurrency:
       group: google-play-upload-${{ github.repository }}
       cancel-in-progress: false
