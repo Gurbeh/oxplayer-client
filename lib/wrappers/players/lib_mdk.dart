@@ -89,8 +89,8 @@ class LibMDK extends BasePlayer {
       await _controller?.play();
     }
     _controller?.setBufferRange(
-      min: const Duration(seconds: 15).inMilliseconds,
-      max: const Duration(seconds: 30).inMilliseconds,
+      min: const Duration(seconds: 30).inMilliseconds,
+      max: const Duration(seconds: 90).inMilliseconds,
     );
     return setState(lastState.update(
       buffering: true,

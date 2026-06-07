@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart' as mpv;
 import 'package:media_kit_video/media_kit_video.dart';
 
+import 'package:fladder/oxplayer/playback/ox_hls_web_buffer_config.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/audio_model.dart';
 import 'package:fladder/models/items/media_streams_model.dart';
@@ -54,6 +55,7 @@ class LibMPV extends BasePlayer {
     dispose();
 
     mpv.MediaKit.ensureInitialized();
+    await OxHlsWebBufferConfig.apply();
 
     _player = mpv.Player(
       configuration: mpv.PlayerConfiguration(

@@ -630,7 +630,7 @@ class _VideoPlayerSettingsModel extends VideoPlayerSettingsModel
       this.hardwareAccel = true,
       this.useLibass = true,
       this.enableTunneling = false,
-      this.bufferSize = 32,
+      this.bufferSize = 128,
       this.playerOptions,
       this.internalVolume = 100,
       final Set<DeviceOrientation>? allowedOrientations,

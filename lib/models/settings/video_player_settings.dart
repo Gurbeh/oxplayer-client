@@ -84,7 +84,7 @@ abstract class VideoPlayerSettingsModel with _$VideoPlayerSettingsModel {
     @Default(true) bool hardwareAccel,
     @Default(true) bool useLibass,
     @Default(false) bool enableTunneling,
-    @Default(32) int bufferSize,
+    @Default(128) int bufferSize,
     PlayerOptions? playerOptions,
     @Default(100) double internalVolume,
     Set<DeviceOrientation>? allowedOrientations,
