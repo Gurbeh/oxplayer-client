@@ -1,0 +1,1 @@
+OXPlayer 0.0.2 — Telegram sign-in improvements and login screen fixes. Full notes: https://github.com/Gurbeh/oxplayer-client/releases/tag/v0.0.2

@@ -41,7 +41,8 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           mkdir -p fastlane/metadata/android/en-US/changelogs
-          printf '%s' "${{ env.CHANGELOG_MSG }}" > "fastlane/metadata/android/en-US/changelogs/${VERSION}.txt"
+          BUILD="${{ steps.version.outputs.build_number }}"
+          printf '%s' "${{ env.CHANGELOG_MSG }}" > "fastlane/metadata/android/en-US/changelogs/${BUILD}.txt"
 
       - name: Commit and Tag
         if: steps.version.outputs.is_new_version == 'true'

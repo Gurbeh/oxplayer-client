@@ -465,13 +465,27 @@ jobs:
           name: oxplayer-android
           path: oxplayer-android
 
+      - name: Write Play release notes
+        if: steps.play_secret.outputs.has_secret == 'true'
+        shell: bash
+        run: |
+          VN="${{ needs.fetch-info.outputs.version_name }}"
+          DIR="distribution/whatsnew"
+          mkdir -p "$DIR"
+          MSG="OXPlayer ${VN} — see https://github.com/${{ github.repository }}/releases/tag/v${VN}"
+          printf '%s' "$MSG" > "${DIR}/whatsnew-en-US"
+
       - name: Upload AAB to Google Play Console
         if: steps.play_secret.outputs.has_secret == 'true'
-        uses: r0adkll/upload-google-play@v1.1.3
+        uses: r0adkll/upload-google-play@v1.1.4
         with:
           serviceAccountJsonPlainText: ${{ secrets.SERVICE_ACCOUNT_JSON }}
           packageName: "app.oxplayer"
           releaseFiles: "oxplayer-android/${{ needs.build-android.outputs.artifact_suffix }}.aab"
-          track: ${{ needs.fetch-info.outputs.build_type == 'nightly' && 'internal' || 'production' }}
-          status: ${{ needs.fetch-info.outputs.build_type == 'nightly' && 'completed' || 'draft' }}
+          # internal first: production API upload fails with "Precondition check failed"
+          # until at least one release was promoted through internal/closed testing in Play Console.
+          tracks: internal
+          status: completed
           releaseName: "${{ needs.fetch-info.outputs.version_code }} (${{ needs.fetch-info.outputs.version_name }})"
+          whatsNewDirectory: distribution/whatsnew
+          changesNotSentForReview: true
