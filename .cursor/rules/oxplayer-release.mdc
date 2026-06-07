@@ -48,7 +48,7 @@ Before tagging:
 | Tag `v*` | release | draft | production (draft) |
 | Schedule / manual nightly | nightly | prerelease `nightly` | internal (completed) |
 | PR | development | no | no |
-| Push to `main` (no tag) | development | no | no |
+| Push to `main` | nightly | prerelease `nightly` | internal (completed) |
 
 ## OX-only additions (keep when syncing from Fladder)
 
@@ -60,5 +60,4 @@ Before tagging:
 ## Never do
 
 - Use pubspec `+N` as CI `--build-number` (causes Play versionCode collisions).
-- Trigger nightly on every `main` push (Fladder does not).
 - Re-tag an existing `v*` without bumping version name in pubspec.

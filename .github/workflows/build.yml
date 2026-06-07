@@ -70,6 +70,8 @@ jobs:
             fi
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             BUILD_TYPE="development"
+          elif [[ "${{ github.event_name }}" == "push" ]] && [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            BUILD_TYPE="nightly"
           else
             BUILD_TYPE="development"
           fi
@@ -255,7 +257,7 @@ jobs:
           path: build/app/outputs/android_artifacts/
 
   create_release:
-    name: Create release
+    name: Create Release
     needs:
       - fetch-info
       - build-android
@@ -407,38 +409,23 @@ jobs:
           fi
 
   release_play_console:
-    name: Upload AAB to Google Play
+    name: Upload AAB to Google Play Console
     needs:
       - fetch-info
       - create_release
       - build-android
     runs-on: ubuntu-latest
-    if: needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly'
     concurrency:
       group: google-play-upload-${{ github.repository }}
       cancel-in-progress: false
     steps:
-      - id: play_secret
-        name: Check Play service account secret
-        env:
-          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
-        shell: bash
-        run: |
-          if [ -n "$SERVICE_ACCOUNT_JSON" ]; then
-            echo "has_secret=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_secret=false" >> "$GITHUB_OUTPUT"
-            echo "Skipping Play upload (SERVICE_ACCOUNT_JSON not set)."
-          fi
-
-      - uses: actions/download-artifact@v5
-        if: steps.play_secret.outputs.has_secret == 'true'
+      - name: Download Artifacts Android
+        uses: actions/download-artifact@v5
         with:
           name: oxplayer-android
           path: oxplayer-android
 
       - name: Upload AAB to Google Play Console
-        if: steps.play_secret.outputs.has_secret == 'true'
         uses: r0adkll/upload-google-play@v1.1.4
         with:
           serviceAccountJsonPlainText: ${{ secrets.SERVICE_ACCOUNT_JSON }}
