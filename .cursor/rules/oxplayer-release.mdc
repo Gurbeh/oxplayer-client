@@ -13,7 +13,7 @@ Same model as upstream [DonutWare/fladder](https://github.com/DonutWare/fladder)
 | Field | Source | Notes |
 |-------|--------|-------|
 | **versionName** | `pubspec.yaml` before `+` | e.g. `0.0.4` |
-| **versionCode (CI builds)** | `github.run_number` | Unique per workflow run — **not** pubspec `+` suffix |
+| **versionCode (CI builds)** | `10000 + github.run_number` | Must exceed all legacy Play uploads (split APKs use `base*1000+abi`) |
 | **Git tag** | `v{versionName}` | e.g. `v0.0.4` |
 
 Local/dev builds may still use pubspec `+N`; CI always passes `--build-number=${{ github.run_number }}`.
@@ -59,5 +59,15 @@ Before tagging:
 
 ## Never do
 
-- Use pubspec `+N` as CI `--build-number` (causes Play versionCode collisions).
+- Use pubspec `+N` or raw `github.run_number` as CI `--build-number` (breaks upgrade path vs legacy split APKs on Play).
+- Upload split APKs from GitHub Releases to Play Console — **AAB only**.
 - Re-tag an existing `v*` without bumping version name in pubspec.
+
+## Play Console: "can't upgrade existing users"
+
+Usually **versionCode too low** vs artifacts already on a track (e.g. split APKs `1007/2007/3007` while AAB used `35`).
+
+1. **Release overview** → note highest **Version code** on internal/production.
+2. Ensure next CI build uses `10000 + run_number` (must be **greater** than that max).
+3. In the draft release, keep **only the new AAB** — remove any old APK rows.
+4. Discard the broken release and let CI upload a fresh AAB, or promote after a green run.

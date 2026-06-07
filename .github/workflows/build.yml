@@ -86,6 +86,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version_name: ${{ steps.fetch.outputs.version_name }}
+      android_version_code: ${{ steps.fetch.outputs.android_version_code }}
       flutter_version: ${{ steps.fetch.outputs.flutter_version }}
       nightly_version: ${{ steps.fetch.outputs.nightly_version }}
       build_type: ${{ needs.check-trigger.outputs.build_type }}
@@ -111,9 +112,13 @@ jobs:
             echo "nightly_version=" >> "$GITHUB_OUTPUT"
           fi
 
+          # Must exceed legacy split-APK versionCodes on Play (base*1000+abi) and pubspec-era +N codes.
+          ANDROID_VERSION_CODE=$((10000 + ${GITHUB_RUN_NUMBER}))
+          echo "android_version_code=${ANDROID_VERSION_CODE}" >> "$GITHUB_OUTPUT"
+
           echo "Base version: $VERSION_NAME"
           echo "Flutter version: $FLUTTER_VERSION"
-          echo "CI build number (Android versionCode): ${{ github.run_number }}"
+          echo "Android versionCode: ${ANDROID_VERSION_CODE}"
 
   build-android:
     needs: [fetch-info]
@@ -180,7 +185,7 @@ jobs:
         if: needs.fetch-info.outputs.build_type == 'development'
         run: |
           flutter build apk --debug --split-per-abi \
-            --build-number=${{ github.run_number }} \
+            --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
             --flavor production \
             --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
 
@@ -189,12 +194,12 @@ jobs:
         run: |
           flutter build apk --release --split-per-abi \
             --split-debug-info=build/debug-info \
-            --build-number=${{ github.run_number }} \
+            --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
             --flavor production \
             --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
           flutter build appbundle --release \
             --split-debug-info=build/debug-info \
-            --build-number=${{ github.run_number }} \
+            --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
             --flavor production \
             --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
 
@@ -205,8 +210,8 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
-          SENTRY_RELEASE: oxplayer-client@${{ needs.fetch-info.outputs.version_name }}+${{ github.run_number }}
-          SENTRY_DIST: ${{ github.run_number }}
+          SENTRY_RELEASE: oxplayer-client@${{ needs.fetch-info.outputs.version_name }}+${{ needs.fetch-info.outputs.android_version_code }}
+          SENTRY_DIST: ${{ needs.fetch-info.outputs.android_version_code }}
         run: dart run sentry_dart_plugin
 
       - name: Verify native ABI parity (Play 64-bit / no x86)
@@ -434,4 +439,4 @@ jobs:
           # OX: internal track until production is promoted in Play Console (Fladder uses production/draft for release).
           tracks: internal
           status: completed
-          releaseName: "${{ github.run_number }} (${{ needs.fetch-info.outputs.version_name }})"
+          releaseName: "${{ needs.fetch-info.outputs.android_version_code }} (${{ needs.fetch-info.outputs.version_name }})"
