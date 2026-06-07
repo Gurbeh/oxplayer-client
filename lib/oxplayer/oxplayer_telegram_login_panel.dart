@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import 'package:fladder/oxplayer/oxplayer_bot_qr_dialog.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_jellyfin_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_login_attempt_api.dart';
@@ -12,6 +13,8 @@ import 'package:fladder/oxplayer/oxplayer_test_account_sign_in.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/screens/shared/media/external_urls.dart';
+import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
+import 'package:fladder/util/localization_helper.dart';
 
 class OxplayerTelegramLoginPanel extends ConsumerStatefulWidget {
   const OxplayerTelegramLoginPanel({
@@ -54,7 +57,10 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && _waiting && mounted) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      if (_attemptId != null && !_pollRunning && !_testSignInInProgress) {
+        unawaited(_pollForCompletion(userOpenedTelegram: _waiting));
+      }
       setState(() {});
     }
   }
@@ -70,6 +76,11 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
       setState(() => _error = 'Device not ready. Pull to retry.');
       return;
     }
+    _cancelPoll = true;
+    for (var i = 0; i < 100 && _pollRunning; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+    _cancelPoll = false;
     setState(() {
       _error = null;
       _waiting = false;
@@ -97,10 +108,13 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
     }
   }
 
-  bool get _isTv => ref.read(argumentsStateProvider).leanBackMode;
+  bool _isTv(BuildContext context) {
+    final leanBack = ref.read(argumentsStateProvider).leanBackMode;
+    return leanBack || AdaptiveLayout.viewSizeOf(context) == ViewSize.television;
+  }
 
   Future<void> _openTelegramOnThisDevice() async {
-    if (_isTv) return;
+    if (_isTv(context)) return;
     final link = _telegramLink;
     if (link != null) {
       unawaited(launchUrl(context, link));
@@ -128,7 +142,7 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
 
   Future<void> _pollForCompletion({required bool userOpenedTelegram}) async {
     if (_pollRunning) {
-      if (userOpenedTelegram && !_isTv && mounted) {
+      if (userOpenedTelegram && !_isTv(context) && mounted) {
         setState(() => _waiting = true);
       }
       return;
@@ -141,7 +155,7 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
     _cancelPoll = false;
     if (mounted) {
       setState(() {
-        _waiting = userOpenedTelegram && !_isTv;
+        _waiting = userOpenedTelegram && !_isTv(context);
         _error = null;
       });
     }
@@ -150,10 +164,10 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
       final poll = await _api.pollUntilComplete(
         attemptId: attemptId,
         deviceId: deviceId,
-        shouldContinue: () => mounted && !_cancelPoll,
+        shouldContinue: () => !_cancelPoll,
       );
-      if (!mounted) return;
       if (poll.isPending) {
+        if (!mounted) return;
         setState(() {
           _waiting = false;
           _error = 'Timed out. Approve in Telegram, then tap Try again.';
@@ -161,15 +175,21 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
         return;
       }
       final response = await oxplayerAuthenticateFromLoginAttemptPoll(ref, poll);
-      if (!mounted) return;
-      if (response?.isSuccessful != true || response?.body == null) {
-        setState(() {
-          _waiting = false;
-          _error = 'Sign-in failed. Try again or use a login code.';
-        });
+      if (response?.isSuccessful == true && response?.body != null) {
+        await widget.onSuccess();
+        if (mounted) {
+          setState(() {
+            _waiting = false;
+            _error = null;
+          });
+        }
         return;
       }
-      await widget.onSuccess();
+      if (!mounted) return;
+      setState(() {
+        _waiting = false;
+        _error = 'Sign-in failed. Try again or use a login code.';
+      });
     } on OxplayerLoginAttemptException catch (e) {
       if (mounted) {
         setState(() {
@@ -194,9 +214,20 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
     final theme = Theme.of(context);
     final link = _telegramLink;
     final bot = OxplayerEnv.botUsername;
-    final isTv = ref.watch(argumentsStateProvider.select((value) => value.leanBackMode));
+    final viewSize = AdaptiveLayout.viewSizeOf(context);
+    final isTv = _isTv(context);
+    final isPhone = viewSize == ViewSize.phone;
+    final showInlineQr = !isPhone;
     final showDeviceButton = !isTv;
     final showWaitingOnDevice = _waiting && showDeviceButton;
+
+    final subtitle = showWaitingOnDevice
+        ? 'Waiting for approval in Telegram\u2026 This screen will sign you in automatically.'
+        : isTv
+            ? 'Scan the QR code with Telegram on your phone. This TV will sign you in automatically.'
+            : isPhone
+                ? 'Tap the button to open Telegram, or use the QR icon to sign in from another device.'
+                : 'Scan the QR with another device, or tap the button to open Telegram on this device.';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -208,50 +239,90 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
         ),
         const SizedBox(height: 8),
         Text(
-          showWaitingOnDevice
-              ? 'Waiting for approval in Telegram… This screen will sign you in automatically.'
-              : isTv
-                  ? 'Scan the QR code with Telegram on your phone. This TV will sign you in automatically.'
-                  : 'Scan the QR with another device, or tap the button to open Telegram on this phone.',
+          subtitle,
           style: theme.textTheme.bodySmall,
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 20),
-        if (link != null)
-          Center(
-            child: OxplayerTestAccountQrHold(
-              enabled: !_testSignInInProgress && !_waiting,
-              onHoldComplete: _signInAsTestAccount,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: QrImageView(
-                  data: link,
-                  size: 200,
-                  version: QrVersions.auto,
-                  backgroundColor: Colors.white,
+        if (showInlineQr) ...[
+          const SizedBox(height: 20),
+          if (link != null)
+            Center(
+              child: OxplayerTestAccountQrHold(
+                enabled: !_testSignInInProgress && !_waiting,
+                onHoldComplete: _signInAsTestAccount,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: QrImageView(
+                    data: link,
+                    size: 200,
+                    version: QrVersions.auto,
+                    backgroundColor: Colors.white,
+                  ),
                 ),
               ),
-            ),
-          )
-        else if (_error == null)
-          const Center(child: CircularProgressIndicator())
-        else
-          const SizedBox(height: 200),
+            )
+          else if (_error == null)
+            const Center(child: CircularProgressIndicator())
+          else
+            const SizedBox(height: 200),
+        ] else if (link == null && _error == null) ...[
+          const SizedBox(height: 20),
+          const Center(child: CircularProgressIndicator()),
+        ],
         if (showDeviceButton) ...[
           const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: link == null ? null : _openTelegramOnThisDevice,
-            icon: showWaitingOnDevice
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.telegram),
-            label: Text(
-              showWaitingOnDevice ? 'Waiting for Telegram…' : 'Open Telegram on this device',
+          if (isPhone)
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: link == null ? null : _openTelegramOnThisDevice,
+                    icon: showWaitingOnDevice
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.telegram),
+                    label: Text(
+                      showWaitingOnDevice
+                          ? 'Waiting for Telegram\u2026'
+                          : 'Open Telegram on this device',
+                    ),
+                  ),
+                ),
+                if (link != null)
+                  IconButton(
+                    tooltip: context.localized.oxplayerHelpQrCaption,
+                    onPressed: showWaitingOnDevice
+                        ? null
+                        : () => showOxplayerBotQrSheet(
+                              context,
+                              telegramLink: link,
+                              botUsername: bot,
+                              onQrHoldComplete: _signInAsTestAccount,
+                              qrHoldEnabled: !_testSignInInProgress && !_waiting,
+                            ),
+                    icon: const Icon(Icons.qr_code_2_rounded),
+                  ),
+              ],
+            )
+          else
+            FilledButton.icon(
+              onPressed: link == null ? null : _openTelegramOnThisDevice,
+              icon: showWaitingOnDevice
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.telegram),
+              label: Text(
+                showWaitingOnDevice
+                    ? 'Waiting for Telegram\u2026'
+                    : 'Open Telegram on this device',
+              ),
             ),
-          ),
         ],
         if (_error != null) ...[
           const SizedBox(height: 12),

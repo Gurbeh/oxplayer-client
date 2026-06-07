@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import 'package:fladder/oxplayer/oxplayer_test_account_qr_hold.dart';
 import 'package:fladder/screens/shared/media/external_urls.dart';
 import 'package:fladder/util/localization_helper.dart';
 
@@ -8,6 +9,8 @@ void showOxplayerBotQrSheet(
   BuildContext context, {
   required String telegramLink,
   String? botUsername,
+  VoidCallback? onQrHoldComplete,
+  bool qrHoldEnabled = true,
 }) {
   final rootContext = Navigator.of(context, rootNavigator: true).context;
   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -41,11 +44,10 @@ void showOxplayerBotQrSheet(
                   ),
                 ),
                 const SizedBox(height: 20),
-                QrImageView(
-                  data: telegramLink,
-                  size: 200,
-                  version: QrVersions.auto,
-                  backgroundColor: Colors.white,
+                _loginQrImage(
+                  telegramLink: telegramLink,
+                  onQrHoldComplete: onQrHoldComplete,
+                  qrHoldEnabled: qrHoldEnabled,
                 ),
                 const SizedBox(height: 16),
                 FilledButton(
@@ -59,4 +61,23 @@ void showOxplayerBotQrSheet(
       },
     );
   });
+}
+
+Widget _loginQrImage({
+  required String telegramLink,
+  VoidCallback? onQrHoldComplete,
+  required bool qrHoldEnabled,
+}) {
+  final qr = QrImageView(
+    data: telegramLink,
+    size: 200,
+    version: QrVersions.auto,
+    backgroundColor: Colors.white,
+  );
+  if (onQrHoldComplete == null) return qr;
+  return OxplayerTestAccountQrHold(
+    enabled: qrHoldEnabled,
+    onHoldComplete: onQrHoldComplete,
+    child: qr,
+  );
 }

@@ -79,11 +79,13 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
     return Scaffold(
       body: SafeArea(
         child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: _bootstrapping
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: _bootstrapping
                   ? const Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -128,6 +130,7 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
                               ),
                           ],
                         ),
+              ),
             ),
           ),
         ),
