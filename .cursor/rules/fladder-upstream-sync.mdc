@@ -14,9 +14,11 @@ This repo is Fladder-based but uses **unrelated Git history** vs `DonutWare/flad
    Remote: `upstream` → `https://github.com/DonutWare/fladder.git`  
    If missing: `git remote add upstream https://github.com/DonutWare/fladder.git`
 
-2. **See what landed upstream** (pick branch; develop is usually ahead of main)  
-   `git log --oneline -30 upstream/develop`  
-   or `upstream/main`
+2. **See what landed upstream** (default: **`upstream/main`** — stable release branch)  
+   `git log --oneline -30 upstream/main`  
+   Use `upstream/develop` only when explicitly asked for unreleased Fladder work.
+
+   New machine setup: `git fetch upstream` then `git remote set-head upstream main` (local only; see `docs/UPSTREAM_SYNC.md`).
 
 3. **For each new commit** (oldest → newest if depending on order)  
    - `git show <commit> --stat` then `git show <commit> -- <path>` for the diff.  

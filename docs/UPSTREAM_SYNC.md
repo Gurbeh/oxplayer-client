@@ -1,43 +1,112 @@
-# Syncing with upstream Fladder
+# Upstream Fladder — setup & sync
 
-This repo is a **fork-style** copy of [Fladder](https://github.com/DonutWare/fladder) (see `../refs/Fladder` in the monorepo as a read-only reference snapshot).
+This repo is a **Fladder-based** client with OXPlayer product code in `lib/oxplayer/`. Almost everything else under `lib/` is upstream Fladder behavior.
 
-**Note:** This tree was imported with **separate Git history** from Fladder, so `git merge upstream/...` often errors with *unrelated histories*. Use **commit-by-commit porting** (see `.cursor/rules/fladder-upstream-sync.mdc` and `git show upstream/develop` / `upstream/main`).
+Upstream project: [DonutWare/fladder](https://github.com/DonutWare/fladder)
 
-## Remote setup
+Optional monorepo snapshot for file diffs: `../refs/Fladder`
 
-Upstream (read-only reference for merges):
+---
+
+## Mental model
+
+```
+Fladder (upstream/main)  ──manual port──►  oxplayer-client (origin/main)
+                                              └── lib/oxplayer/  (OX-only)
+```
+
+- **Git histories are unrelated** — `git merge upstream/main` usually fails with *unrelated histories*.
+- **Do not edit Fladder code** to fix Jellyfin/API bugs; fix **`oxplayer-be`** instead (see `.cursor/rules/fladder-no-edit-trust-jellyfin.mdc`).
+- **OX-only logic** stays in `lib/oxplayer/` and behind `OxplayerConfig.isEnabled`.
+
+---
+
+## One-time setup (new developer / new machine)
+
+After cloning **oxplayer-client**:
 
 ```bash
+# 1. Confirm remotes
+git remote -v
+# origin   → your fork / team repo (push target)
+# upstream → https://github.com/DonutWare/fladder.git (read-only reference)
+
+# 2. Add upstream if missing
 git remote add upstream https://github.com/DonutWare/fladder.git
+
+# 3. Fetch all upstream branches
 git fetch upstream
+
+# 4. Pin local upstream default to main (stable release branch)
+git remote set-head upstream main
 ```
 
-Your own repository (push target for this project):
+Verify:
 
 ```bash
-git remote add origin https://github.com/Aryan-mor/oxplayer-client.git
-git push -u origin main
+git symbolic-ref refs/remotes/upstream/HEAD
+# → refs/remotes/upstream/main
 ```
 
-If `origin` already exists but points to the wrong URL: `git remote set-url origin <new-url>`.
+**No push is required** after step 4. `git remote set-head` is a **local** setting (stored under `.git/`). Each developer runs the same commands on their machine.
 
-## Merge or rebase
+GitHub’s default branch for Fladder is still `develop`; we intentionally track **`upstream/main`** for ports because it matches released/stable Fladder. `upstream/develop` remains available after `git fetch upstream` if you need to inspect unreleased work — do not switch the default unless the team decides to.
 
-Prefer **merge** if you want fewer forced history edits:
+---
+
+## Remotes at a glance
+
+| Remote | URL (typical) | Purpose |
+|--------|----------------|---------|
+| `origin` | `https://github.com/Gurbeh/oxplayer-client.git` | Push OXPlayer work here |
+| `upstream` | `https://github.com/DonutWare/fladder.git` | Read-only; compare & port Fladder fixes |
+
+Wrong `origin` URL? `git remote set-url origin <new-url>`
+
+---
+
+## Sync workflow (porting upstream changes)
+
+Prefer **commit-by-commit porting** over blind merge.
 
 ```bash
-git checkout main
 git fetch upstream
-git merge upstream/main
+git log --oneline -30 upstream/main          # see new stable commits
+git show <commit> --stat                       # scope
+git show <commit> -- lib/path/to/file.dart     # patch to apply
 ```
 
-Resolve conflicts by **keeping upstream behavior** and re-applying OX changes only under `lib/oxplayer/` and minimal hook sites (e.g. `lib/main.dart`).
+For each commit (oldest → newest when order matters):
+
+1. Apply equivalent edits in this tree.
+2. **Keep** `lib/oxplayer/` and OX hook sites in `main.dart` / bootstrap — merge behavior, do not overwrite.
+3. Skip packaging-only changes (fastlane, flatpak, Weblate-only) unless explicitly requested.
+4. After `lib/l10n/*.arb` changes: `flutter gen-l10n` (`lib/l10n/generated` is gitignored).
+5. Verify: `dart analyze` or `flutter analyze` on touched files.
+
+Agent workflow for Cursor: `.cursor/rules/fladder-upstream-sync.mdc`
+
+---
+
+## What not to do
+
+| Avoid | Why |
+|-------|-----|
+| `git merge upstream/main` expecting a clean merge | Unrelated histories; high conflict risk |
+| Replacing Fladder files wholesale from upstream | Wipes OX hooks and custom login/sync paths |
+| Porting from `develop` by default | Unstable; may pull unreleased refactors |
+| Pushing to `upstream` | No write access; not needed |
+
+---
 
 ## OX guard rule
 
-OX-only code must stay behind `OxplayerConfig.isEnabled` (on by default; `--dart-define=OXPLAYER=false` to turn off) and live in `lib/oxplayer/`. That keeps conflict surface small when merging.
+OX-only code must stay behind `OxplayerConfig.isEnabled` (on by default; `--dart-define=OXPLAYER=false` for vanilla Fladder startup) and live in `lib/oxplayer/`. That keeps the conflict surface small when porting.
+
+See also: [`lib/oxplayer/README.md`](../lib/oxplayer/README.md), `.cursor/rules/oxplayer-override-strategy.mdc`
+
+---
 
 ## Reference tree
 
-The workspace may keep `refs/Fladder` as a **non-git** snapshot for diffing APIs; the shipping app is this `oxplayer-client` tree.
+The workspace may keep `refs/Fladder` as a read-only checkout for side-by-side diffs. The shipping app is this `oxplayer-client` tree.

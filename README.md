@@ -14,9 +14,17 @@ flutter run --dart-define=OXPLAYER=false
 
 Implementation lives in [`lib/oxplayer/`](lib/oxplayer/README.md).
 
-## Upstream updates
+## Upstream (Fladder)
 
-See [`docs/UPSTREAM_SYNC.md`](docs/UPSTREAM_SYNC.md).
+First-time Git setup and how we port stable Fladder releases: [`docs/UPSTREAM_SYNC.md`](docs/UPSTREAM_SYNC.md).
+
+Quick start after clone:
+
+```bash
+git remote add upstream https://github.com/DonutWare/fladder.git   # if missing
+git fetch upstream
+git remote set-head upstream main   # local; use upstream/main for ports
+```
 
 ## API
 
