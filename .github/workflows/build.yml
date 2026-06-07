@@ -131,6 +131,8 @@ jobs:
     env:
       BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
       OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      SENTRY_ENVIRONMENT: ${{ needs.fetch-info.outputs.build_type == 'development' && 'development' || 'production' }}
     steps:
       # Full history so sentry_dart_plugin can associate commits with releases (see pubspec ignore_missing).
       - uses: actions/checkout@v5

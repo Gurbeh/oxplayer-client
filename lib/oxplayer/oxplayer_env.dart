@@ -3,6 +3,8 @@ import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 abstract final class OxplayerEnv {
   static const String _cApiBaseUrl = String.fromEnvironment('OXPLAYER_API_BASE_URL', defaultValue: '');
   static const String _cBotUsername = String.fromEnvironment('OXPLAYER_BOT_USERNAME', defaultValue: '');
+  static const String _cSentryDsn = String.fromEnvironment('SENTRY_DSN', defaultValue: '');
+  static const String _cSentryEnvironment = String.fromEnvironment('SENTRY_ENVIRONMENT', defaultValue: '');
 
   static String _pick(List<String> keys, String define) {
     final d = define.trim();
@@ -45,6 +47,16 @@ abstract final class OxplayerEnv {
   }
 
   /// Deep link for app login attempt: ?start=li_<32-char hex attemptId>.
+  static String? get sentryDsn {
+    final t = _pick(['SENTRY_DSN'], _cSentryDsn);
+    return t.isEmpty ? null : t;
+  }
+
+  static String? get sentryEnvironment {
+    final t = _pick(['SENTRY_ENVIRONMENT'], _cSentryEnvironment);
+    return t.isEmpty ? null : t;
+  }
+
   static String? telegramBotLoginAttemptLink(String attemptId) {
     final b = botUsername;
     final id = attemptId.trim();

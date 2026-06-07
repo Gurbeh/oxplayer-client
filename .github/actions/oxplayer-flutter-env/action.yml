@@ -34,6 +34,12 @@ runs:
             "BOT_USERNAME": env_first("BOT_USERNAME"),
             "OXPLAYER_API_BASE_URL": env_first("OXPLAYER_API_BASE_URL"),
         }
+        sentry_dsn = env_first("SENTRY_DSN")
+        if sentry_dsn:
+            keys["SENTRY_DSN"] = sentry_dsn
+        sentry_env = env_first("SENTRY_ENVIRONMENT")
+        if sentry_env:
+            keys["SENTRY_ENVIRONMENT"] = sentry_env
 
         out = Path(os.environ["RUNNER_TEMP"]) / "flutter-build-env.json"
         out.write_text(json.dumps(keys), encoding="utf-8")

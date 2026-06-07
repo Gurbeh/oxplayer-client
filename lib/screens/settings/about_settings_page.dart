@@ -6,6 +6,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/models/funding_model.dart' as funding;
+import 'package:fladder/oxplayer/oxplayer_about_error_logs_button.dart';
 import 'package:fladder/screens/crash_screen/crash_screen.dart';
 import 'package:fladder/screens/settings/settings_scaffold.dart';
 import 'package:fladder/screens/settings/widgets/settings_update_information.dart';
@@ -85,12 +86,12 @@ class AboutSettingsPage extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            FilledButton.tonal(
-              onPressed: () => showDialog(
+            OxplayerAboutErrorLogsButton(
+              label: context.localized.errorLogs,
+              onOpenErrorLogs: () => showDialog(
                 context: context,
                 builder: (context) => const CrashScreen(),
               ),
-              child: Text(context.localized.errorLogs),
             )
           ],
         ),
