@@ -488,4 +488,3 @@ jobs:
           status: completed
           releaseName: "${{ needs.fetch-info.outputs.version_code }} (${{ needs.fetch-info.outputs.version_name }})"
           whatsNewDirectory: distribution/whatsnew
-          changesNotSentForReview: true
