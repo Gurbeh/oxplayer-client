@@ -1,5 +1,7 @@
-# Android CI aligned with upstream Fladder (DonutWare/fladder).
-# Tag v* → release. Schedule / workflow_dispatch → nightly. PR → development.
+# Multi-platform CI aligned with upstream Fladder (DonutWare/fladder).
+# Tag v* → release. Schedule / workflow_dispatch → nightly. PR → development (Android only).
+# Release/nightly: Android, Windows, iOS, macOS, Linux (+ AppImage, Flatpak on release).
+# Web/Docker/Pages deferred until web/ is restored on main.
 # OX additions: oxplayer-flutter-env, Sentry symbols, Play package app.oxplayer, admin Telegram notify.
 name: Build OXPlayer
 
@@ -261,13 +263,257 @@ jobs:
           name: oxplayer-android
           path: build/app/outputs/android_artifacts/
 
+  build-windows:
+    needs: [fetch-info]
+    if: needs.fetch-info.outputs.build_type != 'development'
+    runs-on: windows-2022
+    env:
+      BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
+      OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      SENTRY_ENVIRONMENT: production
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ needs.fetch-info.outputs.flutter_version }}
+          cache: true
+          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+          cache-path: "${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:"
+
+      - run: flutter pub get
+
+      - uses: ./.github/actions/oxplayer-flutter-env
+
+      - name: Build Windows
+        run: |
+          flutter build windows --release `
+            --build-number=${{ needs.fetch-info.outputs.android_version_code }} `
+            --dart-define-from-file="$env:FLUTTER_BUILD_ENV_FILE"
+
+      - name: Compile Inno Setup installer
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        with:
+          path: windows/windows_setup.iss
+          options: /O+ /DFLADDER_VERSION="${{ needs.fetch-info.outputs.version_name }}"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: oxplayer-windows-portable
+          path: build\windows\x64\runner\Release\
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: oxplayer-windows-installer
+          path: windows\Output\fladder_setup.exe
+
+  build-ios:
+    needs: [fetch-info]
+    if: needs.fetch-info.outputs.build_type != 'development'
+    runs-on: macos-latest
+    env:
+      BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
+      OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      SENTRY_ENVIRONMENT: production
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ needs.fetch-info.outputs.flutter_version }}
+          cache: true
+          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+          cache-path: "${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:"
+
+      - run: flutter pub get
+
+      - uses: ./.github/actions/oxplayer-flutter-env
+
+      - name: Build iOS IPA (unsigned)
+        run: |
+          flutter build ipa --no-codesign --flavor production \
+            --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
+            --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
+
+      - name: Package unsigned IPA
+        run: |
+          cd build/ios/archive/Runner.xcarchive/Products/Applications/
+          mkdir Payload
+          mv Runner.app Payload/
+          zip -r iOS.ipa Payload
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: oxplayer-iOS
+          path: build/ios/archive/Runner.xcarchive/Products/Applications/iOS.ipa
+
+  build-macos:
+    needs: [fetch-info]
+    if: needs.fetch-info.outputs.build_type != 'development'
+    runs-on: macos-latest
+    env:
+      BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
+      OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      SENTRY_ENVIRONMENT: production
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ needs.fetch-info.outputs.flutter_version }}
+          cache: true
+          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+          cache-path: "${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:"
+
+      - run: flutter pub get
+
+      - uses: ./.github/actions/oxplayer-flutter-env
+
+      - name: Build macOS app
+        run: |
+          flutter build macos --flavor production --release \
+            --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
+            --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
+
+      - name: Ensure correct app bundle name
+        run: |
+          APP_DIR="build/macos/Build/Products/Release-production"
+          mv "$APP_DIR/fladder.app" "$APP_DIR/Fladder.app"
+
+      - name: Create DMG
+        run: |
+          brew install create-dmg
+          ./scripts/create_dmg.sh
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: oxplayer-macOS
+          path: build/macos/Build/Products/Release-production/macOS.dmg
+
+  build-linux:
+    needs: [fetch-info]
+    if: needs.fetch-info.outputs.build_type != 'development'
+    runs-on: ubuntu-latest
+    env:
+      BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
+      OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      SENTRY_ENVIRONMENT: production
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ needs.fetch-info.outputs.flutter_version }}
+          cache: true
+          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+          cache-path: "${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:"
+
+      - name: Sync pubspec build number for Linux packaging
+        run: |
+          sed -i -E 's/(version: [0-9]+\.[0-9]+\.[0-9]+\+)[0-9]+/\1${{ needs.fetch-info.outputs.android_version_code }}/' pubspec.yaml
+
+      - run: flutter pub get
+
+      - uses: ./.github/actions/oxplayer-flutter-env
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libgtk-3-dev libmpv-dev patchelf cmake clang libfuse2
+
+      - name: Build Linux app
+        run: |
+          flutter build linux --release \
+            --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
+            --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
+
+      - name: Fix RPATH
+        run: |
+          for lib in build/linux/x64/release/bundle/lib/*.so; do
+            [[ -f "$lib" && -n "$(patchelf --print-rpath "$lib")" ]] && \
+            patchelf --set-rpath '$ORIGIN' "$lib"
+          done
+          patchelf --set-rpath '$ORIGIN/lib' "build/linux/x64/release/bundle/fladder"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: oxplayer-linux
+          path: build/linux/x64/release/bundle
+
+      - name: Build AppImage
+        run: |
+          VERSION_TO_USE="${{ needs.fetch-info.outputs.version_name }}"
+          sed -i -E "s/(version:\\s*)latest/\\1${VERSION_TO_USE}/" AppImageBuilder.yml
+          sed -i "s|PLACEHOLDER_OWNER|${{ github.repository_owner }}|g" AppImageBuilder.yml
+          sed -i "s|PLACEHOLDER_REPO|${{ github.event.repository.name }}|g" AppImageBuilder.yml
+          wget -O appimage-builder-x86_64.AppImage https://github.com/AppImageCrafters/appimage-builder/releases/download/v1.1.0/appimage-builder-1.1.0-x86_64.AppImage
+          chmod +x appimage-builder-x86_64.AppImage
+          sudo mv appimage-builder-x86_64.AppImage /usr/local/bin/appimage-builder
+          appimage-builder --recipe AppImageBuilder.yml
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: oxplayer-linux-appimage
+          path: |
+            OXPlayer_x86_64.AppImage
+            OXPlayer_x86_64.AppImage.zsync
+
+  build-linux-flatpak:
+    needs: [fetch-info, build-linux]
+    if: needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly'
+    runs-on: ubuntu-latest
+    container:
+      image: bilelmoussaoui/flatpak-github-actions:gnome-46
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: oxplayer-linux
+          path: build/linux/x64/release/bundle
+
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: OXPlayer-Linux.flatpak
+          manifest-path: flatpak/nl.jknaapen.fladder.yaml
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: oxplayer-linux-flatpak
+          path: OXPlayer-Linux.flatpak
+
   create_release:
     name: Create Release
     needs:
       - fetch-info
       - build-android
+      - build-windows
+      - build-ios
+      - build-macos
+      - build-linux
+      - build-linux-flatpak
     runs-on: ubuntu-latest
-    if: needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly'
+    if: |
+      always() &&
+      (needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly') &&
+      needs.fetch-info.result == 'success' &&
+      needs.build-android.result == 'success' &&
+      needs.build-windows.result == 'success' &&
+      needs.build-ios.result == 'success' &&
+      needs.build-macos.result == 'success' &&
+      needs.build-linux.result == 'success' &&
+      (needs.build-linux-flatpak.result == 'success' || needs.build-linux-flatpak.result == 'skipped')
     permissions:
       contents: write
     steps:
@@ -337,6 +583,88 @@ jobs:
           mv "oxplayer-android/${SUF}-x86_64.apk" "OXPlayer-Android-${V}-x86_64.apk" || true
           mv "oxplayer-android/${SUF}.aab" "OXPlayer-Android-${V}.aab"
 
+      - uses: actions/download-artifact@v5
+        with:
+          name: oxplayer-windows-portable
+          path: oxplayer-windows-portable
+
+      - name: Stage Windows portable
+        shell: bash
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          cd oxplayer-windows-portable
+          zip -r "../OXPlayer-Windows-${V}.zip" .
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: oxplayer-windows-installer
+          path: oxplayer-windows-installer
+
+      - name: Stage Windows installer
+        shell: bash
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          mv "oxplayer-windows-installer/fladder_setup.exe" "OXPlayer-Windows-${V}-Setup.exe"
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: oxplayer-iOS
+          path: oxplayer-iOS
+
+      - name: Stage iOS IPA
+        shell: bash
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          mv "oxplayer-iOS/iOS.ipa" "OXPlayer-iOS-${V}.ipa"
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: oxplayer-macOS
+          path: oxplayer-macOS
+
+      - name: Stage macOS DMG
+        shell: bash
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          mv "oxplayer-macOS/macOS.dmg" "OXPlayer-macOS-${V}.dmg"
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: oxplayer-linux
+          path: oxplayer-linux
+
+      - name: Stage Linux bundle
+        shell: bash
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          cd oxplayer-linux
+          zip -r "../OXPlayer-Linux-${V}.zip" .
+
+      - uses: actions/download-artifact@v5
+        if: needs.fetch-info.outputs.build_type == 'release'
+        with:
+          name: oxplayer-linux-flatpak
+          path: oxplayer-linux-flatpak
+
+      - name: Stage Linux Flatpak
+        if: needs.fetch-info.outputs.build_type == 'release'
+        shell: bash
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          mv "oxplayer-linux-flatpak/OXPlayer-Linux.flatpak" "OXPlayer-Linux-${V}.flatpak"
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: oxplayer-linux-appimage
+          path: oxplayer-linux-appimage
+
+      - name: Stage Linux AppImage
+        shell: bash
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          mv "oxplayer-linux-appimage/OXPlayer_x86_64.AppImage" "OXPlayer-Linux-${V}.AppImage"
+          mv "oxplayer-linux-appimage/OXPlayer_x86_64.AppImage.zsync" "OXPlayer-Linux-${V}.AppImage.zsync"
+
       - name: Prepare GitHub release body file
         shell: bash
         run: |
@@ -361,6 +689,14 @@ jobs:
             OXPlayer-Android-${{ steps.version.outputs.version }}-armeabi-v7a.apk
             OXPlayer-Android-${{ steps.version.outputs.version }}-x86_64.apk
             OXPlayer-Android-${{ steps.version.outputs.version }}.aab
+            OXPlayer-Windows-${{ steps.version.outputs.version }}-Setup.exe
+            OXPlayer-Windows-${{ steps.version.outputs.version }}.zip
+            OXPlayer-iOS-${{ steps.version.outputs.version }}.ipa
+            OXPlayer-macOS-${{ steps.version.outputs.version }}.dmg
+            OXPlayer-Linux-${{ steps.version.outputs.version }}.zip
+            OXPlayer-Linux-${{ steps.version.outputs.version }}.AppImage
+            OXPlayer-Linux-${{ steps.version.outputs.version }}.AppImage.zsync
+            ${{ needs.fetch-info.outputs.build_type == 'release' && format('OXPlayer-Linux-{0}.flatpak', steps.version.outputs.version) || '' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
@@ -420,6 +756,9 @@ jobs:
       - create_release
       - build-android
     runs-on: ubuntu-latest
+    if: |
+      (needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly') &&
+      needs.create_release.result == 'success'
     concurrency:
       group: google-play-upload-${{ github.repository }}
       cancel-in-progress: false
