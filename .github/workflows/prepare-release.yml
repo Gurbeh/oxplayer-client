@@ -5,13 +5,12 @@ on:
 
 jobs:
   prepare-release:
-    name: Bump Version and Tag
+    name: Update metadata and tag
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -25,8 +24,6 @@ jobs:
           echo "version=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
           echo "build_number=${BUILD_NUMBER}" >> "$GITHUB_OUTPUT"
           echo "Version: $VERSION_NAME (Build: $BUILD_NUMBER)"
-
-          bash tool/release/validate_version.sh --for-tag
 
           if git rev-parse "v${VERSION_NAME}" >/dev/null 2>&1; then
             echo "is_new_version=false" >> "$GITHUB_OUTPUT"
@@ -43,8 +40,7 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           mkdir -p fastlane/metadata/android/en-US/changelogs
-          BUILD="${{ steps.version.outputs.build_number }}"
-          printf '%s' "${{ env.CHANGELOG_MSG }}" > "fastlane/metadata/android/en-US/changelogs/${BUILD}.txt"
+          printf '%s' "${{ env.CHANGELOG_MSG }}" > "fastlane/metadata/android/en-US/changelogs/${VERSION}.txt"
 
       - name: Commit and Tag
         if: steps.version.outputs.is_new_version == 'true'

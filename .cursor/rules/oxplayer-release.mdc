@@ -1,20 +1,24 @@
 ---
-description: OXPlayer client release and Google Play versionCode checklist
+description: OXPlayer Android release workflow (Fladder-aligned CI)
 alwaysApply: false
-globs: pubspec.yaml,.github/workflows/**,fastlane/**,tool/release/**
+globs: pubspec.yaml,.github/workflows/**,fastlane/**
 ---
 
-# OXPlayer release (GitHub + Google Play)
+# OXPlayer release (Fladder-aligned Android CI)
 
-## Golden rule
+Same model as upstream [DonutWare/fladder](https://github.com/DonutWare/fladder) Android pipeline.
 
-> **Always inspect git and the Play version ledger before changing `pubspec.yaml` or tagging.**
+## Versioning
 
-`version:` in `pubspec.yaml` is `VERSION_NAME+VERSION_CODE`. Android **versionCode** (`+` suffix) must **strictly increase** and is **never reused**. Nightly builds must **not** upload to Play.
+| Field | Source | Notes |
+|-------|--------|-------|
+| **versionName** | `pubspec.yaml` before `+` | e.g. `0.0.4` |
+| **versionCode (CI builds)** | `github.run_number` | Unique per workflow run — **not** pubspec `+` suffix |
+| **Git tag** | `v{versionName}` | e.g. `v0.0.4` |
 
-## Pre-release checklist (local)
+Local/dev builds may still use pubspec `+N`; CI always passes `--build-number=${{ github.run_number }}`.
 
-Run from repo root:
+## Pre-release checklist
 
 ```bash
 git fetch origin --tags
@@ -22,39 +26,39 @@ git log origin/main -1 --oneline
 git tag -l 'v*' | tail -5
 grep '^version:' pubspec.yaml
 ls fastlane/metadata/android/en-US/changelogs/
-bash tool/release/validate_version.sh --for-tag   # new GitHub tag
-bash tool/release/validate_version.sh             # Play-only retry on main
 ```
 
-| Check | Action |
-|-------|--------|
-| New **GitHub** release | Bump **both** name and code if needed (e.g. `0.0.4+8`). Tag `v{VERSION_NAME}` must **not** exist. |
-| **Play-only** retry (tag already published) | Bump **only** `+VERSION_CODE` on `main` (e.g. `0.0.3+8`). Do **not** re-tag. |
-| `versionCode` vs ledger | `+N` must be **>** highest numeric `fastlane/.../changelogs/N.txt`. |
-| After push to `main` | Nightly may build but **must not** upload to Play (release-only). |
+Before tagging:
 
-## Release workflow (new version)
+1. Bump **version name** in `pubspec.yaml` (e.g. `0.0.3+8` → `0.0.4+8` — the `+` suffix is for local builds only).
+2. Confirm `v{versionName}` tag does **not** exist.
+3. Commit and push to `main`.
 
-1. Commit feature/fixes on `main`.
-2. Set `pubspec.yaml` → e.g. `0.0.4+9` (`+9` > last changelog `8.txt`).
-3. Commit: `chore: bump version to 0.0.4+9`
-4. GitHub Actions → **Prepare Release** (on `main`) → creates changelog + tag `v0.0.4`.
-5. Tag push triggers **Build OXPlayer** (`build_type=release`) → GitHub Release (draft) + Play internal upload.
-6. Publish draft release on GitHub when CI is green.
+## Release steps
 
-## Play-only upload (versionCode collision fix)
+1. **Prepare Release** (workflow_dispatch on `main`) → fastlane `changelogs/{versionName}.txt` + tag `v*`
+2. Tag push → **Build OXPlayer** (`build_type=release`) → signed APK/AAB + GitHub draft release
+3. **Play upload** (if `SERVICE_ACCOUNT_JSON` set): release → `production` / `draft`; nightly → `internal` / `completed`
+4. Publish GitHub draft when green.
 
-When Play returns `Version code N has already been used`:
+## Triggers (Android)
 
-1. `git fetch origin && git pull`
-2. Bump **only** build number: `0.0.3+8` (keep name if GitHub release unchanged).
-3. Add `fastlane/metadata/android/en-US/changelogs/8.txt` if missing.
-4. Push to `main`.
-5. Actions → **Build OXPlayer** → `workflow_dispatch` → `build_type=release` → branch `main`  
-   (skips GitHub release when not on a tag; uploads Play only.)
+| Event | build_type | GitHub Release | Play upload |
+|-------|------------|----------------|-------------|
+| Tag `v*` | release | draft | production (draft) |
+| Schedule / manual nightly | nightly | prerelease `nightly` | internal (completed) |
+| PR | development | no | no |
+| Push to `main` (no tag) | development | no | no |
+
+## OX-only additions (keep when syncing from Fladder)
+
+- `./.github/actions/oxplayer-flutter-env`
+- Sentry symbol upload (`continue-on-error: true`)
+- Admin Telegram notify after GitHub release
+- Package `app.oxplayer`
 
 ## Never do
 
-- Reuse a `versionCode` already in Play or in `changelogs/*.txt`.
-- Tag `v0.0.3` twice or release without running `validate_version.sh`.
-- Rely on nightly/main push for Play uploads.
+- Use pubspec `+N` as CI `--build-number` (causes Play versionCode collisions).
+- Trigger nightly on every `main` push (Fladder does not).
+- Re-tag an existing `v*` without bumping version name in pubspec.

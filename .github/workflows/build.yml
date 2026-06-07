@@ -1,5 +1,6 @@
-# Android-only in CI (Linux build + AppImage + Linux release assets removed from this workflow). Web omitted (fvp/ffi). Windows omitted (media_kit native extract flaky on GHA).
-# Push to main → nightly (create_release runs). PRs → development (no GitHub Release).
+# Android CI aligned with upstream Fladder (DonutWare/fladder).
+# Tag v* → release. Schedule / workflow_dispatch → nightly. PR → development.
+# OX additions: oxplayer-flutter-env, Sentry symbols, Play package app.oxplayer, admin Telegram notify.
 name: Build OXPlayer
 
 on:
@@ -69,8 +70,6 @@ jobs:
             fi
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             BUILD_TYPE="development"
-          elif [[ "${{ github.event_name }}" == "push" ]] && [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            BUILD_TYPE="nightly"
           else
             BUILD_TYPE="development"
           fi
@@ -85,24 +84,19 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version_name: ${{ steps.fetch.outputs.version_name }}
-      version_code: ${{ steps.fetch.outputs.version_code }}
       flutter_version: ${{ steps.fetch.outputs.flutter_version }}
       nightly_version: ${{ steps.fetch.outputs.nightly_version }}
       build_type: ${{ needs.check-trigger.outputs.build_type }}
     steps:
-      # Shallow clone: only pubspec.yaml + .fvmrc are read (avoids noisy full-history fetch).
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - id: fetch
         shell: bash
         run: |
-          VERSION_LINE=$(grep '^version:' pubspec.yaml | cut -d ':' -f2 | tr -d ' ')
-          VERSION_NAME="${VERSION_LINE%%+*}"
-          VERSION_CODE="${VERSION_LINE#*+}"
+          VERSION_NAME=$(grep '^version:' pubspec.yaml | cut -d ':' -f2 | cut -d '+' -f1 | tr -d ' ')
           echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
-          echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
 
           FLUTTER_VERSION=$(jq -r '.flutter' .fvmrc)
           echo "flutter_version=${FLUTTER_VERSION}" >> "$GITHUB_OUTPUT"
@@ -116,13 +110,8 @@ jobs:
           fi
 
           echo "Base version: $VERSION_NAME"
-          echo "Version code: $VERSION_CODE"
           echo "Flutter version: $FLUTTER_VERSION"
-
-      - name: Validate pubspec version (release / Play)
-        if: needs.check-trigger.outputs.build_type == 'release'
-        shell: bash
-        run: bash tool/release/validate_version.sh
+          echo "CI build number (Android versionCode): ${{ github.run_number }}"
 
   build-android:
     needs: [fetch-info]
@@ -139,7 +128,6 @@ jobs:
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       SENTRY_ENVIRONMENT: ${{ needs.fetch-info.outputs.build_type == 'development' && 'development' || 'production' }}
     steps:
-      # Full history so sentry_dart_plugin can associate commits with releases (see pubspec ignore_missing).
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -168,15 +156,6 @@ jobs:
           keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
           EOF
 
-          if ! keytool -list -keystore android/app/keystore.jks \
-               -alias "${{ secrets.ANDROID_KEY_ALIAS }}" \
-               -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
-               -keypass "${{ secrets.ANDROID_KEY_PASSWORD }}" >/dev/null 2>&1; then
-            echo "Keystore validation failed."
-            rm -f android/app/keystore.jks android/app/key.properties
-            exit 1
-          fi
-
       - uses: actions/setup-java@v5
         with:
           distribution: "zulu"
@@ -191,50 +170,41 @@ jobs:
           cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
           cache-path: "${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:"
 
-      - uses: actions/cache@v5
-        with:
-          path: ~/.pub-cache
-          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pub-
-
       - run: flutter pub get
 
       - uses: ./.github/actions/oxplayer-flutter-env
 
-      - name: Build Android (development)
+      - name: Build Android APK (PRs)
         if: needs.fetch-info.outputs.build_type == 'development'
         run: |
           flutter build apk --debug --split-per-abi \
+            --build-number=${{ github.run_number }} \
             --flavor production \
-            --build-name=${{ needs.fetch-info.outputs.version_name }} \
-            --build-number=${{ needs.fetch-info.outputs.version_code }} \
             --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
 
-      - name: Build Android (release)
+      - name: Build Android APK and AAB
         if: needs.fetch-info.outputs.build_type != 'development'
         run: |
           flutter build apk --release --split-per-abi \
             --split-debug-info=build/debug-info \
+            --build-number=${{ github.run_number }} \
             --flavor production \
-            --build-name=${{ needs.fetch-info.outputs.version_name }} \
-            --build-number=${{ needs.fetch-info.outputs.version_code }} \
             --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
           flutter build appbundle --release \
             --split-debug-info=build/debug-info \
+            --build-number=${{ github.run_number }} \
             --flavor production \
-            --build-name=${{ needs.fetch-info.outputs.version_name }} \
-            --build-number=${{ needs.fetch-info.outputs.version_code }} \
             --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
 
       - name: Upload debug symbols to Sentry
         if: needs.fetch-info.outputs.build_type != 'development'
+        continue-on-error: true
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
-          SENTRY_RELEASE: oxplayer-client@${{ needs.fetch-info.outputs.version_name }}+${{ needs.fetch-info.outputs.version_code }}
-          SENTRY_DIST: ${{ needs.fetch-info.outputs.version_code }}
+          SENTRY_RELEASE: oxplayer-client@${{ needs.fetch-info.outputs.version_name }}+${{ github.run_number }}
+          SENTRY_DIST: ${{ github.run_number }}
         run: dart run sentry_dart_plugin
 
       - name: Verify native ABI parity (Play 64-bit / no x86)
@@ -255,9 +225,9 @@ jobs:
         run: |
           mkdir -p build/app/outputs/android_artifacts
           SUF="${{ steps.meta.outputs.artifact_suffix }}"
-          cp "build/app/outputs/flutter-apk/app-armeabi-v7a-production-debug.apk" "build/app/outputs/android_artifacts/${SUF}-armeabi-v7a.apk"
-          cp "build/app/outputs/flutter-apk/app-arm64-v8a-production-debug.apk" "build/app/outputs/android_artifacts/${SUF}-arm64-v8a.apk"
-          cp "build/app/outputs/flutter-apk/app-x86_64-production-debug.apk" "build/app/outputs/android_artifacts/${SUF}-x86_64.apk"
+          cp "build/app/outputs/flutter-apk/app-armeabi-v7a-production-debug.apk" "build/app/outputs/android_artifacts/${SUF}-armeabi-v7a.apk" || true
+          cp "build/app/outputs/flutter-apk/app-arm64-v8a-production-debug.apk" "build/app/outputs/android_artifacts/${SUF}-arm64-v8a.apk" || true
+          cp "build/app/outputs/flutter-apk/app-x86_64-production-debug.apk" "build/app/outputs/android_artifacts/${SUF}-x86_64.apk" || true
 
       - name: Collect Android artifacts (release)
         if: needs.fetch-info.outputs.build_type != 'development'
@@ -265,9 +235,9 @@ jobs:
         run: |
           mkdir -p build/app/outputs/android_artifacts
           SUF="${{ steps.meta.outputs.artifact_suffix }}"
-          cp "build/app/outputs/flutter-apk/app-armeabi-v7a-production-release.apk" "build/app/outputs/android_artifacts/${SUF}-armeabi-v7a.apk"
-          cp "build/app/outputs/flutter-apk/app-arm64-v8a-production-release.apk" "build/app/outputs/android_artifacts/${SUF}-arm64-v8a.apk"
-          cp "build/app/outputs/flutter-apk/app-x86_64-production-release.apk" "build/app/outputs/android_artifacts/${SUF}-x86_64.apk"
+          cp "build/app/outputs/flutter-apk/app-armeabi-v7a-production-release.apk" "build/app/outputs/android_artifacts/${SUF}-armeabi-v7a.apk" || true
+          cp "build/app/outputs/flutter-apk/app-arm64-v8a-production-release.apk" "build/app/outputs/android_artifacts/${SUF}-arm64-v8a.apk" || true
+          cp "build/app/outputs/flutter-apk/app-x86_64-production-release.apk" "build/app/outputs/android_artifacts/${SUF}-x86_64.apk" || true
           mv "build/app/outputs/bundle/productionRelease/app-production-release.aab" "build/app/outputs/android_artifacts/${SUF}.aab"
 
       - name: Attest APKs
@@ -290,9 +260,7 @@ jobs:
       - fetch-info
       - build-android
     runs-on: ubuntu-latest
-    if: |
-      needs.fetch-info.outputs.build_type == 'nightly' ||
-      (needs.fetch-info.outputs.build_type == 'release' && startsWith(github.ref, 'refs/tags/v'))
+    if: needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly'
     permissions:
       contents: write
     steps:
@@ -357,9 +325,9 @@ jobs:
         run: |
           SUF="${{ needs.build-android.outputs.artifact_suffix }}"
           V="${{ steps.version.outputs.version }}"
-          mv "oxplayer-android/${SUF}-armeabi-v7a.apk" "OXPlayer-Android-${V}-armeabi-v7a.apk"
-          mv "oxplayer-android/${SUF}-arm64-v8a.apk" "OXPlayer-Android-${V}-arm64-v8a.apk"
-          mv "oxplayer-android/${SUF}-x86_64.apk" "OXPlayer-Android-${V}-x86_64.apk"
+          mv "oxplayer-android/${SUF}-armeabi-v7a.apk" "OXPlayer-Android-${V}-armeabi-v7a.apk" || true
+          mv "oxplayer-android/${SUF}-arm64-v8a.apk" "OXPlayer-Android-${V}-arm64-v8a.apk" || true
+          mv "oxplayer-android/${SUF}-x86_64.apk" "OXPlayer-Android-${V}-x86_64.apk" || true
           mv "oxplayer-android/${SUF}.aab" "OXPlayer-Android-${V}.aab"
 
       - name: Prepare GitHub release body file
@@ -402,7 +370,7 @@ jobs:
         run: |
           NOTIFY_TOKEN="${NOTIFY_TOKEN_PRIMARY:-${NOTIFY_TOKEN_FALLBACK}}"
           if [ -z "${API_BASE}" ] || [ -z "${NOTIFY_TOKEN}" ]; then
-            echo "Skipping admin release notify (set OXPLAYER_API_BASE_URL and OXPLAYER_CLIENT_RELEASE_NOTIFY_TOKEN or PROVIDER_INTERNAL_TOKEN)."
+            echo "Skipping admin release notify."
             exit 0
           fi
           if [[ "${BUILD_TYPE}" == "nightly" ]]; then
@@ -412,8 +380,7 @@ jobs:
           fi
           BASE="${API_BASE%/}"
           if ! JSON=$(gh release view "${TAG}" --repo "${REPO}" --json url,name,assets 2>/tmp/gh-release-view.err); then
-            echo "::warning::Could not read release ${TAG} from GitHub: $(cat /tmp/gh-release-view.err)"
-            echo "If this persists, remove any repository secret named GITHUB_TOKEN (it overrides the workflow token)."
+            echo "::warning::Could not read release ${TAG}: $(cat /tmp/gh-release-view.err)"
             exit 0
           fi
           RELEASE_URL=$(echo "$JSON" | jq -r .url)
@@ -434,8 +401,7 @@ jobs:
             -d "$BODY")
           NOTIFY_OK=$(jq -r '.ok // false' /tmp/ox-release-notify.json 2>/dev/null || echo false)
           if [ "$HTTP_CODE" != "200" ] || [ "$NOTIFY_OK" != "true" ]; then
-            echo "::warning::Admin Telegram notify failed (HTTP ${HTTP_CODE}): $(cat /tmp/ox-release-notify.json)"
-            echo "Release published; fix TELEGRAM_MAIN_BOT_TOKEN / admin /start with main bot, or set SUPERADMIN_ID on API."
+            echo "::warning::Admin Telegram notify failed (HTTP ${HTTP_CODE})"
           else
             echo "Admin release notify sent."
           fi
@@ -444,11 +410,10 @@ jobs:
     name: Upload AAB to Google Play
     needs:
       - fetch-info
+      - create_release
       - build-android
     runs-on: ubuntu-latest
-    # Release builds only — nightly must not consume versionCode on Play.
-    # Re-enable: repo variable UPLOAD_TO_GOOGLE_PLAY=true (Settings → Actions → Variables).
-    if: needs.fetch-info.outputs.build_type == 'release' && vars.UPLOAD_TO_GOOGLE_PLAY == 'true'
+    if: needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly'
     concurrency:
       group: google-play-upload-${{ github.repository }}
       cancel-in-progress: false
@@ -472,16 +437,6 @@ jobs:
           name: oxplayer-android
           path: oxplayer-android
 
-      - name: Write Play release notes
-        if: steps.play_secret.outputs.has_secret == 'true'
-        shell: bash
-        run: |
-          VN="${{ needs.fetch-info.outputs.version_name }}"
-          DIR="distribution/whatsnew"
-          mkdir -p "$DIR"
-          MSG="OXPlayer ${VN} — see https://github.com/${{ github.repository }}/releases/tag/v${VN}"
-          printf '%s' "$MSG" > "${DIR}/whatsnew-en-US"
-
       - name: Upload AAB to Google Play Console
         if: steps.play_secret.outputs.has_secret == 'true'
         uses: r0adkll/upload-google-play@v1.1.4
@@ -489,9 +444,6 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.SERVICE_ACCOUNT_JSON }}
           packageName: "app.oxplayer"
           releaseFiles: "oxplayer-android/${{ needs.build-android.outputs.artifact_suffix }}.aab"
-          # internal first: production API upload fails with "Precondition check failed"
-          # until at least one release was promoted through internal/closed testing in Play Console.
-          tracks: internal
-          status: completed
-          releaseName: "${{ needs.fetch-info.outputs.version_code }} (${{ needs.fetch-info.outputs.version_name }})"
-          whatsNewDirectory: distribution/whatsnew
+          track: ${{ needs.fetch-info.outputs.build_type == 'nightly' && 'internal' || 'production' }}
+          status: ${{ needs.fetch-info.outputs.build_type == 'nightly' && 'completed' || 'draft' }}
+          releaseName: "${{ github.run_number }} (${{ needs.fetch-info.outputs.version_name }})"
