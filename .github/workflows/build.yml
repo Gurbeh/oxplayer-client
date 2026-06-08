@@ -1,5 +1,6 @@
 # Multi-platform CI aligned with upstream Fladder (DonutWare/fladder).
 # Tag v* → release. Schedule / workflow_dispatch → nightly. PR → development (Android only).
+# Branch `multi-app`: full platform matrix on every run (test branch).
 # Release/nightly: Android, Windows, iOS, macOS, Linux (+ AppImage, Flatpak on release).
 # Web/Docker/Pages deferred until web/ is restored on main.
 # OX additions: oxplayer-flutter-env, Sentry symbols, Play package app.oxplayer, admin Telegram notify.
@@ -11,6 +12,7 @@ on:
       - "v*"
     branches:
       - main
+      - multi-app
   pull_request:
     paths:
       - pubspec.yaml
@@ -41,6 +43,8 @@ concurrency:
 
 env:
   NIGHTLY_TAG: nightly
+  # Test branch: run Windows/iOS/macOS/Linux/Flatpak even on PR/development builds.
+  FULL_MATRIX_BRANCH: multi-app
 
 jobs:
   check-trigger:
@@ -48,6 +52,7 @@ jobs:
     outputs:
       should_run: ${{ steps.check.outputs.should_run }}
       build_type: ${{ steps.check.outputs.build_type }}
+      build_all_platforms: ${{ steps.check.outputs.build_all_platforms }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -78,6 +83,14 @@ jobs:
             BUILD_TYPE="development"
           fi
 
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
+          if [[ "$BRANCH" == "${{ env.FULL_MATRIX_BRANCH }}" ]]; then
+            echo "build_all_platforms=true" >> "$GITHUB_OUTPUT"
+            echo "Full platform matrix enabled for branch: ${BRANCH}"
+          else
+            echo "build_all_platforms=false" >> "$GITHUB_OUTPUT"
+          fi
+
           echo "build_type=${BUILD_TYPE}" >> "$GITHUB_OUTPUT"
           echo "should_run=true" >> "$GITHUB_OUTPUT"
           echo "Build type determined: ${BUILD_TYPE}"
@@ -92,6 +105,7 @@ jobs:
       flutter_version: ${{ steps.fetch.outputs.flutter_version }}
       nightly_version: ${{ steps.fetch.outputs.nightly_version }}
       build_type: ${{ needs.check-trigger.outputs.build_type }}
+      build_all_platforms: ${{ needs.check-trigger.outputs.build_all_platforms }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -146,7 +160,7 @@ jobs:
         run: echo "artifact_suffix=${{ needs.fetch-info.outputs.build_type }}" >> "$GITHUB_OUTPUT"
 
       - name: Configure Android signing
-        if: needs.fetch-info.outputs.build_type != 'development'
+        if: needs.fetch-info.outputs.build_type != 'development' || needs.fetch-info.outputs.build_all_platforms == 'true'
         shell: bash
         run: |
           if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ] || \
@@ -192,7 +206,7 @@ jobs:
             --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
 
       - name: Build Android APK and AAB
-        if: needs.fetch-info.outputs.build_type != 'development'
+        if: needs.fetch-info.outputs.build_type != 'development' || needs.fetch-info.outputs.build_all_platforms == 'true'
         run: |
           flutter build apk --release --split-per-abi \
             --split-debug-info=build/debug-info \
@@ -206,7 +220,7 @@ jobs:
             --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
 
       - name: Upload debug symbols to Sentry
-        if: needs.fetch-info.outputs.build_type != 'development'
+        if: needs.fetch-info.outputs.build_type != 'development' || needs.fetch-info.outputs.build_all_platforms == 'true'
         continue-on-error: true
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
@@ -217,7 +231,7 @@ jobs:
         run: dart run sentry_dart_plugin
 
       - name: Verify native ABI parity (Play 64-bit / no x86)
-        if: needs.fetch-info.outputs.build_type != 'development'
+        if: needs.fetch-info.outputs.build_type != 'development' || needs.fetch-info.outputs.build_all_platforms == 'true'
         run: |
           set -euo pipefail
           AAB="build/app/outputs/bundle/productionRelease/app-production-release.aab"
@@ -239,7 +253,7 @@ jobs:
           cp "build/app/outputs/flutter-apk/app-x86_64-production-debug.apk" "build/app/outputs/android_artifacts/${SUF}-x86_64.apk" || true
 
       - name: Collect Android artifacts (release)
-        if: needs.fetch-info.outputs.build_type != 'development'
+        if: needs.fetch-info.outputs.build_type != 'development' || needs.fetch-info.outputs.build_all_platforms == 'true'
         shell: bash
         run: |
           mkdir -p build/app/outputs/android_artifacts
@@ -250,7 +264,7 @@ jobs:
           mv "build/app/outputs/bundle/productionRelease/app-production-release.aab" "build/app/outputs/android_artifacts/${SUF}.aab"
 
       - name: Attest APKs
-        if: needs.fetch-info.outputs.build_type != 'development'
+        if: needs.fetch-info.outputs.build_type != 'development' || needs.fetch-info.outputs.build_all_platforms == 'true'
         uses: actions/attest@v4
         with:
           subject-path: |
@@ -265,7 +279,7 @@ jobs:
 
   build-windows:
     needs: [fetch-info]
-    if: needs.fetch-info.outputs.build_type != 'development'
+    if: needs.fetch-info.outputs.build_type != 'development' || needs.fetch-info.outputs.build_all_platforms == 'true'
     runs-on: windows-2022
     env:
       BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
@@ -311,7 +325,7 @@ jobs:
 
   build-ios:
     needs: [fetch-info]
-    if: needs.fetch-info.outputs.build_type != 'development'
+    if: needs.fetch-info.outputs.build_type != 'development' || needs.fetch-info.outputs.build_all_platforms == 'true'
     runs-on: macos-latest
     env:
       BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
@@ -353,7 +367,7 @@ jobs:
 
   build-macos:
     needs: [fetch-info]
-    if: needs.fetch-info.outputs.build_type != 'development'
+    if: needs.fetch-info.outputs.build_type != 'development' || needs.fetch-info.outputs.build_all_platforms == 'true'
     runs-on: macos-latest
     env:
       BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
@@ -398,7 +412,7 @@ jobs:
 
   build-linux:
     needs: [fetch-info]
-    if: needs.fetch-info.outputs.build_type != 'development'
+    if: needs.fetch-info.outputs.build_type != 'development' || needs.fetch-info.outputs.build_all_platforms == 'true'
     runs-on: ubuntu-latest
     env:
       BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
@@ -468,7 +482,10 @@ jobs:
 
   build-linux-flatpak:
     needs: [fetch-info, build-linux]
-    if: needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly'
+    if: |
+      needs.fetch-info.outputs.build_type == 'release' ||
+      needs.fetch-info.outputs.build_type == 'nightly' ||
+      needs.fetch-info.outputs.build_all_platforms == 'true'
     runs-on: ubuntu-latest
     container:
       image: bilelmoussaoui/flatpak-github-actions:gnome-46
