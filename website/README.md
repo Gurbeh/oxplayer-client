@@ -5,6 +5,7 @@ Next.js static site for [OXPlayer](https://github.com/Gurbeh/oxplayer-client). D
 | URL | Purpose |
 |-----|---------|
 | https://gurbeh.github.io/oxplayer-client/ | Landing page |
+| https://gurbeh.github.io/oxplayer-client/web/ | Flutter web app |
 | https://gurbeh.github.io/oxplayer-client/privacy-policy.html | Play Store privacy URL (static HTML) |
 | https://gurbeh.github.io/oxplayer-client/privacy-policy/ | Same policy in the site UI |
 

@@ -1,6 +1,6 @@
 # Marketing site + Flutter web app on GitHub Pages.
 # Site: https://gurbeh.github.io/oxplayer-client/
-# Web app: https://gurbeh.github.io/oxplayer-client/app/
+# Web app: https://gurbeh.github.io/oxplayer-client/web/
 # Privacy: https://gurbeh.github.io/oxplayer-client/privacy-policy.html
 name: Deploy website (GitHub Pages)
 
@@ -69,16 +69,16 @@ jobs:
 
       - uses: ./.github/actions/oxplayer-flutter-env
 
-      - name: Build Flutter web for /app/
+      - name: Build Flutter web for /web/
         run: |
           flutter build web --release \
-            --base-href /${{ github.event.repository.name }}/app/ \
+            --base-href /${{ github.event.repository.name }}/web/ \
             --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
 
       - name: Merge marketing site and web app
         run: |
-          mkdir -p website/out/app
-          cp -r build/web/. website/out/app/
+          mkdir -p website/out/web
+          cp -r build/web/. website/out/web/
 
       - uses: actions/configure-pages@v4
 

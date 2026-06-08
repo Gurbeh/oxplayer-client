@@ -2,7 +2,7 @@
 # Tag v* → release. Schedule / workflow_dispatch → nightly. PR → development (Android only).
 # Branch `multi-app`: full platform matrix on every run (test branch).
 # Release/nightly: Android, Windows, iOS, macOS, Linux, Web (+ AppImage, Flatpak on release).
-# GitHub Pages (marketing + /app/) is deployed separately via pages.yml.
+# GitHub Pages (marketing + /web/) is deployed separately via pages.yml.
 # OX additions: oxplayer-flutter-env, Sentry symbols, Play package app.oxplayer, admin Telegram notify.
 name: Build OXPlayer
 
@@ -546,7 +546,7 @@ jobs:
       - name: Build web app
         run: |
           flutter build web --release \
-            --base-href /${{ github.event.repository.name }}/app/ \
+            --base-href /${{ github.event.repository.name }}/web/ \
             --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
             --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
 
