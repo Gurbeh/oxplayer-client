@@ -143,10 +143,9 @@ const HowItWorks = () => {
               img={assetPath("/images/FT-5.png")}
               des={
                 <>
-                  Your library syncs through{" "}
-                  <TelegramBotLink {...OXPLAYER_BOT} /> only open the bot in
-                  Telegram and connect OXPlayer. We never ask for your password
-                  or read your private chats.
+                  Your library syncs through <TelegramBotLink {...OXPLAYER_BOT} />. Open the bot in Telegram,
+                  get a login code, and sign in to OXPlayer — no Telegram login required. We only handle media
+                  you send or forward to the bot.
                 </>
               }
             />
@@ -156,9 +155,9 @@ const HowItWorks = () => {
               img={assetPath("/images/FT-7.png")}
               des={
                 <>
-                  Send a video or movie file to{" "}
-                  <TelegramBotLink {...OXPLAYER_BOT} />. The bot processes your
-                  upload and adds it to your library with posters and metadata.
+                  Send or forward a video or movie file to{" "}
+                  <TelegramBotLink {...OXPLAYER_BOT} />. The bot processes it and adds it to your library with
+                  posters and metadata.
                 </>
               }
             />

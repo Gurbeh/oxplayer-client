@@ -2,7 +2,7 @@
 import Container from "@/components/ui/Container";
 import Heading from "@/components/ui/Heading";
 import Paragraph from "@/components/ui/Paragraph";
-import { SUPPORT_BOT } from "@/config/bots";
+import { SUPPORT_BOT, SUPPORT_EMAIL } from "@/config/bots";
 import PlatformDownloads from "@/features/home/PlatformDownloads";
 import Link from "next/link";
 
@@ -48,6 +48,21 @@ const Footer = () => {
                 className="!text-gray-400 cursor-pointer hover:!text-primary transition-all duration-300"
               >
                 Support (@{SUPPORT_BOT.username})
+              </Paragraph>
+            </a>
+          </li>
+
+          <li className="">
+            <Paragraph className="!text-gray-500">•</Paragraph>
+          </li>
+
+          <li>
+            <a href={`mailto:${SUPPORT_EMAIL}`}>
+              <Paragraph
+                size="sm"
+                className="!text-gray-400 cursor-pointer hover:!text-primary transition-all duration-300"
+              >
+                {SUPPORT_EMAIL}
               </Paragraph>
             </a>
           </li>

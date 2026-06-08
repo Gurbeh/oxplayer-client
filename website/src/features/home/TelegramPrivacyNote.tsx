@@ -15,15 +15,15 @@ const TelegramPrivacyNote = () => {
           <span className="text-primary font-medium">
             Your Telegram stays yours.
           </span>{" "}
-          Sync only through{" "}
+          Send or forward videos to{" "}
           <TelegramBotLink
             {...OXPLAYER_BOT}
             className="text-primary hover:underline font-medium"
           />
           .<br />
-          We never ask for your password or read your private chats.
+          Sign in to OXPlayer with a login code from the bot — no Telegram login required.
           <br />
-          Only media you send to the bot is added to your library.
+          We only process media you send to our bot; we cannot access your account or private chats.
         </Paragraph>
       </Container>
     </section>

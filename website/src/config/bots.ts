@@ -7,3 +7,5 @@ export const SUPPORT_BOT = {
   username: "MySupport2026Bot",
   url: "https://t.me/MySupport2026Bot",
 } as const;
+
+export const SUPPORT_EMAIL = "oxplayerapp@gmail.com";

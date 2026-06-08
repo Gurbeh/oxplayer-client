@@ -1,22 +1,21 @@
 import Container from "@/components/ui/Container";
 import Heading from "@/components/ui/Heading";
 import TelegramBotLink from "@/components/ui/TelegramBotLink";
-import { OXPLAYER_BOT, SUPPORT_BOT } from "@/config/bots";
+import { OXPLAYER_BOT, SUPPORT_BOT, SUPPORT_EMAIL } from "@/config/bots";
 import type { ReactNode } from "react";
 
 const faqs: { q: string; a: ReactNode }[] = [
   {
     q: "What is OXPlayer?",
-    a: "OXPlayer is a personal media library app with a Netflix-style interface. You sync through our Telegram bot and stream videos you upload yourself we do not host or sell movies.",
+    a: "OXPlayer is a personal media library app with a Netflix-style interface. You sync videos by sending or forwarding them to our Telegram bot and stream content you added yourself. We do not host or sell movies.",
   },
   {
     q: "How do I connect Telegram?",
     a: (
       <>
-        Sync only with <TelegramBotLink {...OXPLAYER_BOT} />. Open the bot in
-        Telegram, sign in to the OXPlayer app with Telegram&apos;s official
-        authorization, and your library stays linked to your account. We never
-        ask for your Telegram password or access your private chats.
+        Open <TelegramBotLink {...OXPLAYER_BOT} /> in Telegram and sign in to the OXPlayer app with a login code
+        from the bot. OXPlayer uses its own sign-in — not Telegram Login — and we never collect your Telegram
+        account data, password, or private chats. We only process media you send or forward to our bot.
       </>
     ),
   },
@@ -24,19 +23,18 @@ const faqs: { q: string; a: ReactNode }[] = [
     q: "How do I add movies and videos?",
     a: (
       <>
-        Send a video file to <TelegramBotLink {...OXPLAYER_BOT} />. After the
-        bot finishes processing, the title appears in your OXPlayer library with
-        posters and metadata.
+        Send or forward a video file to <TelegramBotLink {...OXPLAYER_BOT} />. After the bot finishes processing,
+        the title appears in your OXPlayer library with posters and metadata.
       </>
     ),
   },
   {
     q: "Does OXPlayer provide movies or TV shows?",
-    a: "No. OXPlayer does not host, sell, or distribute content. It only organizes and plays videos that you personally send to the bot.",
+    a: "No. OXPlayer does not host, sell, or distribute content. It only organizes and plays videos that you personally send or forward to the bot.",
   },
   {
     q: "Which platforms are available?",
-    a: "Android is available now. iOS and Web are coming soon. Windows and Linux are on the roadmap.",
+    a: "OXPlayer is available on Android, Android TV, iOS, Windows, Linux, and Web. Use the download links on this page to get the latest release for your device.",
   },
   {
     q: "Can I continue watching from where I left off?",
@@ -50,9 +48,8 @@ const faqs: { q: string; a: ReactNode }[] = [
     q: "Is my content private?",
     a: (
       <>
-        Your library belongs to your account. Only media you send to{" "}
-        <TelegramBotLink {...OXPLAYER_BOT} /> is indexed not your other Telegram
-        messages or files.
+        Your library belongs to your account. Only media you send or forward to{" "}
+        <TelegramBotLink {...OXPLAYER_BOT} /> is indexed — not your other Telegram messages or files.
       </>
     ),
   },
@@ -60,8 +57,11 @@ const faqs: { q: string; a: ReactNode }[] = [
     q: "How do I get help?",
     a: (
       <>
-        Message our support bot <TelegramBotLink {...SUPPORT_BOT} /> on Telegram
-        for questions or issues.
+        Message our support bot <TelegramBotLink {...SUPPORT_BOT} /> on Telegram or email us at{" "}
+        <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary hover:underline">
+          {SUPPORT_EMAIL}
+        </a>
+        .
       </>
     ),
   },

@@ -1,0 +1,18 @@
+﻿HTTP/1.1 301 Moved Permanently
+Connection: keep-alive
+Content-Length: 162
+Server: GitHub.com
+Content-Type: text/html
+Location: https://oxplayer.app/
+X-GitHub-Request-Id: CCDC:1B4E5E:C2FEAD:C49B66:6A2703B7
+Accept-Ranges: bytes
+Age: 0
+Date: Mon, 08 Jun 2026 18:02:32 GMT
+Via: 1.1 varnish
+X-Served-By: cache-ber1080044-BER
+X-Cache: MISS
+X-Cache-Hits: 0
+X-Timer: S1780941752.499216,VS0,VE107
+Vary: Accept-Encoding
+X-Fastly-Request-ID: 21521db66c1b3a271ecb33b88a45a6f44f486637
+

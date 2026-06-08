@@ -44,7 +44,7 @@ const PlatformCard = ({ platform, href, compact = false }: PlatformCardProps) =>
 const DownloadMoreCard = ({ compact = false }: { compact?: boolean }) => (
   <button type="button" onClick={scrollToDownloadSection} className={cardClassName(compact)}>
     <FaDownload className={compact ? "text-2xl" : "text-3xl"} />
-    <span className={clsx("font-medium text-gray-100 whitespace-nowrap", compact && "text-sm")}>Download more</span>
+    <span className={clsx("font-medium text-gray-100 whitespace-nowrap", compact && "text-sm")}>Other platforms</span>
   </button>
 );
 
