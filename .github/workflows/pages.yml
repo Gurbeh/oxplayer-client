@@ -73,6 +73,7 @@ jobs:
         run: |
           flutter build web --release \
             --base-href /${{ github.event.repository.name }}/web/ \
+            --no-web-resources-cdn \
             --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
 
       - name: Merge marketing site and web app
