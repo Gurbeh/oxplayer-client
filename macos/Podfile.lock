@@ -29,7 +29,7 @@ PODS:
     - FlutterMacOS
   - macos_window_utils (1.0.0):
     - FlutterMacOS
-  - mdk (0.35.0)
+  - mdk (0.35.1)
   - media_kit_libs_macos_video (1.0.4):
     - FlutterMacOS
   - media_kit_video (0.0.1):
@@ -201,7 +201,7 @@ SPEC CHECKSUMS:
   just_audio: a42c63806f16995daf5b219ae1d679deb76e6a79
   local_auth_darwin: 63c73d6d28cc3e239be2b6aa460ea6e317cd5100
   macos_window_utils: 721df4da91cb4bde7b2b7b6ae93cdead4851118f
-  mdk: baa616b93f696c7066df0e5ebe057badfa9c462b
+  mdk: 59bbe9e2ac2a052455ab1b076c245680d66cf6c0
   media_kit_libs_macos_video: b3e2bbec2eef97c285f2b1baa7963c67c753fb82
   media_kit_video: c75b07f14d59706c775778e4dd47dd027de8d1e5
   package_info_plus: 12f1c5c2cfe8727ca46cbd0b26677728972d9a5b
