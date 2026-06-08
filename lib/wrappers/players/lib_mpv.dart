@@ -47,6 +47,7 @@ class LibMPV extends BasePlayer {
   double _preferredVolume = 100;
   int _fadeGeneration = 0;
   bool _isFading = false;
+
   /// Absolute timeline offset for ox-stream remux (stream starts at ?start= but UI uses catalog clock).
   Duration _remuxTimelineBase = Duration.zero;
   Duration get playPauseFadeDuration => const Duration(milliseconds: 175);
@@ -236,8 +237,7 @@ class LibMPV extends BasePlayer {
   }
 
   /// ox-stream progressive remux (MPEG-TS); duration stays 0 on web until enough is buffered.
-  static bool _isOxStreamRemuxUrl(String url) =>
-      url.contains('/stream.ts') || url.contains('stream.ts?');
+  static bool _isOxStreamRemuxUrl(String url) => url.contains('/stream.ts') || url.contains('stream.ts?');
 
   @override
   Future<void> loadVideo(String url, bool play, {Duration startPosition = Duration.zero}) async {

@@ -31,8 +31,7 @@ class OxplayerTelegramLoginPanel extends ConsumerStatefulWidget {
   ConsumerState<OxplayerTelegramLoginPanel> createState() => _OxplayerTelegramLoginPanelState();
 }
 
-class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLoginPanel>
-    with WidgetsBindingObserver {
+class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLoginPanel> with WidgetsBindingObserver {
   final _api = OxplayerLoginAttemptApi();
   String? _attemptId;
   String? _telegramLink;
@@ -286,9 +285,7 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
                           )
                         : const Icon(Icons.telegram),
                     label: Text(
-                      showWaitingOnDevice
-                          ? 'Waiting for Telegram\u2026'
-                          : 'Open Telegram on this device',
+                      showWaitingOnDevice ? 'Waiting for Telegram\u2026' : 'Open Telegram on this device',
                     ),
                   ),
                 ),
@@ -319,9 +316,7 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
                     )
                   : const Icon(Icons.telegram),
               label: Text(
-                showWaitingOnDevice
-                    ? 'Waiting for Telegram\u2026'
-                    : 'Open Telegram on this device',
+                showWaitingOnDevice ? 'Waiting for Telegram\u2026' : 'Open Telegram on this device',
               ),
             ),
         ],
