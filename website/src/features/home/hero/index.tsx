@@ -1,11 +1,11 @@
 "use client";
-import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
 import Heading from "@/components/ui/Heading";
-import Paragraph from "@/components/ui/Paragraph";
 import Image from "next/image";
 import { Fragment } from "react";
 import { assetPath } from "@/config/site";
+import PlatformDownloads from "@/features/home/PlatformDownloads";
+import { heroMobilePlatforms } from "@/config/platforms";
 
 export const GlowDot = ({
   size = "md",
@@ -41,20 +41,6 @@ export const GlowDot = ({
       `}
     />
   );
-};
-
-const scrollToHowItWorks = () => {
-  document.getElementById("how-it-works")?.scrollIntoView({
-    behavior: "smooth",
-    block: "start",
-  });
-};
-
-const scrollToFooter = () => {
-  document.getElementById("footer")?.scrollIntoView({
-    behavior: "smooth",
-    block: "start",
-  });
 };
 
 const Hero = () => {
@@ -103,22 +89,8 @@ const Hero = () => {
             Organize . Watch . Enjoy
           </Heading>
 
-          <div className="max-w-[900px] mt-5 mx-auto">
-            <Paragraph align="center" className="text-gray-400">
-              Transform your Telegram videos into a beautiful Netflix-style library. Organize movies and shows, resume playback, create
-              watchlists, and enjoy seamless streaming from one powerful app.
-            </Paragraph>
-          </div>
-
-          <div className="mx-auto flex justify-center mt-7 gap-5">
-            <Button action="primary" variant="solid" onClick={scrollToFooter}>
-              Download App
-            </Button>
-
-            <Button action="primary" variant="outline" onClick={scrollToHowItWorks}>
-              Learn More
-            </Button>
-          </div>
+          <PlatformDownloads items={heroMobilePlatforms} showDownloadMore className="mt-7 sm:hidden" />
+          <PlatformDownloads className="mt-7 hidden sm:block" />
         </Container>
       </section>
     </Fragment>
