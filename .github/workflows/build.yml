@@ -1,8 +1,8 @@
 # Multi-platform CI aligned with upstream Fladder (DonutWare/fladder).
 # Tag v* → release. Schedule / workflow_dispatch → nightly. PR → development (Android only).
 # Branch `multi-app`: full platform matrix on every run (test branch).
-# Release/nightly: Android, Windows, iOS, macOS, Linux (+ AppImage, Flatpak on release).
-# Web/Docker/Pages deferred until web/ is restored on main.
+# Release/nightly: Android, Windows, iOS, macOS, Linux, Web (+ AppImage, Flatpak on release).
+# GitHub Pages (marketing + /app/) is deployed separately via pages.yml.
 # OX additions: oxplayer-flutter-env, Sentry symbols, Play package app.oxplayer, admin Telegram notify.
 name: Build OXPlayer
 
@@ -17,6 +17,7 @@ on:
     paths:
       - pubspec.yaml
       - pubspec.lock
+      - web/**
       - .github/workflows/build.yml
       - .github/actions/**
       - .fvmrc
@@ -518,6 +519,42 @@ jobs:
           name: oxplayer-linux-flatpak
           path: OXPlayer-Linux.flatpak
 
+  build-web:
+    needs: [fetch-info]
+    if: needs.fetch-info.outputs.build_type != 'development' || needs.fetch-info.outputs.build_all_platforms == 'true'
+    runs-on: ubuntu-latest
+    env:
+      BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
+      OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      SENTRY_ENVIRONMENT: production
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ needs.fetch-info.outputs.flutter_version }}
+          cache: true
+          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+          cache-path: "${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:"
+
+      - run: flutter pub get
+
+      - uses: ./.github/actions/oxplayer-flutter-env
+
+      - name: Build web app
+        run: |
+          flutter build web --release \
+            --base-href /${{ github.event.repository.name }}/app/ \
+            --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
+            --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: oxplayer-web
+          path: build/web
+
   create_release:
     name: Create Release
     needs:
@@ -528,6 +565,7 @@ jobs:
       - build-macos
       - build-linux
       - build-linux-flatpak
+      - build-web
     runs-on: ubuntu-latest
     if: |
       always() &&
@@ -538,6 +576,7 @@ jobs:
       needs.build-ios.result == 'success' &&
       needs.build-macos.result == 'success' &&
       needs.build-linux.result == 'success' &&
+      needs.build-web.result == 'success' &&
       (needs.build-linux-flatpak.result == 'success' || needs.build-linux-flatpak.result == 'skipped')
     permissions:
       contents: write
@@ -690,6 +729,18 @@ jobs:
           mv "oxplayer-linux-appimage/OXPlayer_x86_64.AppImage" "OXPlayer-Linux-${V}.AppImage"
           mv "oxplayer-linux-appimage/OXPlayer_x86_64.AppImage.zsync" "OXPlayer-Linux-${V}.AppImage.zsync"
 
+      - uses: actions/download-artifact@v5
+        with:
+          name: oxplayer-web
+          path: oxplayer-web
+
+      - name: Stage Web bundle
+        shell: bash
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          cd oxplayer-web
+          zip -r "../OXPlayer-Web-${V}.zip" .
+
       - name: Prepare GitHub release body file
         shell: bash
         run: |
@@ -721,6 +772,7 @@ jobs:
             OXPlayer-Linux-${{ steps.version.outputs.version }}.zip
             OXPlayer-Linux-${{ steps.version.outputs.version }}.AppImage
             OXPlayer-Linux-${{ steps.version.outputs.version }}.AppImage.zsync
+            OXPlayer-Web-${{ steps.version.outputs.version }}.zip
             ${{ needs.fetch-info.outputs.build_type == 'release' && format('OXPlayer-Linux-{0}.flatpak', steps.version.outputs.version) || '' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -804,3 +856,45 @@ jobs:
           tracks: internal
           status: completed
           releaseName: "${{ needs.fetch-info.outputs.android_version_code }} (${{ needs.fetch-info.outputs.version_name }})"
+
+  release_web:
+    name: Release Web (Docker)
+    needs:
+      - fetch-info
+      - create_release
+      - build-web
+    runs-on: ubuntu-latest
+    if: needs.fetch-info.outputs.build_type == 'release'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: oxplayer-web
+          path: build/web
+
+      - name: Deploy to ghcr.io
+        uses: mr-smithers-excellent/docker-build-push@v6
+        with:
+          image: oxplayer
+          addLatest: true
+          multiPlatform: true
+          platform: linux/amd64,linux/arm64,linux/arm/v7
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy rootless image to ghcr.io
+        uses: mr-smithers-excellent/docker-build-push@v6
+        with:
+          dockerfile: Dockerfile-rootless
+          image: oxplayer-rootless
+          addLatest: true
+          multiPlatform: true
+          platform: linux/amd64,linux/arm64,linux/arm/v7
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
