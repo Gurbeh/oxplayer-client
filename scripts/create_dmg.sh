@@ -5,9 +5,9 @@
 
 set -e
 
-# Configuration
-APP_NAME="Fladder"
-APP_PATH="build/macos/Build/Products/Release-production/Fladder.app"
+# Configuration (OXPlayer sets PRODUCT_NAME in macos/Runner/Configs/AppInfo.xcconfig)
+APP_NAME="OXPlayer"
+APP_PATH="build/macos/Build/Products/Release-production/OXPlayer.app"
 DMG_PATH="build/macos/Build/Products/Release-production/macOS.dmg"
 BACKGROUND_IMAGE="assets/macos-dmg/Fladder-DMG-Background.jpg"
 TEMP_DMG_DIR="dmg_temp"

@@ -404,11 +404,6 @@ jobs:
             --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
             --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
 
-      - name: Ensure correct app bundle name
-        run: |
-          APP_DIR="build/macos/Build/Products/Release-production"
-          mv "$APP_DIR/fladder.app" "$APP_DIR/Fladder.app"
-
       - name: Create DMG
         run: |
           brew install create-dmg
@@ -502,7 +497,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          submodules: true
+          submodules: recursive
+
+      - name: Ensure flatpak shared-modules submodule
+        run: git submodule update --init --recursive flatpak/shared-modules
 
       - uses: actions/download-artifact@v5
         with:
