@@ -1,1 +1,1 @@
-Login with Telegram on the web app. Updated app icons and splash screens. Web builds bundle CanvasKit locally for reliable loading on GitHub Pages.
+See the full changelog at: https://github.com/Gurbeh/oxplayer-client/releases/tag/v1.0.2
