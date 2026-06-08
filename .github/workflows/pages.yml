@@ -6,7 +6,7 @@ name: Deploy website (GitHub Pages)
 
 on:
   push:
-    branches: [main, multi-app]
+    branches: [main]
     paths:
       - "website/**"
       - "web/**"
