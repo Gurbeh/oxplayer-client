@@ -1,3 +1,1 @@
-Default in-app player (MPV) with minimize-to-bottom bar while browsing. Removed background library sync notifications to simplify Play compliance. Player top controls layout fix. Account deletion via app or @OXPlayerBot.
-
-Full release notes: https://github.com/Aryan-mor/oxplayer-client/releases/tag/v1.0.2
+Login with Telegram on the web app. Updated app icons and splash screens. Web builds bundle CanvasKit locally for reliable loading on GitHub Pages.

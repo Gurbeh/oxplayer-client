@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart' as urilauncher;
 
 import 'package:fladder/oxplayer/oxplayer_bot_qr_dialog.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
@@ -117,7 +118,11 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
     if (_isTv(context)) return;
     final link = _telegramLink;
     if (link != null) {
-      unawaited(launchUrl(context, link));
+      if (kIsWeb) {
+        await urilauncher.launchUrl(Uri.parse(link), webOnlyWindowName: '_blank');
+      } else {
+        unawaited(launchUrl(context, link));
+      }
     }
     if (!_pollRunning) {
       unawaited(_pollForCompletion(userOpenedTelegram: true));
@@ -142,7 +147,7 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
 
   Future<void> _pollForCompletion({required bool userOpenedTelegram}) async {
     if (_pollRunning) {
-      if (userOpenedTelegram && !_isTv(context) && !kIsWeb && mounted) {
+      if (userOpenedTelegram && !_isTv(context) && mounted) {
         setState(() => _waiting = true);
       }
       return;
@@ -155,7 +160,7 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
     _cancelPoll = false;
     if (mounted) {
       setState(() {
-        _waiting = userOpenedTelegram && !_isTv(context) && !kIsWeb;
+        _waiting = userOpenedTelegram && !_isTv(context);
         _error = null;
       });
     }
@@ -218,16 +223,25 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
     final isTv = _isTv(context);
     final isPhone = viewSize == ViewSize.phone;
     final showInlineQr = !isPhone;
-    final showDeviceButton = !isTv && !kIsWeb;
+    final showDeviceButton = !isTv;
     final showWaitingOnDevice = _waiting && showDeviceButton;
+    final deviceButtonLabel = showWaitingOnDevice
+        ? 'Waiting for Telegram\u2026'
+        : kIsWeb
+            ? 'Login with Telegram'
+            : 'Open Telegram on this device';
 
     final subtitle = showWaitingOnDevice
         ? 'Waiting for approval in Telegram\u2026 This screen will sign you in automatically.'
         : isTv
             ? 'Scan the QR code with Telegram on your phone. This TV will sign you in automatically.'
-            : isPhone
-                ? 'Tap the button to open Telegram, or use the QR icon to sign in from another device.'
-                : 'Scan the QR with another device, or tap the button to open Telegram on this device.';
+            : kIsWeb
+                ? (isPhone
+                    ? 'Tap the button to open Telegram, then approve the login request.'
+                    : 'Scan the QR with your phone, or tap the button to open Telegram in a new tab.')
+                : isPhone
+                    ? 'Tap the button to open Telegram, or use the QR icon to sign in from another device.'
+                    : 'Scan the QR with another device, or tap the button to open Telegram on this device.';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -284,9 +298,7 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.telegram),
-                    label: Text(
-                      showWaitingOnDevice ? 'Waiting for Telegram\u2026' : 'Open Telegram on this device',
-                    ),
+                    label: Text(deviceButtonLabel),
                   ),
                 ),
                 if (link != null)
@@ -315,9 +327,7 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.telegram),
-              label: Text(
-                showWaitingOnDevice ? 'Waiting for Telegram\u2026' : 'Open Telegram on this device',
-              ),
+              label: Text(deviceButtonLabel),
             ),
         ],
         if (_error != null) ...[
