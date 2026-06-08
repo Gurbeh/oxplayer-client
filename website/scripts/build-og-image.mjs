@@ -2,11 +2,23 @@
 /**
  * Build a 1200×630 Open Graph image for link previews (WhatsApp, Telegram, etc.).
  * Output: public/images/og-image.png (target ≤ 300 KB).
+ *
+ * Dev-only (requires `sharp` in devDependencies). CI uses the committed og-image.png.
+ * Regenerate locally: npm run build:og-image
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import sharp from "sharp";
+
+let sharp;
+try {
+  sharp = (await import("sharp")).default;
+} catch {
+  console.error(
+    "[build-og-image] sharp is not installed. Run: npm install && npm run build:og-image",
+  );
+  process.exit(1);
+}
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imagesDir = path.join(root, "public", "images");

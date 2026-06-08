@@ -6,7 +6,7 @@
     "dev": "next dev -p 3001 --webpack",
     "dev:turbo": "next dev -p 3001",
     "build:og-image": "node scripts/build-og-image.mjs",
-    "build": "npm run build:og-image && next build --webpack",
+    "build": "next build --webpack",
     "verify:export": "node scripts/verify-static-export.mjs",
     "start": "next start",
     "lint": "eslint"

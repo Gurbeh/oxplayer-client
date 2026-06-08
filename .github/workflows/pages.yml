@@ -53,11 +53,9 @@ jobs:
 
       - name: Build Next.js static site
         working-directory: website
-        env:
-          NODE_ENV: production
         run: |
-          npm ci
-          npm run build
+          npm ci --include=dev
+          NODE_ENV=production npm run build
           npm run verify:export
 
       - uses: subosito/flutter-action@v2
