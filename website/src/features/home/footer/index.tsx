@@ -2,15 +2,18 @@
 import Container from "@/components/ui/Container";
 import Heading from "@/components/ui/Heading";
 import Paragraph from "@/components/ui/Paragraph";
-import Link from "next/link";
 import { SUPPORT_BOT } from "@/config/bots";
 import PlatformDownloads from "@/features/home/PlatformDownloads";
+import Link from "next/link";
 
 const issuesUrl = "https://github.com/Gurbeh/oxplayer-client/issues";
 
 const Footer = () => {
   return (
-    <section id="footer" className="relative pt-20 pb-1 border-t border-slate-700 overflow-hidden">
+    <section
+      id="footer"
+      className="relative pt-20 pb-1 border-t border-slate-700 overflow-hidden"
+    >
       {/* 🔵 Primary Gradient */}
       <div className="absolute -top-20 -left-20 w-60 h-60 md:w-72 md:h-72 lg:w-96 lg:h-96 bg-primary opacity-30 blur-3xl rounded-full" />
 
@@ -19,12 +22,17 @@ const Footer = () => {
 
       <Container className="flex flex-col items-center relative z-10">
         <Heading level="h2" align="center" className="!text-gray-100">
-          Experience <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">OXPlayer</span> Everywhere
+          Experience{" "}
+          <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+            OXPlayer
+          </span>{" "}
+          Everywhere
         </Heading>
 
         <div className="max-w-2xl mt-4">
           <Paragraph align="center" className="text-gray-400">
-            Watch, organize, and enjoy your Telegram media library seamlessly across all your devices.
+            Watch, organize, and enjoy your Telegram media library seamlessly
+            across all your devices.
           </Paragraph>
         </div>
 
@@ -35,7 +43,10 @@ const Footer = () => {
         <ul className="flex flex-wrap justify-center gap-2 sm:gap-7 mt-20">
           <li>
             <a href={SUPPORT_BOT.url} target="_blank" rel="noopener noreferrer">
-              <Paragraph size="sm" className="!text-gray-400 cursor-pointer hover:!text-primary transition-all duration-300">
+              <Paragraph
+                size="sm"
+                className="!text-gray-400 cursor-pointer hover:!text-primary transition-all duration-300"
+              >
                 Support (@{SUPPORT_BOT.username})
               </Paragraph>
             </a>
@@ -47,7 +58,10 @@ const Footer = () => {
 
           <li>
             <Link href="/privacy-policy/">
-              <Paragraph size="sm" className="!text-gray-400 cursor-pointer hover:!text-primary transition-all duration-300">
+              <Paragraph
+                size="sm"
+                className="!text-gray-400 cursor-pointer hover:!text-primary transition-all duration-300"
+              >
                 Privacy Policy
               </Paragraph>
             </Link>
@@ -59,7 +73,10 @@ const Footer = () => {
 
           <li>
             <a href={issuesUrl} target="_blank" rel="noopener noreferrer">
-              <Paragraph size="sm" className="!text-gray-400 cursor-pointer hover:!text-primary transition-all duration-300">
+              <Paragraph
+                size="sm"
+                className="!text-gray-400 cursor-pointer hover:!text-primary transition-all duration-300"
+              >
                 Terms of Service
               </Paragraph>
             </a>

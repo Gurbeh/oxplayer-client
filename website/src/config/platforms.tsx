@@ -1,6 +1,13 @@
-import { FaAndroid, FaApple, FaGlobe, FaLinux, FaTv, FaWindows } from "react-icons/fa";
-import type { IconType } from "react-icons";
 import type { PlatformId } from "@/config/downloads";
+import type { IconType } from "react-icons";
+import {
+  FaAndroid,
+  FaApple,
+  FaGlobe,
+  FaLinux,
+  FaTv,
+  FaWindows,
+} from "react-icons/fa";
 
 export type Platform = {
   id: PlatformId;
