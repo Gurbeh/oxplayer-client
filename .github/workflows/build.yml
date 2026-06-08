@@ -1007,7 +1007,9 @@ jobs:
       - create_release
       - build-web
     runs-on: ubuntu-latest
-    if: needs.fetch-info.outputs.build_type == 'release'
+    if: |
+      (needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly') &&
+      needs.create_release.result == 'success'
     permissions:
       contents: read
       packages: write

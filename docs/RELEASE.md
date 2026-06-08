@@ -71,7 +71,7 @@ In this repo, **nightly and prerelease are the same pipeline**. The GitHub relea
 Use the **Nightly** steps above.  
 Do **not** create a `v*` tag for a prerelease.
 
-To ship web to **ghcr.io Docker**, use a **Release** (below), not nightly.
+**ghcr.io Docker** (`oxplayer`, `oxplayer-rootless`) is published on both **nightly** and **release** builds after **Create Release** succeeds.
 
 ---
 
@@ -157,6 +157,7 @@ gh release edit vM.m.p --repo Gurbeh/oxplayer-client --draft=false
 |------|------|----------|
 | Nightly build | `pubspec.yaml` (only if you want a new version name) | `git push origin main` **or** `gh workflow run "Build OXPlayer" … -f build_type=nightly` |
 | GitHub Pages web | — | auto on `main` push, or `gh workflow run "Deploy website (GitHub Pages)" …` |
+| ghcr.io Docker web | — | auto on nightly/release **Build OXPlayer** (after **Create Release**) |
 | Prerelease assets | same as nightly | same as nightly |
 | Stable release | `pubspec.yaml` + optional `fastlane/.../changelogs/{M.m.p}.txt` | `Prepare Release` → `Build OXPlayer` on `vM.m.p` with `build_type=release` → publish draft |
 
