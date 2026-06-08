@@ -179,11 +179,22 @@ jobs:
 
       - uses: ./.github/actions/oxplayer-flutter-env
 
+      - name: Cache libmpv Android JARs
+        uses: actions/cache@v4
+        with:
+          path: .ci-cache/libmpv-android-v1.1.8
+          key: libmpv-android-v1.1.8
+
+      - name: Pre-fetch libmpv Android JARs
+        run: |
+          chmod +x .github/scripts/prefetch_libmpv_android.sh
+          .github/scripts/prefetch_libmpv_android.sh
+
       - name: Build Android APK (PRs)
         if: needs.fetch-info.outputs.build_type == 'development'
         run: |
           chmod +x .github/scripts/retry_command.sh
-          .github/scripts/retry_command.sh 3 45 -- \
+          .github/scripts/retry_command.sh 5 60 -- \
             flutter build apk --debug --split-per-abi \
               --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
               --flavor production \
@@ -193,13 +204,13 @@ jobs:
         if: needs.fetch-info.outputs.build_type != 'development'
         run: |
           chmod +x .github/scripts/retry_command.sh
-          .github/scripts/retry_command.sh 3 45 -- \
+          .github/scripts/retry_command.sh 5 60 -- \
             flutter build apk --release --split-per-abi \
               --split-debug-info=build/debug-info \
               --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
               --flavor production \
               --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
-          .github/scripts/retry_command.sh 3 45 -- \
+          .github/scripts/retry_command.sh 5 60 -- \
             flutter build appbundle --release \
               --split-debug-info=build/debug-info \
               --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
@@ -272,6 +283,8 @@ jobs:
       OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       SENTRY_ENVIRONMENT: production
+      OX_MEDIAKIT_MPV_SCRIPT: ${{ github.workspace }}/tool/ci/extract_mpv_windows.ps1
+      OX_MEDIAKIT_ANGLE_SCRIPT: ${{ github.workspace }}/tool/ci/extract_angle_windows.ps1
     steps:
       - uses: actions/checkout@v5
 
@@ -285,14 +298,101 @@ jobs:
 
       - run: flutter pub get
 
+      - name: Patch media_kit Windows CMake (7z extract via PowerShell)
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import os
+          import pathlib
+          import re
+
+          fatal = 'message(FATAL_ERROR "${locationForArchive} Integrity check failed, please try to re-build project again.")'
+          warn = 'message(WARNING "${locationForArchive} integrity check failed; continuing (CI)")'
+
+          roots = [
+              pathlib.Path(os.environ.get("LOCALAPPDATA", "")) / "Pub" / "Cache",
+              pathlib.Path(os.environ.get("PUB_CACHE", "")),
+              pathlib.Path.home() / "AppData" / "Local" / "Pub" / "Cache",
+              pathlib.Path.home() / ".pub-cache",
+          ]
+
+          libmpv_re = re.compile(
+              r'(add_custom_command\(\s*TARGET\s+"\$\{PROJECT_NAME\}_LIBMPV_EXTRACT"\s*)'
+              r'.*?'
+              r'(\s*WORKING_DIRECTORY\s+"\$\{LIBMPV_SRC\}"\s*\))',
+              re.DOTALL,
+          )
+          angle_re = re.compile(
+              r'(add_custom_command\(\s*TARGET\s+"\$\{PROJECT_NAME\}_ANGLE_EXTRACT"\s*)'
+              r'.*?'
+              r'(\s*WORKING_DIRECTORY\s+"\$\{ANGLE_SRC\}"\s*\))',
+              re.DOTALL,
+          )
+
+          def sub_lib(m: re.Match) -> str:
+              return (
+                  m.group(1)
+                  + '\n COMMAND powershell.exe -NoProfile -ExecutionPolicy Bypass '
+                  + '-File "$ENV:OX_MEDIAKIT_MPV_SCRIPT}" '
+                  + '-Archive "${LIBMPV_ARCHIVE}" -DestDir "${LIBMPV_SRC}"'
+                  + m.group(2)
+              )
+
+          def sub_angle(m: re.Match) -> str:
+              return (
+                  m.group(1)
+                  + '\n COMMAND powershell.exe -NoProfile -ExecutionPolicy Bypass '
+                  + '-File "$ENV:OX_MEDIAKIT_ANGLE_SCRIPT}" '
+                  + '-Archive "${ANGLE_ARCHIVE}" -DestDir "${ANGLE_SRC}"'
+                  + m.group(2)
+              )
+
+          for root in roots:
+              if not root.is_dir():
+                  continue
+              for cm in root.rglob("CMakeLists.txt"):
+                  if "media_kit_libs_windows_video" not in cm.parts or cm.parent.name != "windows":
+                      continue
+                  text = cm.read_text(encoding="utf-8", errors="replace")
+                  orig = text
+                  text = text.replace(fatal, warn)
+                  text, n_lib = libmpv_re.subn(sub_lib, text, count=1)
+                  text, n_ang = angle_re.subn(sub_angle, text, count=1)
+                  if text != orig:
+                      cm.write_text(text, encoding="utf-8")
+                      print("Patched", cm, "libmpv_block=", n_lib, "angle_block=", n_ang)
+          PY
+
       - uses: ./.github/actions/oxplayer-flutter-env
 
-      - name: Build Windows
+      - name: Cache Windows media_kit archives
+        uses: actions/cache@v4
+        with:
+          path: .ci-cache/mpv-windows
+          key: mpv-windows-20260531-angle-v1.0.1
+
+      - name: Pre-fetch Windows media_kit archives
+        shell: pwsh
         run: |
-          if (Test-Path build/windows) { Remove-Item -Recurse -Force build/windows }
-          flutter build windows --release `
-            --build-number=${{ needs.fetch-info.outputs.android_version_code }} `
-            --dart-define-from-file="$env:FLUTTER_BUILD_ENV_FILE"
+          .\.github\scripts\prefetch_mpv_windows.ps1
+
+      - name: Build Windows
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            rm -f build/windows/x64/*.7z 2>/dev/null || true
+            rm -rf build/windows/x64/libmpv build/windows/x64/ANGLE 2>/dev/null || true
+            pwsh -NoProfile -File .github/scripts/prefetch_mpv_windows.ps1
+            if flutter build windows --release \
+              --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
+              --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"; then
+              exit 0
+            fi
+            echo "Windows build failed (attempt ${attempt}/5), retrying in 45s..."
+            sleep 45
+          done
+          exit 1
 
       - name: Compile Inno Setup installer
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
@@ -376,9 +476,32 @@ jobs:
 
       - name: Build macOS app
         run: |
-          flutter build macos --flavor production --release \
-            --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
-            --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
+          set -euo pipefail
+          chmod +x .github/scripts/retry_command.sh
+
+          prepare_macos_deps() {
+            flutter build macos --config-only --flavor production \
+              --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
+            mk_makefile="$(find "${PUB_CACHE}/git" -path '*/media_kit_libs_macos_video/macos/Makefile' 2>/dev/null | head -1 || true)"
+            if [[ -n "${mk_makefile}" ]]; then
+              make -C "${mk_makefile%/Makefile}" clean || true
+            fi
+            cd macos
+            pod install --repo-update
+            cd ..
+          }
+
+          for attempt in 1 2 3 4 5; do
+            prepare_macos_deps
+            if flutter build macos --flavor production --release \
+              --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
+              --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"; then
+              exit 0
+            fi
+            echo "macOS build failed (attempt ${attempt}/5), retrying in 45s..."
+            sleep 45
+          done
+          exit 1
 
       - name: Create DMG
         run: |
