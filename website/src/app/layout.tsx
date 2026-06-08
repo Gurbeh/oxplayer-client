@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Nosifer, Space_Grotesk } from "next/font/google";
 
-import { assetPath, SITE_ORIGIN } from "@/config/site";
+import { createPageMetadata } from "@/config/seo";
+import { assetPath } from "@/config/site";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -17,10 +18,7 @@ const nosifer = Nosifer({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(`${SITE_ORIGIN}/`),
-  title: "OXPlayer",
-  description:
-    "Transform your Telegram videos into a beautiful Netflix-style media library with smart organization, seamless playback, and powerful streaming features.",
+  ...createPageMetadata(),
   icons: {
     icon: [{ url: assetPath("/images/logo.png"), type: "image/png" }],
     apple: [{ url: assetPath("/images/logo.png"), type: "image/png" }],

@@ -19,6 +19,16 @@ const REQUIRED_CSS_MARKERS = [
   ".min-h-screen",
 ];
 
+const REQUIRED_META_MARKERS = [
+  'property="og:title"',
+  'property="og:description"',
+  'property="og:image"',
+  'property="og:url"',
+  'name="twitter:card"',
+];
+
+const REQUIRED_STATIC_ASSETS = ["images/og-image.png"];
+
 function fail(message) {
   console.error(`\n[verify-static-export] ${message}\n`);
   process.exit(1);
@@ -43,6 +53,18 @@ const stylesheetHrefs = [
 
 if (stylesheetHrefs.length === 0) {
   fail("No stylesheet <link> tags found in index.html.");
+}
+
+const missingMeta = REQUIRED_META_MARKERS.filter((marker) => !html.includes(marker));
+if (missingMeta.length > 0) {
+  fail(`index.html missing social/SEO meta tags: ${missingMeta.join(", ")}`);
+}
+
+for (const asset of REQUIRED_STATIC_ASSETS) {
+  const assetPath = path.join(outDir, asset);
+  if (!fs.existsSync(assetPath)) {
+    fail(`Missing static asset in export: ${asset}`);
+  }
 }
 
 for (const href of stylesheetHrefs) {
