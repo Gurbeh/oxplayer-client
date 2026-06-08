@@ -177,7 +177,7 @@ class HomeScreen extends ConsumerWidget {
                 );
               }
             case HomeTabs.sync:
-              if (canDownload) {
+              if (canDownload && !kIsWeb) {
                 return DestinationModel(
                   label: context.localized.navigationSync,
                   icon: Icon(e.icon),

@@ -26,6 +26,8 @@ class NotificationService {
   }
 
   static Future<void> init() async {
+    if (kIsWeb) return;
+
     const android = AndroidInitializationSettings('ic_notification');
     final darwin = const DarwinInitializationSettings();
     final linux = const LinuxInitializationSettings(defaultActionName: 'Open notification');
@@ -49,7 +51,7 @@ class NotificationService {
       onDidReceiveBackgroundNotificationResponse: _notificationBackgroundEntryPoint,
     );
 
-    if (Platform.isAndroid) {
+    if (!kIsWeb && Platform.isAndroid) {
       final channel = const AndroidNotificationChannel(
         _channelId,
         _channelName,
@@ -68,6 +70,8 @@ class NotificationService {
   }
 
   static Future<bool> requestPermission() async {
+    if (kIsWeb) return false;
+
     if (Platform.isAndroid) {
       final status = await Permission.notification.status;
       if (status.isGranted) return true;

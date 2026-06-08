@@ -181,7 +181,7 @@ class _VideoOptionsMobileState extends ConsumerState<VideoOptions> {
                 ],
               ),
             ),
-          if (!AdaptiveLayout.of(context).isDesktop)
+          if (!AdaptiveLayout.of(context).isDesktop && !kIsWeb)
             SpacedListTile(
               title: Text(context.localized.playerSettingsOrientationTitle),
               onTap: () => showOrientationOptions(context, ref),

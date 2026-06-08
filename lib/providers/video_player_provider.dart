@@ -68,9 +68,16 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     );
   }
 
+  static bool _isOxStreamRemuxUrl(String? url) =>
+      kIsWeb && url != null && (url.contains('/stream.ts') || url.contains('stream.ts?'));
+
   Future<void> updateDuration(Duration duration) async {
     final catalog = ref.read(playBackModel)?.item.overview.runTime;
-    if (duration == Duration.zero && catalog != null && catalog > Duration.zero) {
+    final mediaUrl = ref.read(playBackModel)?.media?.url;
+    if (_isOxStreamRemuxUrl(mediaUrl) && catalog != null && catalog > Duration.zero) {
+      // Fragmented remux reports growing buffer duration; keep catalog runtime for the scrubber.
+      duration = catalog;
+    } else if (duration == Duration.zero && catalog != null && catalog > Duration.zero) {
       duration = catalog;
     }
     mediaState.update((state) {
@@ -155,6 +162,16 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
           ));
 
       await state.play();
+
+      if (_isOxStreamRemuxUrl(media.url)) {
+        final runtime = model.item.overview.runTime;
+        mediaState.update((state) => state.copyWith(
+              position: effectiveStartPosition,
+              lastPosition: effectiveStartPosition,
+              duration: runtime ?? state.duration,
+              buffering: false,
+            ));
+      }
 
       return true;
     }

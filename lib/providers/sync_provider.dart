@@ -212,7 +212,7 @@ class SyncNotifier extends StateNotifier<SyncSettingsModel> {
 
   late final JellyService api = ref.read(jellyApiProvider);
 
-  String? get _savePath => (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+  String? get _savePath => !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
       ? ref.read(clientSettingsProvider.select((value) => value.syncPath))
       : mobileDirectory.path;
 
@@ -221,6 +221,7 @@ class SyncNotifier extends StateNotifier<SyncSettingsModel> {
   Directory get mainDirectory => Directory(path.joinAll([_savePath ?? "", subPath]));
 
   Directory? get saveDirectory {
+    if (kIsWeb) return null;
     final directory = _savePath != null
         ? Directory(path.joinAll([_savePath ?? "", subPath, ref.read(userProvider)?.id ?? "UnknownUser"]))
         : null;

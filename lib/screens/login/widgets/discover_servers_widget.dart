@@ -62,7 +62,7 @@ class DiscoverServersWidget extends ConsumerWidget {
               .toList()
               .addInBetween(const SizedBox(height: 4)),
         ],
-        ...[
+        if (!kIsWeb) ...[
           const Divider(),
           Row(
             children: [

@@ -34,7 +34,9 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
   @override
   void didUpdateWidget(covariant DetailsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    updateWidget();
+    if (kIsWeb) {
+      updateWidget();
+    }
   }
 
   @override

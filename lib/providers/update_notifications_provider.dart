@@ -18,7 +18,7 @@ import 'package:fladder/providers/shared_provider.dart';
 
 final supportsNotificationsProvider = Provider.autoDispose<bool>((ref) {
   final leanBackMode = ref.watch(argumentsStateProvider.select((value) => value.leanBackMode));
-  return (!leanBackMode) &&
+  return (!kIsWeb && !leanBackMode) &&
       (Platform.isAndroid || Platform.isIOS || Platform.isWindows || Platform.isMacOS || Platform.isLinux);
 });
 
@@ -56,6 +56,7 @@ class UpdateNotifications {
     final interval = ref.read(clientSettingsProvider).updateNotificationsInterval;
 
     try {
+      if (kIsWeb) return;
       if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
         _desktopTimer?.cancel();
         _desktopTimer = Timer.periodic(interval, (_) {
@@ -90,7 +91,7 @@ class UpdateNotifications {
     try {
       _desktopTimer?.cancel();
       _desktopTimer = null;
-      if ((Platform.isAndroid || Platform.isIOS)) {
+      if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
         await Workmanager().cancelByUniqueName(updateTaskName);
       }
     } catch (e) {
@@ -109,7 +110,7 @@ class UpdateNotifications {
       if (accounts.isEmpty) {
         _desktopTimer?.cancel();
         _desktopTimer = null;
-        if ((Platform.isAndroid || Platform.isIOS)) {
+        if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
           await Workmanager().cancelByUniqueName(updateTaskName);
         }
         return;
@@ -122,7 +123,7 @@ class UpdateNotifications {
   //Used for debug purposes, to trigger the background task immediately and show a notification for any new items
   Future<void> executeBackgroundTask() async {
     try {
-      if ((Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
+      if (!kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
         await performHeadlessUpdateCheck(debug: true);
         return;
       } else {
@@ -143,7 +144,7 @@ class UpdateNotifications {
   Future<void> cancelAllTasks() async {
     _desktopTimer?.cancel();
     _desktopTimer = null;
-    if ((Platform.isAndroid || Platform.isIOS)) {
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
       await Workmanager().cancelAll();
     }
   }

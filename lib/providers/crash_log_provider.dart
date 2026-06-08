@@ -39,8 +39,10 @@ class CrashLogNotifier extends StateNotifier<List<ErrorLogModel>> {
       return false;
     };
 
-    await _initializeLogFile();
-    await _loadLogsFromFile();
+    if (!kIsWeb) {
+      await _initializeLogFile();
+      await _loadLogsFromFile();
+    }
   }
 
   Future<void> _initializeLogFile() async {
@@ -79,8 +81,10 @@ class CrashLogNotifier extends StateNotifier<List<ErrorLogModel>> {
 
   Future<void> clearLogs() async {
     state = [];
-    _debounceTimer?.cancel();
-    await _saveLogsToFile();
+    if (!kIsWeb) {
+      _debounceTimer?.cancel();
+      await _saveLogsToFile();
+    }
   }
 
   void _scheduleSave() {
@@ -99,7 +103,9 @@ class CrashLogNotifier extends StateNotifier<List<ErrorLogModel>> {
       if (state.length >= maxLength) {
         state = state.sublist(0, maxLength);
       }
-      _scheduleSave();
+      if (!kIsWeb) {
+        _scheduleSave();
+      }
     }
   }
 

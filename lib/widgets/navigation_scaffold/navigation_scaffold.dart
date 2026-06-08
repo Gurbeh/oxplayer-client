@@ -79,7 +79,7 @@ class _NavigationScaffoldState extends ConsumerState<NavigationScaffold> {
     final showAudioSidePanel = showAudioFullScreen && AdaptiveLayout.layoutModeOf(context) == LayoutMode.dual;
     final showAudioOverlay = showAudioFullScreen && !showAudioSidePanel;
 
-    final isDesktop = AdaptiveLayout.of(context).isDesktop;
+    final isDesktop = AdaptiveLayout.of(context).isDesktop || kIsWeb;
 
     final mediaQuery = MediaQuery.of(context);
     final theme = Theme.of(context);

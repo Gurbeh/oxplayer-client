@@ -1,15 +1,22 @@
-# Marketing site + Privacy Policy (Google Play) on GitHub Pages.
+# Marketing site + Flutter web app on GitHub Pages.
 # Site: https://gurbeh.github.io/oxplayer-client/
+# Web app: https://gurbeh.github.io/oxplayer-client/app/
 # Privacy: https://gurbeh.github.io/oxplayer-client/privacy-policy.html
 name: Deploy website (GitHub Pages)
 
 on:
   push:
-    branches: [main]
+    branches: [main, multi-app]
     paths:
       - "website/**"
+      - "web/**"
+      - "lib/**"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+      - ".fvmrc"
       - "docs/privacy-policy.html"
       - ".github/workflows/pages.yml"
+      - ".github/actions/**"
   workflow_dispatch:
 
 permissions:
@@ -27,6 +34,11 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    env:
+      BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
+      OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      SENTRY_ENVIRONMENT: production
     steps:
       - uses: actions/checkout@v4
 
@@ -46,6 +58,27 @@ jobs:
         run: |
           npm ci
           npm run build
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version-file: .fvmrc
+          cache: true
+
+      - run: flutter pub get
+
+      - uses: ./.github/actions/oxplayer-flutter-env
+
+      - name: Build Flutter web for /app/
+        run: |
+          flutter build web --release \
+            --base-href /${{ github.event.repository.name }}/app/ \
+            --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
+
+      - name: Merge marketing site and web app
+        run: |
+          mkdir -p website/out/app
+          cp -r build/web/. website/out/app/
 
       - uses: actions/configure-pages@v4
 

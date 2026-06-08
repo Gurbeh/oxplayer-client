@@ -28,7 +28,9 @@ import 'package:fladder/widgets/media_query_scaler.dart';
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await OxplayerSentry.init();
+  if (!kIsWeb) {
+    await OxplayerSentry.init();
+  }
 
   final bootstrap = await bootstrapApplication(args);
 

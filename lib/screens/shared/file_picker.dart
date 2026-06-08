@@ -123,7 +123,7 @@ class _FilePickerBarState extends ConsumerState<FilePickerBar> {
               : Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    if (AdaptiveLayout.of(context).isDesktop)
+                    if (AdaptiveLayout.of(context).isDesktop || kIsWeb)
                       Row(
                         children: [
                           Text(

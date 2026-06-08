@@ -13,9 +13,10 @@ Map<String, String> oxplayerMediaBrowserHeaders(OxplayerRead read, CredentialsMo
   final application = read(applicationInfoProvider);
   final leanbackMode = read(argumentsStateProvider).leanBackMode;
   final os = switch (application.platform) {
-    TargetPlatform.android =>
-      leanbackMode ? "${application.platform.name.capitalize()} TV" : application.platform.name.capitalize(),
-    _ => application.platform.name.capitalize(),
+    TargetPlatform.android => kIsWeb
+        ? "${application.platform.name.capitalize()} Web"
+        : (leanbackMode ? "${application.platform.name.capitalize()} TV" : application.platform.name.capitalize()),
+    _ => !kIsWeb ? application.platform.name.capitalize() : "${application.platform.name.capitalize()} Web",
   };
   return {
     'authorization':

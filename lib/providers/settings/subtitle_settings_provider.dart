@@ -22,7 +22,7 @@ class SubtitleSettingsNotifier extends StateNotifier<SubtitleSettingsModel> {
   set state(SubtitleSettingsModel value) {
     super.state = value;
     ref.read(sharedUtilityProvider).subtitleSettings = value;
-    if (Platform.isAndroid) {
+    if (!kIsWeb && Platform.isAndroid) {
       pigeon.VideoPlayerApi().setSubtitleSettings(
         pigeon.SubtitleSettings(
           fontSize: state.fontSize,

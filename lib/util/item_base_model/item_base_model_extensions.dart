@@ -27,6 +27,8 @@ import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
 import 'package:fladder/screens/syncing/sync_button.dart';
 import 'package:fladder/screens/syncing/sync_item_details.dart';
 import 'package:fladder/seerr/seerr_models.dart';
+import 'package:fladder/util/clipboard_helper.dart';
+import 'package:fladder/util/file_downloader.dart';
 import 'package:fladder/util/item_base_model/play_item_helpers.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/refresh_state.dart';
@@ -129,6 +131,7 @@ extension ItemBaseModelExtensions on ItemBaseModel {
         )) &&
         syncAble &&
         (canDownload ?? false);
+    final downloadUrl = ref.read(userProvider.notifier).createDownloadUrl(this);
     final syncedItemFuture = ref.read(syncProvider.notifier).getSyncedItem(id);
     final hasSeerrData = overview.seerrUrl?.isNotEmpty == true;
     final showMarkAs = switch (this) {
@@ -310,40 +313,54 @@ extension ItemBaseModelExtensions on ItemBaseModel {
           },
           label: Text(context.localized.refreshMetadata),
         ),
-      if (!exclude.contains(ItemActions.download) && downloadEnabled)
-        ItemActionButton(
-          icon: FutureBuilder(
-            future: syncedItemFuture,
-            builder: (context, snapshot) {
-              final syncedItem = snapshot.data;
+      if (!exclude.contains(ItemActions.download) && downloadEnabled) ...[
+        if (!kIsWeb)
+          ItemActionButton(
+            icon: FutureBuilder(
+              future: syncedItemFuture,
+              builder: (context, snapshot) {
+                final syncedItem = snapshot.data;
+                if (syncedItem != null) {
+                  return IgnorePointer(child: SyncButton(item: this, syncedItem: syncedItem));
+                }
+                return const Icon(IconsaxPlusLinear.arrow_down_2);
+              },
+            ),
+            label: FutureBuilder(
+              future: syncedItemFuture,
+              builder: (context, snapshot) {
+                final syncedItem = snapshot.data;
+                if (syncedItem != null) {
+                  return Text(
+                    context.localized.syncDetails,
+                  );
+                }
+                return Text(context.localized.sync);
+              },
+            ),
+            action: () async {
+              final syncedItem = await syncedItemFuture;
               if (syncedItem != null) {
-                return IgnorePointer(child: SyncButton(item: this, syncedItem: syncedItem));
+                await showSyncItemDetails(context, syncedItem, ref);
+              } else {
+                await ref.read(syncProvider.notifier).addSyncItem(context, this);
               }
-              return const Icon(IconsaxPlusLinear.arrow_down_2);
+              context.refreshData();
             },
+          )
+        else if (downloadUrl != null) ...[
+          ItemActionButton(
+            icon: const Icon(IconsaxPlusLinear.document_download),
+            action: () => downloadFile(downloadUrl),
+            label: Text(context.localized.downloadFile(type.label(context.localized).toLowerCase())),
           ),
-          label: FutureBuilder(
-            future: syncedItemFuture,
-            builder: (context, snapshot) {
-              final syncedItem = snapshot.data;
-              if (syncedItem != null) {
-                return Text(
-                  context.localized.syncDetails,
-                );
-              }
-              return Text(context.localized.sync);
-            },
-          ),
-          action: () async {
-            final syncedItem = await syncedItemFuture;
-            if (syncedItem != null) {
-              await showSyncItemDetails(context, syncedItem, ref);
-            } else {
-              await ref.read(syncProvider.notifier).addSyncItem(context, this);
-            }
-            context.refreshData();
-          },
-        ),
+          ItemActionButton(
+            icon: const Icon(IconsaxPlusLinear.link_21),
+            action: () => context.copyToClipboard(downloadUrl),
+            label: Text(context.localized.copyStreamUrl),
+          )
+        ],
+      ],
       if (hasSeerrData && tmdbId != null)
         ItemActionButton(
           icon: const Icon(IconsaxPlusLinear.link_21),

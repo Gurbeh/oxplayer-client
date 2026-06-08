@@ -110,6 +110,7 @@ abstract class ClientSettingsModel with _$ClientSettingsModel {
   }
 
   Future<String?> getSavePath() async {
+    if (kIsWeb && syncPath == null) return null;
     if (Platform.isMacOS) {
       return await DirectoryBookmark().resolveDirectory(syncPathKey);
     }

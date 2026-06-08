@@ -49,6 +49,10 @@ extension BookBaseModelExtension on BookModel? {
     AutoDisposeStateNotifierProvider<BookDetailsProviderNotifier, BookProviderModel>? provider,
     BuildContext? parentContext,
   }) async {
+    if (kIsWeb) {
+      FladderSnack.show(context.localized.unableToPlayBooksOnWeb, context: context);
+      return;
+    }
     if (this == null) {
       return;
     }

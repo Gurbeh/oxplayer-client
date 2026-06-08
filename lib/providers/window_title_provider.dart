@@ -74,7 +74,7 @@ class WindowTitleNotifier extends StateNotifier<String> {
       state = newState;
     });
 
-    if ((Platform.isLinux || Platform.isMacOS || Platform.isWindows)) {
+    if (!kIsWeb && (Platform.isLinux || Platform.isMacOS || Platform.isWindows)) {
       windowManager.setTitle(newState);
     }
   }

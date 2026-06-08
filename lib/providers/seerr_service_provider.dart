@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:chopper/chopper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -741,7 +742,7 @@ class SeerrService {
   String? _extractSessionCookie(Response<dynamic> response) {
     final setCookie = response.base.headers['set-cookie'];
     if (setCookie == null || setCookie.isEmpty) {
-      return null;
+      return kIsWeb ? kBrowserManagedCookie : null;
     }
     return setCookie.split(';').first.trim();
   }

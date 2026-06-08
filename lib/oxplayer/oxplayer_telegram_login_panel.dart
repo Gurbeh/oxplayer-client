@@ -142,7 +142,7 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
 
   Future<void> _pollForCompletion({required bool userOpenedTelegram}) async {
     if (_pollRunning) {
-      if (userOpenedTelegram && !_isTv(context) && mounted) {
+      if (userOpenedTelegram && !_isTv(context) && !kIsWeb && mounted) {
         setState(() => _waiting = true);
       }
       return;
@@ -155,7 +155,7 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
     _cancelPoll = false;
     if (mounted) {
       setState(() {
-        _waiting = userOpenedTelegram && !_isTv(context);
+        _waiting = userOpenedTelegram && !_isTv(context) && !kIsWeb;
         _error = null;
       });
     }
@@ -218,7 +218,7 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
     final isTv = _isTv(context);
     final isPhone = viewSize == ViewSize.phone;
     final showInlineQr = !isPhone;
-    final showDeviceButton = !isTv;
+    final showDeviceButton = !isTv && !kIsWeb;
     final showWaitingOnDevice = _waiting && showDeviceButton;
 
     final subtitle = showWaitingOnDevice
