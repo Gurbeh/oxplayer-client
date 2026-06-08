@@ -1,3 +1,1 @@
-Sign in with Telegram (phone or QR). For reviewers: Settings → About → press and hold the logo for 3 seconds to load the demo library. Bug fixes and stability improvements.
-
-See the full changelog at: https://github.com/Aryan-mor/oxplayer-client/releases/tag/v1.0.1
+See the full changelog at: https://github.com/Gurbeh/oxplayer-client/releases/tag/v1.0.1
