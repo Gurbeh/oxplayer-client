@@ -466,16 +466,48 @@ jobs:
           name: oxplayer-linux
           path: build/linux/x64/release/bundle
 
+      - name: Cache AppRun binaries
+        uses: actions/cache@v4
+        with:
+          path: appimage-build/AppRun
+          key: apprun-v2.0.0-x86_64-${{ runner.os }}
+          restore-keys: |
+            apprun-v2.0.0-x86_64-${{ runner.os }}
+
       - name: Build AppImage
         run: |
           VERSION_TO_USE="${{ needs.fetch-info.outputs.version_name }}"
           sed -i -E "s/(version:\\s*)latest/\\1${VERSION_TO_USE}/" AppImageBuilder.yml
           sed -i "s|PLACEHOLDER_OWNER|${{ github.repository_owner }}|g" AppImageBuilder.yml
           sed -i "s|PLACEHOLDER_REPO|${{ github.event.repository.name }}|g" AppImageBuilder.yml
-          wget -O appimage-builder-x86_64.AppImage https://github.com/AppImageCrafters/appimage-builder/releases/download/v1.1.0/appimage-builder-1.1.0-x86_64.AppImage
+          curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 \
+            -o appimage-builder-x86_64.AppImage \
+            https://github.com/AppImageCrafters/appimage-builder/releases/download/v1.1.0/appimage-builder-1.1.0-x86_64.AppImage
           chmod +x appimage-builder-x86_64.AppImage
           sudo mv appimage-builder-x86_64.AppImage /usr/local/bin/appimage-builder
-          appimage-builder --recipe AppImageBuilder.yml
+
+          # appimage-builder downloads AppRun from GitHub at runtime; pre-cache to avoid 504 timeouts.
+          APPRUN_VERSION="v2.0.0"
+          CACHE_DIR="appimage-build/AppRun/${APPRUN_VERSION}"
+          mkdir -p "${CACHE_DIR}"
+          for asset in AppRun-Release-x86_64 libapprun_hooks-Release-x86_64.so; do
+            dest="${CACHE_DIR}/${asset}"
+            if [ ! -f "${dest}" ]; then
+              url="https://github.com/AppImageCrafters/AppRun/releases/download/${APPRUN_VERSION}/${asset}"
+              curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 -o "${dest}" "${url}"
+            fi
+          done
+
+          for attempt in 1 2 3; do
+            if appimage-builder --recipe AppImageBuilder.yml; then
+              break
+            fi
+            if [ "${attempt}" -eq 3 ]; then
+              exit 1
+            fi
+            echo "appimage-builder failed (attempt ${attempt}/3), retrying in 30s..."
+            sleep 30
+          done
 
       - uses: actions/upload-artifact@v5
         with:
