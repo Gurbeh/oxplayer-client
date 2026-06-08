@@ -179,12 +179,6 @@ jobs:
 
       - uses: ./.github/actions/oxplayer-flutter-env
 
-      - name: Warm Gradle wrapper
-        working-directory: android
-        run: |
-          chmod +x ../.github/scripts/retry_command.sh
-          ../.github/scripts/retry_command.sh 5 30 -- ./gradlew --version
-
       - name: Build Android APK (PRs)
         if: needs.fetch-info.outputs.build_type == 'development'
         run: |
