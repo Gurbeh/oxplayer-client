@@ -5,7 +5,7 @@ EXPOSE 80
 ENV BASE_URL=""
 ENV SEERR_BASE_URL=""
 ENV SEERR_HEADER="null"
-ENV FLADDER_WEBPATH="/"
+ENV FLADDER_WEBPATH="/web/"
 
 COPY build/web /usr/share/nginx/html
 COPY docker-entrypoint.sh /docker-entrypoint.sh

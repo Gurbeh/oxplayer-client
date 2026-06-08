@@ -1,6 +1,6 @@
 # Marketing site + Flutter web app on GitHub Pages.
 # Site: https://gurbeh.github.io/oxplayer-client/
-# Web app: https://gurbeh.github.io/oxplayer-client/web/
+# Web app: https://oxplayer.app/web/ (custom domain; was /oxplayer-client/web/ on github.io only)
 # Privacy: https://gurbeh.github.io/oxplayer-client/privacy-policy.html
 name: Deploy website (GitHub Pages)
 
@@ -72,7 +72,7 @@ jobs:
       - name: Build Flutter web for /web/
         run: |
           flutter build web --release \
-            --base-href /${{ github.event.repository.name }}/web/ \
+            --base-href /web/ \
             --no-web-resources-cdn \
             --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
 

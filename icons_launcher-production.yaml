@@ -2,11 +2,14 @@ icons_launcher:
   image_path: "icons/production/oxplayer_icon.png"
   platforms:
     android:
-      # Launcher mipmaps + adaptive XML come from Icon Kitchen (see refs/IconKitchen-Output).
-      # After changing icons in Kitchen, copy android/res + play_store_512 into this project again.
-      enable: false
+      adaptive_foreground_image: "icons/production/oxplayer_icon.png"
+      adaptive_background_color: "#210000"
+      adaptive_monochrome_image: "icons/production/oxplayer_adaptive_icon.png"
+      notification_image: icons/oxplayer_notification_icon.png
+      enable: true
     ios:
-      enable: false
+      image_path: "icons/production/oxplayer_store_icon.png"
+      enable: true
     windows:
       image_path: "icons/production/oxplayer_icon_desktop.png"
       enable: true
@@ -17,5 +20,5 @@ icons_launcher:
       image_path: "icons/production/oxplayer_icon_desktop.png"
       enable: true
     web:
-      # Web icons come from Icon Kitchen (web/icons + favicon.png).
-      enable: false
+      favicon_path: "icons/production/oxplayer_icon_desktop.png"
+      enable: true
