@@ -333,7 +333,7 @@ jobs:
               return (
                   m.group(1)
                   + '\n COMMAND powershell.exe -NoProfile -ExecutionPolicy Bypass '
-                  + '-File "$ENV:OX_MEDIAKIT_MPV_SCRIPT}" '
+                  + '-File "$ENV{OX_MEDIAKIT_MPV_SCRIPT}" '
                   + '-Archive "${LIBMPV_ARCHIVE}" -DestDir "${LIBMPV_SRC}"'
                   + m.group(2)
               )
@@ -342,7 +342,7 @@ jobs:
               return (
                   m.group(1)
                   + '\n COMMAND powershell.exe -NoProfile -ExecutionPolicy Bypass '
-                  + '-File "$ENV:OX_MEDIAKIT_ANGLE_SCRIPT}" '
+                  + '-File "$ENV{OX_MEDIAKIT_ANGLE_SCRIPT}" '
                   + '-Archive "${ANGLE_ARCHIVE}" -DestDir "${ANGLE_SRC}"'
                   + m.group(2)
               )
@@ -435,9 +435,31 @@ jobs:
 
       - name: Build iOS IPA (unsigned)
         run: |
-          flutter build ipa --no-codesign --flavor production \
-            --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
-            --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
+          set -uo pipefail
+
+          # media_kit_libs_ios_video downloads Mpv.xcframework via `make` during pod install,
+          # but the podspec ignores curl failures — a transient 504 leaves the framework missing
+          # ("Framework 'Mpv' not found"). Materialize it explicitly with retries before archiving.
+          prepare_ios_deps() {
+            flutter build ios --config-only --no-codesign --flavor production \
+              --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE" || return 1
+            mk_makefile="$(find "${PUB_CACHE}/git" -path '*/media_kit_libs_ios_video/ios/Makefile' 2>/dev/null | head -1 || true)"
+            if [[ -n "${mk_makefile}" ]]; then
+              ( cd "${mk_makefile%/Makefile}" && make clean && make ) || return 1
+            fi
+            ( cd ios && pod install --repo-update ) || return 1
+          }
+
+          for attempt in 1 2 3 4 5; do
+            if prepare_ios_deps && flutter build ipa --no-codesign --flavor production \
+              --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
+              --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"; then
+              exit 0
+            fi
+            echo "iOS build failed (attempt ${attempt}/5), retrying in 45s..."
+            sleep 45
+          done
+          exit 1
 
       - name: Package unsigned IPA
         run: |
