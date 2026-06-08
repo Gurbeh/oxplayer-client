@@ -12,22 +12,25 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
-def localProperties = new Properties()
-def localPropertiesFile = rootProject.file('local.properties')
-if (localPropertiesFile.exists()) {
-    localPropertiesFile.withReader('UTF-8') { reader ->
-        localProperties.load(reader)
-    }
+// Semantic version + versionCode derived from pubspec.yaml (decoupled from +N build suffix).
+def pubspecFile = file('../../pubspec.yaml')
+if (!pubspecFile.exists()) {
+    throw new GradleException("pubspec.yaml not found at ${pubspecFile.absolutePath}")
 }
-
-def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
-if (flutterVersionCode == null) {
-    flutterVersionCode = '1'
+def pubspecVersionMatcher = pubspecFile.text =~ /(?m)^version:\s*(\d+)\.(\d+)\.(\d+)/
+if (!pubspecVersionMatcher.find()) {
+    throw new GradleException("Could not parse semantic version from pubspec.yaml (expected format: version: M.m.p+N)")
 }
-
-def flutterVersionName = localProperties.getProperty('flutter.versionName')
-if (flutterVersionName == null) {
-    flutterVersionName = '1.0'
+def major = pubspecVersionMatcher.group(1).toInteger()
+def minor = pubspecVersionMatcher.group(2).toInteger()
+def patch = pubspecVersionMatcher.group(3).toInteger()
+def semanticVersionName = "${major}.${minor}.${patch}"
+def computedVersionCode = (major * 100000) + (minor * 1000) + patch
+if (computedVersionCode < 100001) {
+    throw new GradleException(
+            "computedVersionCode ${computedVersionCode} is below minimum 100001. " +
+                    "Bump pubspec.yaml semantic version (formula: major*100000 + minor*1000 + patch)."
+    )
 }
 
 android {
@@ -71,8 +74,8 @@ android {
         applicationId = "app.oxplayer"
         minSdkVersion flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        versionCode = computedVersionCode
+        versionName = semanticVersionName
 
         // Do NOT set ndk.abiFilters here: `flutter build apk --split-per-abi` (CI) already
         // configures splits.abi (armeabi-v7a, arm64-v8a, x86_64) and Gradle fails if both exist.
