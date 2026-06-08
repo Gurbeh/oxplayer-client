@@ -58,6 +58,7 @@ jobs:
         run: |
           npm ci
           npm run build
+          npm run verify:export
 
       - uses: subosito/flutter-action@v2
         with:
