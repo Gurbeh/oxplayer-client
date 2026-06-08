@@ -165,6 +165,8 @@ jobs:
           java-version: "17"
           cache: "gradle"
 
+      - uses: gradle/actions/setup-gradle@v4
+
       - uses: subosito/flutter-action@v2
         with:
           channel: "stable"
@@ -177,27 +179,38 @@ jobs:
 
       - uses: ./.github/actions/oxplayer-flutter-env
 
+      - name: Warm Gradle wrapper
+        working-directory: android
+        run: |
+          chmod +x ../.github/scripts/retry_command.sh
+          ../.github/scripts/retry_command.sh 5 30 -- ./gradlew --version
+
       - name: Build Android APK (PRs)
         if: needs.fetch-info.outputs.build_type == 'development'
         run: |
-          flutter build apk --debug --split-per-abi \
-            --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
-            --flavor production \
-            --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
+          chmod +x .github/scripts/retry_command.sh
+          .github/scripts/retry_command.sh 3 45 -- \
+            flutter build apk --debug --split-per-abi \
+              --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
+              --flavor production \
+              --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
 
       - name: Build Android APK and AAB
         if: needs.fetch-info.outputs.build_type != 'development'
         run: |
-          flutter build apk --release --split-per-abi \
-            --split-debug-info=build/debug-info \
-            --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
-            --flavor production \
-            --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
-          flutter build appbundle --release \
-            --split-debug-info=build/debug-info \
-            --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
-            --flavor production \
-            --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
+          chmod +x .github/scripts/retry_command.sh
+          .github/scripts/retry_command.sh 3 45 -- \
+            flutter build apk --release --split-per-abi \
+              --split-debug-info=build/debug-info \
+              --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
+              --flavor production \
+              --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
+          .github/scripts/retry_command.sh 3 45 -- \
+            flutter build appbundle --release \
+              --split-debug-info=build/debug-info \
+              --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
+              --flavor production \
+              --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
 
       - name: Upload debug symbols to Sentry
         if: needs.fetch-info.outputs.build_type != 'development'
@@ -443,27 +456,35 @@ jobs:
           name: oxplayer-linux
           path: build/linux/x64/release/bundle
 
-      - name: Cache AppRun binaries
+      - name: Cache AppImage tooling
         uses: actions/cache@v4
         with:
-          path: appimage-build/AppRun
-          key: apprun-v2.0.0-x86_64-${{ runner.os }}
+          path: |
+            .ci-cache/appimage-builder-x86_64.AppImage
+            appimage-build/AppRun
+          key: appimage-tooling-v2.0.0-x86_64-${{ runner.os }}
           restore-keys: |
-            apprun-v2.0.0-x86_64-${{ runner.os }}
+            appimage-tooling-v2.0.0-x86_64-${{ runner.os }}
 
       - name: Build AppImage
         run: |
+          set -euo pipefail
+          chmod +x .github/scripts/download_with_retry.sh .github/scripts/retry_command.sh
+          mkdir -p .ci-cache
+
           VERSION_TO_USE="${{ needs.fetch-info.outputs.version_name }}"
           sed -i -E "s/(version:\\s*)latest/\\1${VERSION_TO_USE}/" AppImageBuilder.yml
           sed -i "s|PLACEHOLDER_OWNER|${{ github.repository_owner }}|g" AppImageBuilder.yml
           sed -i "s|PLACEHOLDER_REPO|${{ github.event.repository.name }}|g" AppImageBuilder.yml
-          curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 \
-            -o appimage-builder-x86_64.AppImage \
-            https://github.com/AppImageCrafters/appimage-builder/releases/download/v1.1.0/appimage-builder-1.1.0-x86_64.AppImage
-          chmod +x appimage-builder-x86_64.AppImage
-          sudo mv appimage-builder-x86_64.AppImage /usr/local/bin/appimage-builder
 
-          # appimage-builder downloads AppRun from GitHub at runtime; pre-cache to avoid 504 timeouts.
+          BUILDER_DEST=".ci-cache/appimage-builder-x86_64.AppImage"
+          if [ ! -f "${BUILDER_DEST}" ]; then
+            .github/scripts/download_with_retry.sh \
+              "https://github.com/AppImageCrafters/appimage-builder/releases/download/v1.1.0/appimage-builder-1.1.0-x86_64.AppImage" \
+              "${BUILDER_DEST}"
+          fi
+          install -m 755 "${BUILDER_DEST}" /usr/local/bin/appimage-builder
+
           APPRUN_VERSION="v2.0.0"
           CACHE_DIR="appimage-build/AppRun/${APPRUN_VERSION}"
           mkdir -p "${CACHE_DIR}"
@@ -471,20 +492,12 @@ jobs:
             dest="${CACHE_DIR}/${asset}"
             if [ ! -f "${dest}" ]; then
               url="https://github.com/AppImageCrafters/AppRun/releases/download/${APPRUN_VERSION}/${asset}"
-              curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 -o "${dest}" "${url}"
+              .github/scripts/download_with_retry.sh "${url}" "${dest}"
             fi
           done
 
-          for attempt in 1 2 3; do
-            if appimage-builder --recipe AppImageBuilder.yml; then
-              break
-            fi
-            if [ "${attempt}" -eq 3 ]; then
-              exit 1
-            fi
-            echo "appimage-builder failed (attempt ${attempt}/3), retrying in 30s..."
-            sleep 30
-          done
+          .github/scripts/retry_command.sh 3 45 -- \
+            appimage-builder --recipe AppImageBuilder.yml
 
       - uses: actions/upload-artifact@v5
         with:
