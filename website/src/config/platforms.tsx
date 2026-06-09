@@ -21,6 +21,7 @@ export const platforms: Platform[] = [
   { id: "Android", label: "Android", Icon: FaAndroid, heroMobile: true },
   { id: "AndroidTV", label: "Android TV", Icon: FaTv, heroMobile: false },
   { id: "iOS", label: "iOS", Icon: FaApple, heroMobile: true },
+  { id: "macOS", label: "macOS", Icon: FaApple, heroMobile: false },
   { id: "Windows", label: "Windows", Icon: FaWindows, heroMobile: false },
   { id: "Linux", label: "Linux", Icon: FaLinux, heroMobile: false },
   { id: "Web", label: "Web", Icon: FaGlobe, heroMobile: true },

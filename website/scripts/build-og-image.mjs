@@ -53,7 +53,7 @@ const textSvg = Buffer.from(
     <text x="0" y="118" font-family="Segoe UI, system-ui, sans-serif" font-size="30" font-weight="600" fill="#EDAE49">Your Personal Telegram Cinema</text>
     <text x="0" y="168" font-family="Segoe UI, system-ui, sans-serif" font-size="20" fill="#cbd5e1">Netflix-style media library</text>
     <text x="0" y="198" font-family="Segoe UI, system-ui, sans-serif" font-size="20" fill="#cbd5e1">for videos you send to the bot</text>
-    <text x="0" y="260" font-family="Segoe UI, system-ui, sans-serif" font-size="16" fill="#94a3b8">Android · iOS · Windows · Linux · Web</text>
+    <text x="0" y="260" font-family="Segoe UI, system-ui, sans-serif" font-size="16" fill="#94a3b8">Android · iOS · macOS · Windows · Linux · Web</text>
   </svg>`,
 );
 

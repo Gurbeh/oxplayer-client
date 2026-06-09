@@ -7,13 +7,14 @@ export const RELEASES_PAGE_URL = `https://github.com/${GITHUB_REPO}/releases/lat
 /** Live web app (deployed from release builds). */
 export const WEB_APP_URL = `${SITE_ORIGIN}/web/`;
 
-export type PlatformId = "Android" | "AndroidTV" | "iOS" | "Windows" | "Linux" | "Web";
+export type PlatformId = "Android" | "AndroidTV" | "iOS" | "macOS" | "Windows" | "Linux" | "Web";
 
 /** Match primary release asset per platform from GitHub Releases. */
 export const PLATFORM_ASSET_PATTERNS: Record<Exclude<PlatformId, "Web">, RegExp> = {
   Android: /^OXPlayer-Android-.+-arm64-v8a\.apk$/,
   AndroidTV: /^OXPlayer-Android-.+-armeabi-v7a\.apk$/,
   iOS: /^OXPlayer-iOS-.+\.ipa$/,
+  macOS: /^OXPlayer-macOS-.+\.dmg$/,
   Windows: /^OXPlayer-Windows-.+-Setup\.exe$/,
   Linux: /^OXPlayer-Linux-.+\.AppImage$/,
 };

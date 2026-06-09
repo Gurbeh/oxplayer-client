@@ -34,7 +34,7 @@ const faqs: { q: string; a: ReactNode }[] = [
   },
   {
     q: "Which platforms are available?",
-    a: "OXPlayer is available on Android, Android TV, iOS, Windows, Linux, and Web. Use the download links on this page to get the latest release for your device.",
+    a: "OXPlayer is available on Android, Android TV, iOS, macOS, Windows, Linux, and Web. Use the download links on this page to get the latest release for your device.",
   },
   {
     q: "Can I continue watching from where I left off?",
