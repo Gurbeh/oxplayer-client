@@ -109,6 +109,11 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <!-- Impeller GLES mipmap gen crashes on TCL/Android TV (Sentry OXPLAYER-CLIENT-6: TQMQueueMipgen). -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
+
         <receiver
             android:name="com.ryanheise.audioservice.MediaButtonReceiver"
             android:exported="true"

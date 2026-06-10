@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:transparent_image/transparent_image.dart';
 
 import 'package:fladder/models/items/images_models.dart';
-import 'package:fladder/oxplayer/oxplayer_tv_image_decode.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 
@@ -40,11 +39,11 @@ class FladderImage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final useBluredPlaceHolder = ref.watch(clientSettingsProvider.select((value) => value.blurPlaceHolders));
+    final leanBackMode = ref.watch(argumentsStateProvider.select((value) => value.leanBackMode));
+    final useBluredPlaceHolder =
+        !leanBackMode && ref.watch(clientSettingsProvider.select((value) => value.blurPlaceHolders));
     final newImage = image;
     final imageProvider = cachedImage ? image?.imageProvider : image?.nonCachedImageProvider;
-
-    final leanBackMode = ref.watch(argumentsStateProvider.select((value) => value.leanBackMode));
 
     if (newImage == null) {
       return placeHolder ?? Container();
@@ -69,14 +68,9 @@ class FladderImage extends ConsumerWidget {
               fit: fit,
               placeholderFit: fit,
               alignment: alignment ?? Alignment.center,
+              filterQuality: leanBackMode ? FilterQuality.medium : FilterQuality.low,
               imageErrorBuilder: imageErrorBuilder,
-              image: leanBackMode
-                  ? ResizeImage(
-                      imageProvider,
-                      policy: ResizeImagePolicy.fit,
-                      height: oxplayerTvImageDecodeHeight(context, fallback: decodeHeight),
-                    )
-                  : imageProvider,
+              image: imageProvider,
             )
         ],
       );
