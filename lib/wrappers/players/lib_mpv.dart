@@ -18,6 +18,7 @@ import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/settings/subtitle_settings_model.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/providers/settings/subtitle_settings_provider.dart';
 import 'package:fladder/screens/video_player/video_player.dart' as video_screen;
 import 'package:fladder/util/subtitle_position_calculator.dart';
@@ -263,6 +264,11 @@ class LibMPV extends BasePlayer {
           await Future.delayed(const Duration(milliseconds: 150));
           if (DateTime.now().isAfter(_firstLoadAttempt.add(_maxRetryDuration))) {
             log("Max retry duration reached, stopping retries.");
+            unawaited(OxplayerPlaybackTelemetry.reportFailure(
+              stage: 'player_load',
+              reason: 'max_retry_duration_reached',
+              streamUrl: url,
+            ));
             _retryTimer?.cancel();
             _retryTimer = null;
           } else {

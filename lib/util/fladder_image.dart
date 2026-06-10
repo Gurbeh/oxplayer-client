@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:transparent_image/transparent_image.dart';
 
 import 'package:fladder/models/items/images_models.dart';
+import 'package:fladder/oxplayer/oxplayer_tv_image_decode.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 
@@ -73,7 +74,7 @@ class FladderImage extends ConsumerWidget {
                   ? ResizeImage(
                       imageProvider,
                       policy: ResizeImagePolicy.fit,
-                      height: decodeHeight,
+                      height: oxplayerTvImageDecodeHeight(context, fallback: decodeHeight),
                     )
                   : imageProvider,
             )

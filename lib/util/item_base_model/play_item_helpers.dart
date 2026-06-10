@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer';
 import 'dart:math' show Random, min;
 
@@ -23,6 +24,7 @@ import 'package:fladder/models/items/photos_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/tv_playback_model.dart';
 import 'package:fladder/models/video_stream_model.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/book_viewer_provider.dart';
 import 'package:fladder/providers/items/book_details_provider.dart';
@@ -625,6 +627,11 @@ extension ItemBaseModelExtensions on ItemBaseModel? {
     final model = await op.valueOrCancellation(null);
     if (op.isCanceled || model == null) {
       if (!op.isCanceled) {
+        unawaited(OxplayerPlaybackTelemetry.reportFailure(
+          stage: 'playback_model',
+          reason: 'unable_to_create_playback_model',
+          itemId: itemModel.id,
+        ));
         try {
           Navigator.of(context, rootNavigator: true).pop();
         } catch (e) {
@@ -682,6 +689,11 @@ extension ItemBaseModelsBooleans on List<ItemBaseModel> {
     final result = await op.valueOrCancellation(null);
     if (op.isCanceled || result == null) {
       if (!op.isCanceled) {
+        unawaited(OxplayerPlaybackTelemetry.reportFailure(
+          stage: 'playback_model',
+          reason: 'unable_to_create_playback_model',
+          itemId: isNotEmpty ? first.id : null,
+        ));
         try {
           Navigator.of(context, rootNavigator: true).pop();
         } catch (e) {
@@ -913,6 +925,10 @@ Future<void> _playVideo(
 }) async {
   if (current == null) {
     if (context.mounted) {
+      unawaited(OxplayerPlaybackTelemetry.reportFailure(
+        stage: 'playback_model',
+        reason: 'playback_model_null',
+      ));
       try {
         Navigator.of(context, rootNavigator: true).pop();
       } catch (e) {
@@ -934,6 +950,12 @@ Future<void> _playVideo(
 
   if (!loadedCorrectly) {
     if (context.mounted) {
+      unawaited(OxplayerPlaybackTelemetry.reportFailure(
+        stage: 'player_load',
+        reason: 'load_playback_item_failed',
+        itemId: current.item.id,
+        streamUrl: current.media?.url,
+      ));
       try {
         Navigator.of(context, rootNavigator: true).pop();
       } catch (e) {

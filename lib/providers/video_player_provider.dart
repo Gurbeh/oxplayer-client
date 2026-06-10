@@ -11,6 +11,7 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/media_playback_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/playback_queue_state.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/settings/video_player_settings_provider.dart';
 import 'package:fladder/wrappers/media_control_wrapper.dart';
@@ -177,6 +178,11 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     }
 
     mediaState.update((state) => state.copyWith(errorPlaying: true));
+    unawaited(OxplayerPlaybackTelemetry.reportFailure(
+      stage: 'player_load',
+      reason: 'missing_media_url',
+      itemId: model.item.id,
+    ));
     return false;
   }
 
