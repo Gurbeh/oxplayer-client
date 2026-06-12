@@ -4,19 +4,23 @@ globs: oxplayer-client/**/*
 alwaysApply: false
 ---
 
-# Pre-push verification (oxplayer-client)
+# Pre-push verification (oxplayer-client) — required
 
-Before pushing client changes, run:
+Every `git push` must pass `scripts/verify-all.sh` (enforced by the pre-push hook).
+
+**One-time setup after clone:**
+
+```bash
+bash scripts/install-pre-push-hook.sh
+```
+
+**Manual run (same check the hook uses):**
 
 ```bash
 bash scripts/verify-all.sh
 ```
 
-Optional one-time setup — block push when verify fails:
-
-```bash
-bash scripts/install-pre-push-hook.sh
-```
+Hook source (versioned): `scripts/git-hooks/pre-push`. Do not bypass with `--no-verify` unless explicitly debugging hook issues.
 
 Playback and catalog UI hooks for OX belong in `lib/oxplayer/` with thin call sites in Fladder detail/playback files — do not rewrite upstream providers.
 

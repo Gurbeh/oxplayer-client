@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Required before every git push — same static checks as CI (scripts/verify-all.sh).
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+echo "pre-push (required): running scripts/verify-all.sh ..."
+bash "${ROOT}/scripts/verify-all.sh"

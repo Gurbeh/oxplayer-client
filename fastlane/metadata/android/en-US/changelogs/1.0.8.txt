@@ -1,0 +1,1 @@
+Fix build error on movie detail screen (missing MediaStreamHelper import). Pre-push verify now runs dart analyze before every push.
