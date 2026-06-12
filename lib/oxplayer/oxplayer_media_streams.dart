@@ -14,5 +14,13 @@ String oxplayerVersionStreamLabel(VersionStreamModel stream) {
   if (stream.name.trim().isNotEmpty) {
     return stream.name.trim();
   }
-  return stream.detailedResolutionLabel;
+  final resolution = stream.detailedResolutionLabel.trim();
+  if (resolution.isNotEmpty && resolution != 'Unknown Unknown') {
+    return resolution;
+  }
+  final id = stream.id?.trim();
+  if (id != null && id.isNotEmpty) {
+    return id.replaceFirst(RegExp(r'^ms_'), 'Variant ');
+  }
+  return 'Variant ${stream.index + 1}';
 }

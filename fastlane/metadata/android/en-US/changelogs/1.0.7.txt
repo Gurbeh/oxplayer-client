@@ -1,0 +1,1 @@
+Multi-file version picker on movie and episode detail pages. Playback fixes for titles with several file variants. Pre-push verify scripts for safer releases.

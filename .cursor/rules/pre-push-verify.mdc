@@ -9,8 +9,13 @@ alwaysApply: false
 Before pushing client changes, run:
 
 ```bash
-dart analyze lib/
-dart format --output=none --set-exit-if-changed lib/oxplayer lib/models/playback
+bash scripts/verify-all.sh
+```
+
+Optional one-time setup — block push when verify fails:
+
+```bash
+bash scripts/install-pre-push-hook.sh
 ```
 
 Playback and catalog UI hooks for OX belong in `lib/oxplayer/` with thin call sites in Fladder detail/playback files — do not rewrite upstream providers.
