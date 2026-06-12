@@ -14,7 +14,7 @@ void oxplayerMaybeConfigureSeerr(WidgetRef ref) {
   unawaited(oxplayerConfigureSeerrFromServer(ref));
 }
 
-/// Server-driven Seerr credentials for VIP/admin (GET /me/seerr). No user types in the client.
+/// Server-driven Seerr via API proxy for VIP/admin (GET /me/seerr). No user types in the client.
 Future<void> oxplayerConfigureSeerrFromServer(WidgetRef ref) async {
   if (!OxplayerEnv.isEnabled) return;
 
@@ -47,13 +47,14 @@ Future<void> oxplayerConfigureSeerrFromServer(WidgetRef ref) async {
       return;
     }
 
-    final serverUrl = body['serverUrl']?.toString().trim() ?? '';
-    final sessionCookie = body['sessionCookie']?.toString().trim() ?? '';
-    if (serverUrl.isEmpty || sessionCookie.isEmpty) return;
+    final proxyPath = body['proxyPath']?.toString().trim() ?? '';
+    if (proxyPath.isEmpty) return;
 
-    ref.read(userProvider.notifier).setSeerrServerUrl(serverUrl);
-    ref.read(userProvider.notifier).setSeerrSessionCookie(sessionCookie);
+    final proxyBase = proxyPath.startsWith('http') ? proxyPath : '$base$proxyPath';
+    ref.read(userProvider.notifier).setSeerrServerUrl(proxyBase);
+    ref.read(userProvider.notifier).setSeerrSessionCookie('');
     ref.read(userProvider.notifier).setSeerrApiKey('');
+    ref.read(userProvider.notifier).setSeerrCustomHeaders(const {'ox-seerr-proxy': '1'});
   } catch (_) {
     // Transient failure — [oxplayerMaybeConfigureSeerr] will retry on next home mount.
   }

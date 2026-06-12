@@ -16,7 +16,11 @@ abstract class SeerrCredentialsModel with _$SeerrCredentialsModel {
     @Default({}) Map<String, String> customHeaders,
   }) = _SeerrCredentialsModel;
 
+  /// OX server proxies Seerr; [customHeaders] contains `ox-seerr-proxy: 1`.
+  bool get useProxy => customHeaders['ox-seerr-proxy'] == '1';
+
   bool get isConfigured {
+    if (useProxy) return serverUrl.isNotEmpty;
     return serverUrl.isNotEmpty && (apiKey.isNotEmpty || sessionCookie.isNotEmpty);
   }
 

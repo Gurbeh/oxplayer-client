@@ -5,6 +5,7 @@ import 'package:chopper/chopper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/providers/connectivity_provider.dart';
 import 'package:fladder/providers/seerr_service_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
@@ -48,19 +49,27 @@ class SeerrRequest implements Interceptor {
   FutureOr<Response<BodyType>> intercept<BodyType>(Chain<BodyType> chain) async {
     final connectivityNotifier = ref.read(connectivityStatusProvider.notifier);
     final creds = ref.read(userProvider)?.seerrCredentials;
-    final serverUrl = (FladderConfig.seerrBaseUrl ?? creds?.serverUrl)?.trim();
+    final useOxProxy = OxplayerEnv.isEnabled && (creds?.useProxy ?? false);
+    final serverUrl = useOxProxy
+        ? creds?.serverUrl.trim()
+        : (FladderConfig.seerrBaseUrl ?? creds?.serverUrl)?.trim();
 
     if (serverUrl == null || serverUrl.isEmpty) {
       throw const HttpException('Seerr server not configured');
     }
 
-    final apiKey = creds?.apiKey.trim() ?? '';
-    final cookie = creds?.sessionCookie.trim() ?? '';
-
-    final authHeaders = _authHeaders(apiKey: apiKey, cookie: cookie);
+    final Map<String, String> authHeaders;
+    if (useOxProxy) {
+      final token = ref.read(userProvider)?.credentials.token.trim() ?? '';
+      authHeaders = token.isEmpty ? const {} : {'Authorization': 'MediaBrowser Token="$token"'};
+    } else {
+      final apiKey = creds?.apiKey.trim() ?? '';
+      final cookie = creds?.sessionCookie.trim() ?? '';
+      authHeaders = _authHeaders(apiKey: apiKey, cookie: cookie);
+    }
     final customHeaders = {
       ...?creds?.customHeaders,
-    };
+    }..remove('ox-seerr-proxy');
     final headers = {...authHeaders, ...customHeaders};
     final apiBaseUri = Uri.parse(serverUrl);
 

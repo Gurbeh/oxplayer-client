@@ -10,6 +10,8 @@ import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/special_feature_model.dart';
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/ox_item_recommendations.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/related_provider.dart';
 import 'package:fladder/providers/seerr_api_provider.dart';
@@ -62,21 +64,24 @@ class MovieDetails extends _$MovieDetails {
       String? seerrUrl;
 
       final seerrCreds = ref.read(userProvider)?.seerrCredentials;
-      if (seerrCreds?.isConfigured == true) {
-        final tmdbId = newState.tmdbId;
-        if (tmdbId != null) {
-          final seerr = ref.read(seerrApiProvider);
-          seerrRelated = await seerr.discoverRelatedMovies(tmdbId: tmdbId);
-          seerrRecommended = await seerr.discoverRecommendedMovies(tmdbId: tmdbId);
-          final seerrPoster = await seerr.fetchDashboardPosterFromIds(
-            tmdbId: tmdbId,
-            mediaType: SeerrMediaType.movie,
-          );
-          final status = seerrPoster?.mediaInfo?.mediaStatus;
-          if (status != SeerrMediaStatus.unknown) {
-            final seerrServerUrl = ref.read(userProvider.select((value) => value?.seerrCredentials?.serverUrl));
-            seerrUrl = '${seerrServerUrl}movie/$tmdbId';
-          }
+      final tmdbId = newState.tmdbId;
+      if (OxplayerEnv.isEnabled) {
+        if (seerrCreds?.isConfigured == true && tmdbId != null) {
+          seerrUrl = 'ox';
+        }
+        seerrRecommended = await oxFetchItemRecommendations(ref, item.id);
+      } else if (seerrCreds?.isConfigured == true && tmdbId != null) {
+        final seerr = ref.read(seerrApiProvider);
+        seerrRelated = await seerr.discoverRelatedMovies(tmdbId: tmdbId);
+        seerrRecommended = await seerr.discoverRecommendedMovies(tmdbId: tmdbId);
+        final seerrPoster = await seerr.fetchDashboardPosterFromIds(
+          tmdbId: tmdbId,
+          mediaType: SeerrMediaType.movie,
+        );
+        final status = seerrPoster?.mediaInfo?.mediaStatus;
+        if (status != SeerrMediaStatus.unknown) {
+          final seerrServerUrl = ref.read(userProvider.select((value) => value?.seerrCredentials?.serverUrl));
+          seerrUrl = '${seerrServerUrl}movie/$tmdbId';
         }
       }
 

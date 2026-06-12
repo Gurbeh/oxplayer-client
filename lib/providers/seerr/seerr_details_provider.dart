@@ -5,6 +5,8 @@ import 'package:fladder/jellyfin/jellyfin_open_api.enums.swagger.dart';
 import 'package:fladder/models/items/images_models.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/ox_seerr_bundle.dart';
 import 'package:fladder/providers/seerr_api_provider.dart';
 import 'package:fladder/providers/seerr_user_provider.dart';
 import 'package:fladder/seerr/seerr_models.dart';
@@ -115,7 +117,20 @@ class SeerrDetails extends _$SeerrDetails {
       }
     }
 
-    if (currentMediaType == SeerrMediaType.movie) {
+    if (OxplayerEnv.isEnabled) {
+      final bundleMedia = currentMediaType == SeerrMediaType.tvshow ? 'tv' : 'movie';
+      final bundle = await oxFetchSeerrBundle(
+        ref,
+        tmdbId: poster.tmdbId,
+        mediaType: bundleMedia,
+      );
+      if (bundle != null) {
+        state = state.copyWith(
+          recommended: oxPosterCardsFromBundle(bundle['recommendations'], bundleMedia),
+          similar: oxPosterCardsFromBundle(bundle['similar'], bundleMedia),
+        );
+      }
+    } else if (currentMediaType == SeerrMediaType.movie) {
       final recommended = await api.discoverRecommendedMovies(tmdbId: poster.tmdbId);
       final related = await api.discoverRelatedMovies(tmdbId: poster.tmdbId);
       state = state.copyWith(recommended: recommended, similar: related);

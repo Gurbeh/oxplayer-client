@@ -206,7 +206,10 @@ Future<List<NotificationModel>> _fetchAndNotifySeerrRequestsForAccount(
         ? seerrCredentials.serverUrl.substring(0, seerrCredentials.serverUrl.length - 1)
         : seerrCredentials.serverUrl;
 
-    final seerrApi = NotificationHelpers.createSeerrClient(seerrCredentials);
+    final seerrApi = NotificationHelpers.createSeerrClient(
+      seerrCredentials,
+      oxBearerToken: account.credentials.token,
+    );
 
     final newRequests = await NotificationHelpers.fetchSeerrRequests(
       seerrApi,

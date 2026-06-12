@@ -209,11 +209,7 @@ class User extends _$User {
   void logoutSeerr() {
     final user = state;
     if (user == null) return;
-    final updated = (user.seerrCredentials ?? const SeerrCredentialsModel()).copyWith(
-      apiKey: "",
-      sessionCookie: "",
-    );
-    userState = user.copyWith(seerrCredentials: updated);
+    userState = user.copyWith(seerrCredentials: const SeerrCredentialsModel());
   }
 
   void setSeerrApiKey(String? value) {

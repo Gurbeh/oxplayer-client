@@ -7,6 +7,7 @@ import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/person_model.dart';
 import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/seerr_api_provider.dart';
 import 'package:fladder/providers/seerr_service_provider.dart';
@@ -90,6 +91,10 @@ class PersonDetailsNotifier extends StateNotifier<PersonModel?> {
 
   Future<void> fetchSeerrCredits() async {
     if (state == null) return;
+    if (OxplayerEnv.isEnabled) {
+      state = state?.copyWith(seerrMovies: const [], seerrSeries: const []);
+      return;
+    }
 
     final seerrCredentials = ref.read(userProvider)?.seerrCredentials;
     if (seerrCredentials?.isConfigured != true) {

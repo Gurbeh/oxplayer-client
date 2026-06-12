@@ -24,15 +24,20 @@ class NotificationHelpers {
     return [...servers, saved];
   }
 
-  static SeerrChopperService createSeerrClient(SeerrCredentialsModel credentials) {
+  static SeerrChopperService createSeerrClient(
+    SeerrCredentialsModel credentials, {
+    String? oxBearerToken,
+  }) {
     final chopper = ChopperClient(
       baseUrl: Uri.parse(credentials.serverUrl),
       converter: const SeerrJsonConverter(),
       interceptors: [
         _WorkerSeerrAuthInterceptor(
-            apiKey: credentials.apiKey.trim(),
-            cookie: credentials.sessionCookie.trim(),
-            customHeaders: credentials.customHeaders),
+          apiKey: credentials.apiKey.trim(),
+          cookie: credentials.sessionCookie.trim(),
+          customHeaders: credentials.customHeaders,
+          oxBearerToken: credentials.useProxy ? oxBearerToken : null,
+        ),
         HttpLoggingInterceptor(level: Level.basic),
       ],
     );
@@ -202,21 +207,31 @@ class _WorkerAuthInterceptor implements Interceptor {
 }
 
 class _WorkerSeerrAuthInterceptor implements Interceptor {
-  _WorkerSeerrAuthInterceptor({required this.apiKey, required this.cookie, required this.customHeaders});
+  _WorkerSeerrAuthInterceptor({
+    required this.apiKey,
+    required this.cookie,
+    required this.customHeaders,
+    this.oxBearerToken,
+  });
 
   final String apiKey;
   final String cookie;
   final Map<String, String> customHeaders;
+  final String? oxBearerToken;
 
   @override
   FutureOr<Response<BodyType>> intercept<BodyType>(Chain<BodyType> chain) {
     final headers = <String, String>{...chain.request.headers};
-    if (apiKey.isNotEmpty) {
+    final proxyToken = oxBearerToken?.trim() ?? '';
+    if (proxyToken.isNotEmpty) {
+      headers['Authorization'] = 'MediaBrowser Token="$proxyToken"';
+    } else if (apiKey.isNotEmpty) {
       headers['X-Api-Key'] = apiKey;
     } else if (cookie.isNotEmpty) {
       headers['Cookie'] = cookie;
     }
     headers.addAll(customHeaders);
+    headers.remove('ox-seerr-proxy');
     final request = chain.request.copyWith(headers: headers);
     return chain.proceed(request);
   }
