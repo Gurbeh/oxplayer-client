@@ -1,6 +1,9 @@
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 
 abstract final class OxplayerEnv {
+  /// True when this build targets OXPlayer (API base URL configured).
+  static bool get isEnabled => apiBaseUrl != null;
+
   static const String _cApiBaseUrl = String.fromEnvironment('OXPLAYER_API_BASE_URL', defaultValue: '');
   static const String _cBotUsername = String.fromEnvironment('OXPLAYER_BOT_USERNAME', defaultValue: '');
   static const String _cSentryDsn = String.fromEnvironment('SENTRY_DSN', defaultValue: '');

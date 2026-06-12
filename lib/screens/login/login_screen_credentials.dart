@@ -26,6 +26,8 @@ import 'package:fladder/screens/shared/outlined_text_field.dart';
 import 'package:fladder/screens/shared/passcode_input.dart';
 import 'package:fladder/util/auth_service.dart';
 import 'package:fladder/util/deep_link_helper.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_seerr_auto_config.dart';
 import 'package:fladder/util/fladder_config.dart';
 import 'package:fladder/util/localization_helper.dart';
 
@@ -275,7 +277,7 @@ class _LoginScreenCredentialsState extends ConsumerState<LoginScreenCredentials>
                                 ),
                         ),
                       ),
-                      if (FladderConfig.seerrBaseUrl?.isNotEmpty != true)
+                      if (!OxplayerEnv.isEnabled && FladderConfig.seerrBaseUrl?.isNotEmpty != true)
                         IconButton.filledTonal(
                           onPressed: () async {
                             final tempSeerrUrl = ref.read(authProvider.select((value) => value.tempSeerrUrl));
@@ -426,6 +428,9 @@ class _LoginScreenCredentialsState extends ConsumerState<LoginScreenCredentials>
 }
 
 Future<void> loggedInGoToHome(BuildContext context, WidgetRef ref) async {
+  if (OxplayerEnv.isEnabled) {
+    await oxplayerConfigureSeerrFromServer(ref);
+  }
   ref.read(lockScreenActiveProvider.notifier).update((state) => false);
   if (context.mounted) {
     await context.router.replaceAll([const DashboardRoute()]);

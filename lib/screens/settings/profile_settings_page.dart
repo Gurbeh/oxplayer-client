@@ -333,36 +333,38 @@ class _UserSettingsPageState extends ConsumerState<ProfileSettingsPage> with Wid
             ],
           ),
         ],
-        const SizedBox(height: 16),
-        ...settingsListGroup(
-          context,
-          const SettingsLabelDivider(label: "Seerr"),
-          [
-            SettingsListTile(
-              label: Text(context.localized.seerr),
-              subLabel: Text(_seerrStatusLabel(context, user?.seerrCredentials, seerrUser)),
-              onTap: () => showSeerrConnectionDialog(context),
-            ),
-            if (seerrUser?.canManageRequests ?? false)
-              SettingsListTileCheckbox(
-                label: Text(context.localized.seerrRequestNotifications),
-                value: user?.seerrRequestsEnabled ?? false,
-                onChanged: (val) async {
-                  final current = ref.read(userProvider);
-                  if (current == null || val == null) return;
-
-                  ref.read(userProvider.notifier).userState = current.copyWith(seerrRequestsEnabled: val);
-
-                  if (val) {
-                    await NotificationService.requestPermission();
-                    await ref.read(updateNotificationsProvider).registerBackgroundTask();
-                  } else {
-                    await ref.read(updateNotificationsProvider).conditionallyUnregisterBackgroundTask();
-                  }
-                },
+        if (!OxplayerEnv.isEnabled) ...[
+          const SizedBox(height: 16),
+          ...settingsListGroup(
+            context,
+            const SettingsLabelDivider(label: "Seerr"),
+            [
+              SettingsListTile(
+                label: Text(context.localized.seerr),
+                subLabel: Text(_seerrStatusLabel(context, user?.seerrCredentials, seerrUser)),
+                onTap: () => showSeerrConnectionDialog(context),
               ),
-          ],
-        ),
+              if (seerrUser?.canManageRequests ?? false)
+                SettingsListTileCheckbox(
+                  label: Text(context.localized.seerrRequestNotifications),
+                  value: user?.seerrRequestsEnabled ?? false,
+                  onChanged: (val) async {
+                    final current = ref.read(userProvider);
+                    if (current == null || val == null) return;
+
+                    ref.read(userProvider.notifier).userState = current.copyWith(seerrRequestsEnabled: val);
+
+                    if (val) {
+                      await NotificationService.requestPermission();
+                      await ref.read(updateNotificationsProvider).registerBackgroundTask();
+                    } else {
+                      await ref.read(updateNotificationsProvider).conditionallyUnregisterBackgroundTask();
+                    }
+                  },
+                ),
+            ],
+          ),
+        ],
         const SizedBox(height: 16),
         const LibraryOrderEditor(),
         const SizedBox(height: 16),

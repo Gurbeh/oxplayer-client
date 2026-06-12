@@ -7,6 +7,8 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'package:fladder/models/settings/client_settings_model.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_seerr_bootstrap.dart';
 import 'package:fladder/providers/dashboard_mode_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/sync_provider.dart';
@@ -218,7 +220,7 @@ class HomeScreen extends ConsumerWidget {
         })
         .nonNulls
         .toList();
-    return NotificationManagerInitializer(
+    final shell = NotificationManagerInitializer(
       child: InputHandler<GlobalHotKeys>(
         autoFocus: false,
         keyMapResult: (result) {
@@ -258,5 +260,9 @@ class HomeScreen extends ConsumerWidget {
         ),
       ),
     );
+    if (OxplayerEnv.isEnabled) {
+      return OxplayerSeerrBootstrap(child: shell);
+    }
+    return shell;
   }
 }

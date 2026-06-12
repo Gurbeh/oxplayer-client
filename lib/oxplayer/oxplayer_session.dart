@@ -5,7 +5,9 @@ import 'package:auto_route/auto_route.dart';
 import 'package:chopper/chopper.dart';
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/account_model.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
+import 'package:fladder/oxplayer/oxplayer_seerr_auto_config.dart';
 import 'package:fladder/oxplayer/oxplayer_session_store.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/auth_provider.dart';
@@ -41,7 +43,11 @@ String? _readRefreshHeader(Response<dynamic> response) {
 
 /// Validates the stored access token on cold start; refreshes or clears the session.
 Future<bool> oxplayerRestoreSession(WidgetRef ref, AccountModel account) async {
-  return _restoreSession(ref.read, account);
+  final ok = await _restoreSession(ref.read, account);
+  if (ok && OxplayerEnv.isEnabled) {
+    await oxplayerConfigureSeerrFromServer(ref);
+  }
+  return ok;
 }
 
 Future<bool> _restoreSession(OxplayerRead read, AccountModel account) async {
