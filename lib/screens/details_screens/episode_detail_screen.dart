@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/providers/items/episode_details_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
+import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
 import 'package:fladder/screens/shared/detail_scaffold.dart';
@@ -160,7 +161,8 @@ class _ItemDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
                     genres: details.series?.overview.genreItems ?? [],
                     officialRating: details.episode?.overview.parentalRating,
                     communityRating: details.episode?.overview.communityRating,
-                    mediaStreamHelper: details.episode?.mediaStreams != null
+                    mediaStreamHelper: details.episode != null &&
+                            oxplayerShowMediaStreamHelper(details.episode!.mediaStreams)
                         ? MediaStreamHelper(
                             mediaStream: details.episode!.mediaStreams,
                             onItemChanged: (changed) {

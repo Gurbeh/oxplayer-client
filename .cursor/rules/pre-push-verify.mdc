@@ -1,0 +1,21 @@
+---
+description: Run analyze/build checks before pushing oxplayer-client changes
+globs: oxplayer-client/**/*
+alwaysApply: false
+---
+
+# Pre-push verification (oxplayer-client)
+
+Before pushing client changes, run:
+
+```bash
+dart analyze lib/
+dart format --output=none --set-exit-if-changed lib/oxplayer lib/models/playback
+```
+
+Playback and catalog UI hooks for OX belong in `lib/oxplayer/` with thin call sites in Fladder detail/playback files — do not rewrite upstream providers.
+
+After server API fixes, confirm on a movie/episode with **2+ file variants**:
+- Version picker appears next to Play
+- Labels show quality/language (from `MediaSource.Name`)
+- Playback starts for each selected variant

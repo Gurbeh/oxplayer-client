@@ -30,6 +30,7 @@ export 'playback_queue_source.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/models/syncing/sync_item.dart';
 import 'package:fladder/models/video_stream_model.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_media_source.dart';
 import 'package:fladder/profiles/default_profile.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/connectivity_provider.dart';
@@ -418,7 +419,7 @@ class PlaybackModelHelper {
         return null;
       }
 
-      final mediaSource = playbackInfo.mediaSources?[newStreamModel?.versionStreamIndex ?? 0];
+      final mediaSource = oxplayerResolvePlaybackMediaSource(playbackInfo);
 
       if (mediaSource == null) {
         return null;

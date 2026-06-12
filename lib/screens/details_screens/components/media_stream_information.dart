@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/items/media_streams_model.dart';
+import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
 import 'package:fladder/screens/details_screens/components/label_title_item.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/widgets/shared/enum_selection.dart';
@@ -45,7 +46,7 @@ class MediaStreamInformation extends ConsumerWidget {
                       selected: mediaStream.currentVersionStream == e,
                       label: textWidget(
                         context,
-                        label: e.name,
+                        label: oxplayerVersionStreamLabel(e),
                       ),
                       action: () => onVersionIndexChanged?.call(e.index),
                     ))

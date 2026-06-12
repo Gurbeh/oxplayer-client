@@ -9,6 +9,7 @@ import 'package:fladder/models/items/images_models.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/watched_state.dart';
+import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/shared/media/components/media_header.dart';
 import 'package:fladder/screens/shared/media/components/small_detail_widgets.dart';
@@ -89,77 +90,82 @@ class OverviewHeader extends ConsumerWidget {
     final streamHeight = 43.0;
 
     final streamOptionsButtons = [
-      SizedBox(
-        height: streamHeight,
-        child: EnumBox(
-          onFocusChanged: (focused) {
-            if (focused) {
-              context.ensureVisible(alignment: 1.0);
-            }
-          },
-          currentWidget: Row(
-            mainAxisSize: MainAxisSize.min,
-            spacing: 8,
-            children: [
-              Icon(
-                IconsaxPlusLinear.video_square,
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
-              ),
-              Text(
-                mediaStreamHelper?.mediaStream.currentVersionStream?.detailedResolutionLabel ?? "",
-              ),
-            ],
+      if ((mediaStreamHelper?.mediaStream.versionStreams.length ?? 0) > 1)
+        SizedBox(
+          height: streamHeight,
+          child: EnumBox(
+            onFocusChanged: (focused) {
+              if (focused) {
+                context.ensureVisible(alignment: 1.0);
+              }
+            },
+            currentWidget: Row(
+              mainAxisSize: MainAxisSize.min,
+              spacing: 8,
+              children: [
+                Icon(
+                  IconsaxPlusLinear.video_square,
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
+                Text(
+                  mediaStreamHelper!.mediaStream.currentVersionStream != null
+                      ? oxplayerVersionStreamLabel(mediaStreamHelper!.mediaStream.currentVersionStream!)
+                      : "",
+                ),
+              ],
+            ),
+            itemBuilder: (context) => mediaStreamHelper!.mediaStream.versionStreams
+                .mapIndexed((index, e) => ItemActionButton(
+                      selected: mediaStreamHelper!.mediaStream.currentVersionStream == e,
+                      label: Text(oxplayerVersionStreamLabel(e)),
+                      action: () {
+                        final newItem = mediaStreamHelper!.mediaStream.copyWith(
+                          versionStreamIndex: e.index,
+                        );
+                        mediaStreamHelper!.onItemChanged?.call(newItem);
+                      },
+                    ))
+                .toList(),
           ),
-          itemBuilder: (context) => mediaStreamHelper!.mediaStream.versionStreams
-              .mapIndexed((index, e) => ItemActionButton(
-                    selected: mediaStreamHelper!.mediaStream.currentVersionStream == e,
-                    label: Text(e.name),
-                    action: () {
-                      final newItem = mediaStreamHelper!.mediaStream.copyWith(
-                        versionStreamIndex: e.index,
-                      );
-                      mediaStreamHelper!.onItemChanged?.call(newItem);
-                    },
-                  ))
-              .toList(),
         ),
-      ),
-      SizedBox(
-        height: streamHeight,
-        child: EnumBox(
-          onFocusChanged: (focused) {
-            if (focused) {
-              context.ensureVisible(alignment: 1.0);
-            }
-          },
-          currentWidget: Row(
-            mainAxisSize: MainAxisSize.min,
-            spacing: 8,
-            children: [
-              Icon(
-                IconsaxPlusLinear.audio_square,
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
-              ),
-              Text(
-                mediaStreamHelper?.mediaStream.currentAudioStream?.shortTitle ?? "",
-              ),
-            ],
+      if (mediaStreamHelper != null && mediaStreamHelper!.mediaStream.audioStreams.isNotEmpty)
+        SizedBox(
+          height: streamHeight,
+          child: EnumBox(
+            onFocusChanged: (focused) {
+              if (focused) {
+                context.ensureVisible(alignment: 1.0);
+              }
+            },
+            currentWidget: Row(
+              mainAxisSize: MainAxisSize.min,
+              spacing: 8,
+              children: [
+                Icon(
+                  IconsaxPlusLinear.audio_square,
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
+                Text(
+                  mediaStreamHelper?.mediaStream.currentAudioStream?.shortTitle ?? "",
+                ),
+              ],
+            ),
+            itemBuilder: (context) => [AudioStreamModel.no(), ...mediaStreamHelper!.mediaStream.audioStreams]
+                .mapIndexed((index, e) => ItemActionButton(
+                      selected: mediaStreamHelper!.mediaStream.currentAudioStream == e,
+                      label: Text(e.displayTitle),
+                      action: () {
+                        final newItem = mediaStreamHelper!.mediaStream.copyWith(
+                          defaultAudioStreamIndex: e.index,
+                        );
+                        mediaStreamHelper!.onItemChanged?.call(newItem);
+                      },
+                    ))
+                .toList(),
           ),
-          itemBuilder: (context) => [AudioStreamModel.no(), ...mediaStreamHelper!.mediaStream.audioStreams]
-              .mapIndexed((index, e) => ItemActionButton(
-                    selected: mediaStreamHelper!.mediaStream.currentAudioStream == e,
-                    label: Text(e.displayTitle),
-                    action: () {
-                      final newItem = mediaStreamHelper!.mediaStream.copyWith(
-                        defaultAudioStreamIndex: e.index,
-                      );
-                      mediaStreamHelper!.onItemChanged?.call(newItem);
-                    },
-                  ))
-              .toList(),
         ),
-      ),
-      SizedBox(
+      if (mediaStreamHelper != null && mediaStreamHelper!.mediaStream.subStreams.isNotEmpty)
+        SizedBox(
         height: streamHeight,
         child: EnumBox(
           onFocusChanged: (focused) {

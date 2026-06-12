@@ -1,0 +1,18 @@
+import 'package:fladder/models/items/media_streams_model.dart';
+
+/// Whether the detail page should show stream pickers (version / audio / sub).
+///
+/// Fladder gates on [MediaStreamsModel.isNotEmpty] (audio + subs required).
+/// OX items may have multiple file variants before probe completes — still show
+/// the version picker when more than one [MediaSource] exists.
+bool oxplayerShowMediaStreamHelper(MediaStreamsModel streams) {
+  return streams.versionStreams.length > 1 || streams.isNotEmpty;
+}
+
+/// Label for a version/file option in the play-button picker.
+String oxplayerVersionStreamLabel(VersionStreamModel stream) {
+  if (stream.name.trim().isNotEmpty) {
+    return stream.name.trim();
+  }
+  return stream.detailedResolutionLabel;
+}
