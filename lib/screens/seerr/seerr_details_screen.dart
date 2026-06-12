@@ -73,16 +73,25 @@ class SeerrDetailsScreen extends ConsumerWidget {
     final rottenTomatoes = state.ratings?.rt;
 
     final canManageRequest = state.currentUser?.canManageRequests ?? false;
-    final hasUsersRequests = requests.any((request) => request.requestedBy?.id == state.currentUser?.id);
+    final currentUserId = state.currentUser?.id;
+    final hasUsersRequests = requests.any((request) => request.requestedBy?.id == currentUserId);
     final hasVisibleRequests = (canManageRequest || hasUsersRequests) && requests.isNotEmpty;
 
-    final canRequestMore = hasKnownStatus
-        ? switch (currentPoster?.type) {
-            SeerrMediaType.movie => false,
-            SeerrMediaType.tvshow => true,
-            _ => false,
-          }
-        : true;
+    bool currentUserHasBlockingRequest() {
+      if (currentUserId == null) return false;
+      return requests.any((request) {
+        if (request.requestedBy?.id != currentUserId) return false;
+        final status = request.requestStatus;
+        return status == SeerrRequestStatus.pending ||
+            status == SeerrRequestStatus.approved ||
+            status == SeerrRequestStatus.completed;
+      });
+    }
+
+    final canRequestMore = switch (currentPoster?.type) {
+      SeerrMediaType.tvshow => true,
+      _ => !currentUserHasBlockingRequest(),
+    };
 
     final mainButtonLabel = currentPoster?.type == SeerrMediaType.movie
         ? context.localized.request
