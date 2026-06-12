@@ -419,13 +419,19 @@ class PlaybackModelHelper {
         return null;
       }
 
-      final mediaSource = oxplayerResolvePlaybackMediaSource(playbackInfo);
+      final requestedMediaSourceId = newStreamModel?.currentVersionStream?.id;
+      final mediaSource = oxplayerResolvePlaybackMediaSource(
+        playbackInfo,
+        requestedMediaSourceId: requestedMediaSourceId,
+      );
 
       if (mediaSource == null) {
         return null;
       }
 
+      final resolvedVersionIndex = playbackInfo.mediaSources?.indexWhere((s) => s.id == mediaSource.id) ?? -1;
       final mediaStreamsWithUrls = MediaStreamsModel.fromMediaStreamsList(playbackInfo.mediaSources, ref).copyWith(
+        versionStreamIndex: resolvedVersionIndex >= 0 ? resolvedVersionIndex : newStreamModel?.versionStreamIndex,
         defaultAudioStreamIndex: audioStreamIndex,
         defaultSubStreamIndex: subStreamIndex,
       );
@@ -586,9 +592,13 @@ class PlaybackModelHelper {
 
     PlaybackInfoResponse playbackInfo = response.bodyOrThrow;
 
-    final mediaSource = playbackInfo.mediaSources?.first;
+    final mediaSource = oxplayerResolvePlaybackMediaSource(
+      playbackInfo,
+      requestedMediaSourceId: playbackModel.mediaStreams?.currentVersionStream?.id,
+    );
 
     final mediaStreamsWithUrls = MediaStreamsModel.fromMediaStreamsList(playbackInfo.mediaSources, ref).copyWith(
+      versionStreamIndex: playbackModel.mediaStreams?.versionStreamIndex,
       defaultAudioStreamIndex: audioIndex,
       defaultSubStreamIndex: subIndex,
     );

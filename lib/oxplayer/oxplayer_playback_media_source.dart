@@ -1,19 +1,37 @@
+import 'package:collection/collection.dart';
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
+
+bool oxplayerMediaSourceHasPlayableUrl(MediaSourceInfo source) {
+  final path = (source.path ?? '').trim();
+  if (path.isEmpty) {
+    return false;
+  }
+  final uri = Uri.tryParse(path);
+  return uri != null && uri.hasScheme && uri.hasAuthority;
+}
 
 /// Resolves the playable [MediaSourceInfo] from a PlaybackInfo response.
 ///
-/// OX PlaybackInfo returns exactly one fully populated source (the resolved
-/// variant). Catalog may list multiple variants at higher indices — do not
-/// index by [versionStreamIndex] here.
+/// OX aligns [PlaybackInfoResponse.mediaSources] indices with catalog variants;
+/// only the resolved row carries an ox-stream URL — other slots are id-only stubs.
 MediaSourceInfo? oxplayerResolvePlaybackMediaSource(
-  PlaybackInfoResponse? playbackInfo,
-) {
+  PlaybackInfoResponse? playbackInfo, {
+  String? requestedMediaSourceId,
+}) {
   final sources = playbackInfo?.mediaSources;
   if (sources == null || sources.isEmpty) {
     return null;
   }
-  return sources.firstWhere(
-    (s) => (s.path ?? '').isNotEmpty || (s.id ?? '').isNotEmpty,
-    orElse: () => sources.first,
-  );
+
+  final requested = requestedMediaSourceId?.trim();
+  if (requested != null && requested.isNotEmpty) {
+    final match = sources.firstWhereOrNull(
+      (s) => s.id == requested && oxplayerMediaSourceHasPlayableUrl(s),
+    );
+    if (match != null) {
+      return match;
+    }
+  }
+
+  return sources.firstWhereOrNull(oxplayerMediaSourceHasPlayableUrl) ?? sources.first;
 }

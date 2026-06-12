@@ -78,7 +78,7 @@ SeerrDashboardPosterModel? _posterFromBaseDto(BaseItemDto dto, Ref ref) {
     title: dto.name ?? '',
     overview: dto.overview ?? '',
     images: itemModel.images ?? ImagesData(),
-    mediaStatus: SeerrMediaStatus.unknown,
+    mediaStatus: SeerrMediaStatus.available,
     releaseYear: dto.productionYear?.toString(),
   );
 }

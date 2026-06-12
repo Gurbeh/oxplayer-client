@@ -73,7 +73,10 @@ class SeerrDetails extends _$SeerrDetails {
           seasons: details.seasons,
           seasonStatuses: seasonStatusMap.isEmpty ? poster.seasonStatuses : seasonStatusMap,
           mediaInfo: details.mediaInfo,
+          mediaStatus: details.mediaInfo?.mediaStatus ?? poster.mediaStatus,
+          jellyfinItemId: details.mediaInfo?.primaryJellyfinMediaId ?? poster.jellyfinItemId,
         );
+        poster = updatedPoster;
 
         state = state.copyWith(
           poster: updatedPoster,
@@ -99,7 +102,10 @@ class SeerrDetails extends _$SeerrDetails {
 
         final updatedPoster = poster.copyWith(
           mediaInfo: details.mediaInfo,
+          mediaStatus: details.mediaInfo?.mediaStatus ?? poster.mediaStatus,
+          jellyfinItemId: details.mediaInfo?.primaryJellyfinMediaId ?? poster.jellyfinItemId,
         );
+        poster = updatedPoster;
 
         final ratings = await api.movieRatings(poster.tmdbId);
 
@@ -126,7 +132,7 @@ class SeerrDetails extends _$SeerrDetails {
       );
       if (bundle != null) {
         state = state.copyWith(
-          recommended: oxPosterCardsFromBundle(bundle['recommendations'], bundleMedia),
+          recommended: oxPosterCardsFromBundle(bundle['recommended'], bundleMedia),
           similar: oxPosterCardsFromBundle(bundle['similar'], bundleMedia),
         );
       }
@@ -140,12 +146,7 @@ class SeerrDetails extends _$SeerrDetails {
       state = state.copyWith(recommended: recommended, similar: related);
     }
 
-    state = state.copyWith(
-      currentUser: currentUserBody,
-      poster: poster.copyWith(
-        mediaInfo: refreshedPoster?.mediaInfo == null ? null : poster.mediaInfo,
-      ),
-    );
+    state = state.copyWith(currentUser: currentUserBody);
   }
 
   List<Person> _mapCredits(SeerrCredits? credits) {

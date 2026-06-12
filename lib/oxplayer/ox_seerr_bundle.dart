@@ -76,15 +76,21 @@ SeerrDashboardPosterModel? _posterFromBundleCard(
     primary = ImageData(path: posterUrl, key: 'ox_bundle_$id');
   }
 
+  SeerrMediaInfo? mediaInfo;
+  if (card['mediaInfo'] is Map<String, dynamic>) {
+    mediaInfo = SeerrMediaInfo.fromJson(card['mediaInfo'] as Map<String, dynamic>);
+  }
+
   return SeerrDashboardPosterModel(
     id: '$id',
     type: type,
     tmdbId: id,
-    jellyfinItemId: null,
+    jellyfinItemId: mediaInfo?.primaryJellyfinMediaId,
     title: (card['title'] as String?) ?? '',
     overview: (card['overview'] as String?) ?? '',
     images: ImagesData(primary: primary),
-    mediaStatus: SeerrMediaStatus.unknown,
+    mediaStatus: mediaInfo?.mediaStatus ?? SeerrMediaStatus.unknown,
+    mediaInfo: mediaInfo,
     releaseYear: card['year'] as String?,
   );
 }
