@@ -10,8 +10,10 @@ import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/special_feature_model.dart';
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
-import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/ox_item_recommendations.dart';
+import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
+import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/related_provider.dart';
 import 'package:fladder/providers/seerr_api_provider.dart';
@@ -35,15 +37,43 @@ class MovieDetails extends _$MovieDetails {
         state = state ?? item;
       }
       MovieModel? newState;
-      final response = await api.usersUserIdItemsItemIdGet(itemId: item.id);
-      if (response.body == null) return null;
-      newState = (response.bodyOrThrow as MovieModel).copyWith(
-        related: state?.related ?? const [],
-        seerrRelated: state?.seerrRelated ?? const [],
-        seerrRecommended: state?.seerrRecommended ?? const [],
-      );
+      if (OxplayerEnv.isEnabled) {
+        final oxItem = await oxFetchLibraryItemDetails(ref, item.id);
+        if (oxItem != null && oxItem.model is MovieModel) {
+          newState = (oxItem.model as MovieModel).copyWith(
+            related: state?.related ?? const [],
+            seerrRelated: state?.seerrRelated ?? const [],
+            seerrRecommended: state?.seerrRecommended ?? const [],
+          );
+        }
+      }
+      if (newState == null) {
+        final response = await api.usersUserIdItemsItemIdGet(itemId: item.id);
+        if (response.body == null) return null;
+        newState = (response.bodyOrThrow as MovieModel).copyWith(
+          related: state?.related ?? const [],
+          seerrRelated: state?.seerrRelated ?? const [],
+          seerrRecommended: state?.seerrRecommended ?? const [],
+        );
+        if (OxplayerEnv.isEnabled) {
+          final raw = await oxFetchLibraryItemJson(ref, item.id);
+          oxApplyLibraryItemRatings(ref, item.id, raw != null ? oxRatingsFromItemJson(raw) : null);
+        }
+      }
 
       state = newState;
+
+      if (OxplayerEnv.isEnabled && oxSeerrRatingsMissingRt(ref.read(oxLibraryItemRatingsProvider(item.id)))) {
+        final tmdbId = newState.tmdbId;
+        if (tmdbId != null) {
+          final fromSeerr = await ref.read(seerrApiProvider).movieRatings(tmdbId);
+          final merged = oxMergeSeerrRatings(
+            fromSeerr,
+            ref.read(oxLibraryItemRatingsProvider(item.id)),
+          );
+          oxApplyLibraryItemRatings(ref, item.id, merged);
+        }
+      }
 
       List<BaseItemDto> specialFeatures;
       try {

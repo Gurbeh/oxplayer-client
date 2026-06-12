@@ -8,6 +8,8 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/providers/items/series_details_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
+import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
@@ -155,10 +157,17 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                     studios: details.overview.studios,
                     officialRating: details.overview.parentalRating,
                     genres: details.overview.genreItems,
+                    communityRating: details.overview.communityRating,
+                    additionalLabels: OxplayerEnv.isEnabled
+                        ? oxSeerrRatingLabels(
+                            context,
+                            ref.watch(oxLibraryItemRatingsProvider(widget.item.id)),
+                          )
+                        : const [],
                     mediaStreamHelper: currentEpisode != null &&
                             oxplayerShowMediaStreamHelper(currentEpisode.mediaStreams)
                         ? MediaStreamHelper(
-                            mediaStream: currentEpisode!.mediaStreams,
+                            mediaStream: currentEpisode.mediaStreams,
                             onItemChanged: (changed) {
                               final updateEpisode = currentEpisode.copyWith(
                                 mediaStreams: changed,
@@ -167,7 +176,6 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                             },
                           )
                         : null,
-                    communityRating: details.overview.communityRating,
                   ),
                   if (details.overview.summary.isNotEmpty)
                     Padding(

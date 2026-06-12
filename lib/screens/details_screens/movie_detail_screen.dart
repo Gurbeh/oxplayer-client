@@ -7,6 +7,8 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/providers/items/movies_details_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
+import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
@@ -155,6 +157,12 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                     studios: details.overview.studios,
                     officialRating: details.overview.parentalRating,
                     communityRating: details.overview.communityRating,
+                    additionalLabels: OxplayerEnv.isEnabled
+                        ? oxSeerrRatingLabels(
+                            context,
+                            ref.watch(oxLibraryItemRatingsProvider(widget.item.id)),
+                          )
+                        : const [],
                     mediaStreamHelper:
                         oxplayerShowMediaStreamHelper(details.mediaStreams)
                             ? MediaStreamHelper(

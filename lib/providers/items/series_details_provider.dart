@@ -12,8 +12,10 @@ import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/models/items/special_feature_model.dart';
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
-import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/ox_item_recommendations.dart';
+import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
+import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/related_provider.dart';
 import 'package:fladder/providers/seerr_api_provider.dart';
@@ -40,18 +42,49 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
         state = state ?? seriesModel;
       }
       SeriesModel? newState;
-      final response = await api.usersUserIdItemsItemIdGet(itemId: seriesModel.id);
-      if (response.body == null) return null;
-      newState = (response.bodyOrThrow as SeriesModel).copyWith(
-        related: state?.related ?? const [],
-        seerrRelated: state?.seerrRelated ?? const [],
-        seerrRecommended: state?.seerrRecommended ?? const [],
-        availableEpisodes: state?.availableEpisodes ?? const [],
-        seasons: state?.seasons ?? const [],
-        canDownload: state?.canDownload ?? false,
-      );
+      if (OxplayerEnv.isEnabled) {
+        final oxItem = await oxFetchLibraryItemDetails(ref, seriesModel.id);
+        if (oxItem != null && oxItem.model is SeriesModel) {
+          newState = (oxItem.model as SeriesModel).copyWith(
+            related: state?.related ?? const [],
+            seerrRelated: state?.seerrRelated ?? const [],
+            seerrRecommended: state?.seerrRecommended ?? const [],
+            availableEpisodes: state?.availableEpisodes ?? const [],
+            seasons: state?.seasons ?? const [],
+            canDownload: state?.canDownload ?? false,
+          );
+        }
+      }
+      if (newState == null) {
+        final response = await api.usersUserIdItemsItemIdGet(itemId: seriesModel.id);
+        if (response.body == null) return null;
+        newState = (response.bodyOrThrow as SeriesModel).copyWith(
+          related: state?.related ?? const [],
+          seerrRelated: state?.seerrRelated ?? const [],
+          seerrRecommended: state?.seerrRecommended ?? const [],
+          availableEpisodes: state?.availableEpisodes ?? const [],
+          seasons: state?.seasons ?? const [],
+          canDownload: state?.canDownload ?? false,
+        );
+        if (OxplayerEnv.isEnabled) {
+          final raw = await oxFetchLibraryItemJson(ref, seriesModel.id);
+          oxApplyLibraryItemRatings(ref, seriesModel.id, raw != null ? oxRatingsFromItemJson(raw) : null);
+        }
+      }
 
       state = newState;
+
+      if (OxplayerEnv.isEnabled && oxSeerrRatingsMissingRt(ref.read(oxLibraryItemRatingsProvider(seriesModel.id)))) {
+        final tmdbId = newState.tmdbId;
+        if (tmdbId != null) {
+          final rt = await ref.read(seerrApiProvider).tvRatings(tmdbId);
+          final merged = oxMergeSeerrRatings(
+            rt != null ? SeerrRatingsResponse(rt: rt) : null,
+            ref.read(oxLibraryItemRatingsProvider(seriesModel.id)),
+          );
+          oxApplyLibraryItemRatings(ref, seriesModel.id, merged);
+        }
+      }
 
       final seasons = await api.showsSeriesIdSeasonsGet(
         seriesId: seriesModel.id,
@@ -147,7 +180,7 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
           seerrUrl: seerrUrl,
         ),
       );
-      return response;
+      return null;
     } catch (e) {
       log("Error fetching series details: $e");
       return null;

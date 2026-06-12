@@ -7,6 +7,7 @@ import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/ox_seerr_bundle.dart';
+import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
 import 'package:fladder/providers/seerr_api_provider.dart';
 import 'package:fladder/providers/seerr_user_provider.dart';
 import 'package:fladder/seerr/seerr_models.dart';
@@ -131,7 +132,18 @@ class SeerrDetails extends _$SeerrDetails {
         mediaType: bundleMedia,
       );
       if (bundle != null) {
+        final posterWithLogo = oxMergeBundleLogoIntoPoster(poster, bundle);
+        final bundleRatings = oxRatingsFromBundle(bundle);
+        var mergedRatings = oxMergeSeerrRatings(state.ratings, bundleRatings);
+        if (oxSeerrRatingsMissingRt(mergedRatings)) {
+          final extra = currentMediaType == SeerrMediaType.tvshow
+              ? SeerrRatingsResponse(rt: await api.tvRatings(poster.tmdbId))
+              : await api.movieRatings(poster.tmdbId);
+          mergedRatings = oxMergeSeerrRatings(extra, mergedRatings);
+        }
         state = state.copyWith(
+          poster: posterWithLogo,
+          ratings: mergedRatings,
           recommended: oxPosterCardsFromBundle(bundle['recommended'], bundleMedia),
           similar: oxPosterCardsFromBundle(bundle['similar'], bundleMedia),
         );

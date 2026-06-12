@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import 'package:fladder/models/items/images_models.dart';
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
+import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/seerr/seerr_models.dart';
@@ -42,6 +43,49 @@ Future<Map<String, dynamic>?> oxFetchSeerrBundle(
   } catch (_) {
     return null;
   }
+}
+
+/// Reads `logoUrl` (or `logoPath`) from a seerr-bundle poster object.
+String? oxLogoUrlFromBundlePoster(Map<String, dynamic> poster) {
+  final logoUrl = poster['logoUrl'] as String?;
+  if (logoUrl != null && logoUrl.isNotEmpty) return logoUrl;
+
+  final logoPath = poster['logoPath'] as String?;
+  if (logoPath != null && logoPath.isNotEmpty) {
+    return logoPath.startsWith('http') ? logoPath : '$_tmdbImageBase$logoPath';
+  }
+  return null;
+}
+
+ImagesData oxImagesWithBundleLogo(ImagesData images, String? logoUrl, {required String keyPrefix}) {
+  if (logoUrl == null || logoUrl.isEmpty) return images;
+  return ImagesData(
+    primary: images.primary,
+    backDrop: images.backDrop,
+    logo: ImageData(path: logoUrl, key: '${keyPrefix}_logo'),
+  );
+}
+
+/// Parses `ratings` from seerr-bundle into [SeerrRatingsResponse] (RT + IMDb).
+SeerrRatingsResponse? oxRatingsFromBundle(Map<String, dynamic> bundle) {
+  return oxParseSeerrRatingsJson(bundle['ratings']);
+}
+
+/// Merges bundle.poster.logoUrl into [poster] for SeerrDetailsScreen header art.
+SeerrDashboardPosterModel oxMergeBundleLogoIntoPoster(
+  SeerrDashboardPosterModel poster,
+  Map<String, dynamic> bundle,
+) {
+  final posterMap = bundle['poster'];
+  if (posterMap is! Map<String, dynamic>) return poster;
+
+  final logoUrl = oxLogoUrlFromBundlePoster(posterMap);
+  if (logoUrl == null) return poster;
+
+  final keyPrefix = poster.type == SeerrMediaType.movie ? 'tmdb_movie_${poster.tmdbId}' : 'tmdb_tv_${poster.tmdbId}';
+  return poster.copyWith(
+    images: oxImagesWithBundleLogo(poster.images, logoUrl, keyPrefix: keyPrefix),
+  );
 }
 
 List<SeerrDashboardPosterModel> oxPosterCardsFromBundle(
