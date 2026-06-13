@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/providers/seerr_api_provider.dart';
 import 'package:fladder/providers/seerr_user_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
@@ -16,6 +17,18 @@ import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/widgets/shared/item_actions.dart';
 import 'package:fladder/widgets/shared/modal_bottom_sheet.dart';
 import 'package:fladder/widgets/shared/modal_side_sheet.dart';
+
+/// Whether [showMediaManagementSheet] would show at least one action (not dividers only).
+bool seerrHasMediaManagementActions({
+  required SeerrDashboardPosterModel poster,
+  required bool canManageRequest,
+}) {
+  if (poster.mediaInfo == null) return false;
+  if (canManageRequest) return true;
+  if (!OxplayerEnv.isEnabled) return true;
+  if (poster.itemBaseModel != null) return true;
+  return false;
+}
 
 Future<void> showMediaManagementSheet({
   required BuildContext context,
@@ -89,19 +102,20 @@ class _MediaManagementActionsState extends ConsumerState<_MediaManagementActions
     }
 
     final actions = [
-      ItemActionButton(
-        icon: const Icon(IconsaxPlusBold.discover),
-        label: Text(context.localized.openInSeerr),
-        backgroundColor: Colors.deepPurpleAccent.shade700,
-        action: () {
-          final seerrUrl = ref.read(userProvider.select((value) => value?.seerrCredentials?.serverUrl));
-          if (isTvSeries) {
-            launchUrl(context, '$seerrUrl/tv/${widget.poster.tmdbId}');
-          } else {
-            launchUrl(context, '$seerrUrl/movie/${widget.poster.tmdbId}');
-          }
-        },
-      ),
+      if (!OxplayerEnv.isEnabled)
+        ItemActionButton(
+          icon: const Icon(IconsaxPlusBold.discover),
+          label: Text(context.localized.openInSeerr),
+          backgroundColor: Colors.deepPurpleAccent.shade700,
+          action: () {
+            final seerrUrl = ref.read(userProvider.select((value) => value?.seerrCredentials?.serverUrl));
+            if (isTvSeries) {
+              launchUrl(context, '$seerrUrl/tv/${widget.poster.tmdbId}');
+            } else {
+              launchUrl(context, '$seerrUrl/movie/${widget.poster.tmdbId}');
+            }
+          },
+        ),
       if (itemModel != null)
         ItemActionButton(
           icon: Icon(itemModel.type.icon),

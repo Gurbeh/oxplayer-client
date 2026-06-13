@@ -333,7 +333,11 @@ class SeerrDetailsScreen extends ConsumerWidget {
                                         ),
                                       ),
                                     ),
-                                  if (hasVisibleRequests && currentPoster.mediaInfo != null)
+                                  if (hasVisibleRequests &&
+                                      seerrHasMediaManagementActions(
+                                        poster: currentPoster,
+                                        canManageRequest: canManageRequest,
+                                      ))
                                     FocusButton(
                                       autoFocus: false,
                                       onTap: () async {
