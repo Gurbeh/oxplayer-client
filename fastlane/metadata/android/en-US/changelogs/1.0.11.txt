@@ -1,0 +1,1 @@
+Poll PlaybackInfo while media hydrates (HTTP 202) so playback waits instead of failing during provider sync.

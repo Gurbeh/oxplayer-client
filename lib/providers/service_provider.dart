@@ -20,6 +20,8 @@ import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/media_segments_model.dart';
 import 'package:fladder/models/items/photos_model.dart';
 import 'package:fladder/models/items/trick_play_model.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_info_polling.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/providers/image_provider.dart';
@@ -589,22 +591,28 @@ class JellyService {
   Future<Response<PlaybackInfoResponse>> itemsItemIdPlaybackInfoPost({
     required String? itemId,
     required PlaybackInfoDto? body,
-  }) async =>
-      api.itemsItemIdPlaybackInfoPost(
-        itemId: itemId,
-        userId: account?.id,
-        enableDirectPlay: body?.enableDirectPlay,
-        enableDirectStream: body?.enableDirectStream,
-        enableTranscoding: body?.enableTranscoding,
-        autoOpenLiveStream: body?.autoOpenLiveStream,
-        maxStreamingBitrate: body?.maxStreamingBitrate,
-        liveStreamId: body?.liveStreamId,
-        startTimeTicks: body?.startTimeTicks,
-        mediaSourceId: body?.mediaSourceId,
-        audioStreamIndex: body?.audioStreamIndex,
-        subtitleStreamIndex: body?.subtitleStreamIndex,
-        body: body,
-      );
+  }) async {
+    Future<Response<PlaybackInfoResponse>> request() => api.itemsItemIdPlaybackInfoPost(
+          itemId: itemId,
+          userId: account?.id,
+          enableDirectPlay: body?.enableDirectPlay,
+          enableDirectStream: body?.enableDirectStream,
+          enableTranscoding: body?.enableTranscoding,
+          autoOpenLiveStream: body?.autoOpenLiveStream,
+          maxStreamingBitrate: body?.maxStreamingBitrate,
+          liveStreamId: body?.liveStreamId,
+          startTimeTicks: body?.startTimeTicks,
+          mediaSourceId: body?.mediaSourceId,
+          audioStreamIndex: body?.audioStreamIndex,
+          subtitleStreamIndex: body?.subtitleStreamIndex,
+          body: body,
+        );
+
+    if (OxplayerEnv.isEnabled) {
+      return oxplayerPollPlaybackInfoUntilReady(request);
+    }
+    return request();
+  }
 
   //VideosItemsStreamGet
   Future<Response<String>> videoStreamGet(
