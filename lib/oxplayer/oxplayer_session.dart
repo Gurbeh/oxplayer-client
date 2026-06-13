@@ -70,7 +70,8 @@ Future<bool> _restoreSession(OxplayerRead read, AccountModel account) async {
     try {
       return await oxplayerTryRefreshSession(read).timeout(kOxSessionRestoreTimeout);
     } on TimeoutException {
-      return false;
+      // API briefly down (deploy) — keep cached session; client retries on next request.
+      return true;
     }
   } on TimeoutException {
     // Server unreachable — do not block splash; open app with cached credentials.

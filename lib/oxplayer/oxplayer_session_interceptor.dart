@@ -23,7 +23,13 @@ class OxplayerSessionInterceptor implements Interceptor {
 
     if (ref.read(userProvider) == null) return response;
 
-    final refreshed = await oxplayerTryRefreshSession(ref.read);
+    bool refreshed = false;
+    try {
+      refreshed = await oxplayerTryRefreshSession(ref.read);
+    } catch (_) {
+      // Transient network / API restart — do not clear the session.
+      return response;
+    }
     if (refreshed) {
       return chain.proceed(chain.request);
     }
