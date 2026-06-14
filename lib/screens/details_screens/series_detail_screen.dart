@@ -11,6 +11,7 @@ import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
+import 'package:fladder/oxplayer/widgets/ox_series_request_button.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
 import 'package:fladder/screens/seerr/widgets/seerr_poster_row.dart';
@@ -129,6 +130,10 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                           selectedIcon: IconsaxPlusBold.tick_circle,
                           icon: IconsaxPlusLinear.tick_circle,
                         ),
+                        if (OxplayerEnv.isEnabled &&
+                            details.overview.seerrUrl?.isNotEmpty == true &&
+                            details.tmdbId != null)
+                          OxSeriesRequestButton(tmdbId: details.tmdbId!),
                         SelectableIconButton(
                           onPressed: () {
                             showBottomSheetPill(
