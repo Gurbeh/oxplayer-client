@@ -10,6 +10,8 @@ import 'package:punycoder/punycoder.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_force_repair_interceptor.dart';
 import 'package:fladder/oxplayer/oxplayer_session_interceptor.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/providers/connectivity_provider.dart';
@@ -45,6 +47,7 @@ class JellyApi extends _$JellyApi {
           interceptors: [
             JellyRequest(ref),
             OxplayerSessionInterceptor(ref),
+            if (OxplayerEnv.isEnabled) OxplayerForceRepairInterceptor(ref),
             JellyResponse(ref),
             HttpLoggingInterceptor(level: Level.basic),
           ],

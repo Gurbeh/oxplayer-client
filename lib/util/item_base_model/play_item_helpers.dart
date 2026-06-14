@@ -24,6 +24,8 @@ import 'package:fladder/models/items/photos_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/tv_playback_model.dart';
 import 'package:fladder/models/video_stream_model.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/book_viewer_provider.dart';
@@ -943,10 +945,18 @@ Future<void> _playVideo(
 
   final actualStartPosition = startPosition ?? await current.startDuration() ?? Duration.zero;
 
-  final loadedCorrectly = await ref.read(videoPlayerProvider.notifier).loadPlaybackItem(
+  var loadedCorrectly = await ref.read(videoPlayerProvider.notifier).loadPlaybackItem(
         current,
         actualStartPosition,
       );
+
+  if (!loadedCorrectly && OxplayerEnv.isEnabled) {
+    loadedCorrectly = await oxplayerMaybeRetryPlayAfterLoadFailure(
+      ref: ref,
+      current: current,
+      startPosition: actualStartPosition,
+    );
+  }
 
   if (!loadedCorrectly) {
     if (context.mounted) {
