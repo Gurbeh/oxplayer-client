@@ -1,0 +1,3 @@
+Request more seasons from the library series page when Seerr is configured and episodes are still missing.
+Playback repair retries when the server is still hydrating media (HTTP 202).
+Improved Seerr season status handling with the OX server proxy.
