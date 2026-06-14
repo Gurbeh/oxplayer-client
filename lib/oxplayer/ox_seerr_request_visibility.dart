@@ -45,3 +45,11 @@ bool oxShouldShowSeriesRequestButton({
   if (!seerrConfigured) return false;
   return oxHasRequestableSeasons(seasons: seasons, seasonStatuses: seasonStatuses);
 }
+
+/// True when a movie is not fully on disk and can still be requested via Seerr.
+bool oxMovieIsRequestable(SeerrMediaStatus? status) {
+  if (status == null || !status.isKnown) return true;
+  return status != SeerrMediaStatus.available &&
+      status != SeerrMediaStatus.blacklisted &&
+      status != SeerrMediaStatus.deleted;
+}

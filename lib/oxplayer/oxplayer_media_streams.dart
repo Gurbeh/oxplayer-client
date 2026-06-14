@@ -1,4 +1,5 @@
 import 'package:fladder/models/items/media_streams_model.dart';
+import 'package:fladder/models/items/movie_model.dart';
 
 /// Whether the detail page should show stream pickers (version / audio / sub).
 ///
@@ -7,6 +8,11 @@ import 'package:fladder/models/items/media_streams_model.dart';
 /// the version picker when more than one [MediaSource] exists.
 bool oxplayerShowMediaStreamHelper(MediaStreamsModel streams) {
   return streams.versionStreams.length > 1 || streams.isNotEmpty;
+}
+
+/// Browse-only or catalog movies without attached files have no version streams.
+bool oxMovieHasPlayableMedia(MovieModel movie) {
+  return movie.mediaStreams.versionStreams.isNotEmpty;
 }
 
 /// Label for a version/file option in the play-button picker.

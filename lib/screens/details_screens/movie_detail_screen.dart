@@ -10,6 +10,7 @@ import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
+import 'package:fladder/oxplayer/widgets/ox_movie_request_button.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
 import 'package:fladder/screens/seerr/widgets/seerr_poster_row.dart';
@@ -51,6 +52,11 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
     final wrapAlignment = AdaptiveLayout.viewSizeOf(context) != ViewSize.phone
         ? WrapAlignment.start
         : WrapAlignment.center;
+    final hasPlayableMedia = details != null && oxMovieHasPlayableMedia(details);
+    final showMovieRequest = OxplayerEnv.isEnabled &&
+        details?.overview.seerrUrl?.isNotEmpty == true &&
+        details?.tmdbId != null &&
+        !hasPlayableMedia;
 
     return DetailScaffold(
       label: widget.item.name,
@@ -83,30 +89,37 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                     name: details.name,
                     image: details.images,
                     padding: padding,
-                    mainButton: MediaPlayButton(
-                      item: details,
-                      onLongPressed: (restart) async {
-                        await details.play(
-                          detailsContext,
-                          ref,
-                          showPlaybackOption: true,
-                          startPosition: restart ? Duration.zero : null,
-                        );
-                        ref
-                            .read(providerInstance.notifier)
-                            .fetchDetails(widget.item);
-                      },
-                      onPressed: (restart) async {
-                        await details.play(
-                          detailsContext,
-                          ref,
-                          startPosition: restart ? Duration.zero : null,
-                        );
-                        ref
-                            .read(providerInstance.notifier)
-                            .fetchDetails(widget.item);
-                      },
-                    ),
+                    mainButton: hasPlayableMedia
+                        ? MediaPlayButton(
+                            item: details,
+                            onLongPressed: (restart) async {
+                              await details.play(
+                                detailsContext,
+                                ref,
+                                showPlaybackOption: true,
+                                startPosition: restart ? Duration.zero : null,
+                              );
+                              ref
+                                  .read(providerInstance.notifier)
+                                  .fetchDetails(widget.item);
+                            },
+                            onPressed: (restart) async {
+                              await details.play(
+                                detailsContext,
+                                ref,
+                                startPosition: restart ? Duration.zero : null,
+                              );
+                              ref
+                                  .read(providerInstance.notifier)
+                                  .fetchDetails(widget.item);
+                            },
+                          )
+                        : showMovieRequest
+                            ? OxMovieRequestButton(
+                                tmdbId: details.tmdbId!,
+                                prominent: true,
+                              )
+                            : null,
                     centerButtons: Wrap(
                       spacing: 8,
                       runSpacing: 8,
