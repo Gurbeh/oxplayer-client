@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:chopper/chopper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
 import 'package:fladder/oxplayer/oxplayer_session.dart';
 import 'package:fladder/providers/user_provider.dart';
 
@@ -31,10 +32,25 @@ class OxplayerSessionInterceptor implements Interceptor {
       return response;
     }
     if (refreshed) {
-      return chain.proceed(chain.request);
+      final retry = oxplayerRetryRequestWithFreshToken(ref, chain.request);
+      return chain.proceed(retry);
     }
 
-    ref.read(oxplayerSessionRevokedProvider.notifier).state++;
+    // Refresh failed without clearing the session (transient 5xx) — surface the 401, keep local tokens.
+    if (ref.read(userProvider) == null) {
+      ref.read(oxplayerSessionRevokedProvider.notifier).state++;
+    }
     return response;
   }
+}
+
+/// Re-applies the current access token after a successful refresh (upstream [JellyRequest] is not re-run).
+Request oxplayerRetryRequestWithFreshToken(Ref ref, Request request) {
+  final credentials = ref.read(userProvider)?.credentials;
+  if (credentials == null || credentials.token.trim().isEmpty) {
+    return request;
+  }
+  final headers = Map<String, String>.from(request.headers);
+  headers.addAll(oxplayerMediaBrowserHeaders(ref.read, credentials));
+  return request.copyWith(headers: headers);
 }

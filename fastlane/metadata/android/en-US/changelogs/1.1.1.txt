@@ -1,0 +1,1 @@
+Auth resiliency: survive API redeploys without forced logout (503 on DB blips, refresh grace period, smarter session retry).

@@ -898,7 +898,7 @@ jobs:
           tag_name: ${{ needs.fetch-info.outputs.build_type == 'nightly' && env.NIGHTLY_TAG || github.ref_name }}
           name: ${{ needs.fetch-info.outputs.build_type == 'nightly' && format('OXPlayer nightly — {0}', steps.version.outputs.version) || format('OXPlayer {0}', steps.version.outputs.version) }}
           body_path: gh-release-body.md
-          draft: ${{ needs.fetch-info.outputs.build_type == 'release' }}
+          draft: false
           prerelease: ${{ needs.fetch-info.outputs.build_type == 'nightly' }}
           make_latest: ${{ needs.fetch-info.outputs.build_type == 'release' }}
           generate_release_notes: ${{ needs.fetch-info.outputs.build_type == 'release' }}

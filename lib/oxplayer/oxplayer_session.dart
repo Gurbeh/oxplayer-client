@@ -68,7 +68,11 @@ Future<bool> _restoreSession(OxplayerRead read, AccountModel account) async {
     }
 
     try {
-      return await oxplayerTryRefreshSession(read).timeout(kOxSessionRestoreTimeout);
+      final refreshed = await oxplayerTryRefreshSession(read).timeout(kOxSessionRestoreTimeout);
+      if (refreshed) return true;
+      // Transient refresh failure (5xx) — keep cached credentials.
+      if (read(userProvider) != null) return true;
+      return false;
     } on TimeoutException {
       // API briefly down (deploy) — keep cached session; client retries on next request.
       return true;
@@ -141,8 +145,13 @@ Future<bool> _refreshSession(OxplayerRead read) async {
       )
       .timeout(kOxSessionRestoreTimeout);
 
-  if (!response.isSuccessful || (response.body?.accessToken?.isEmpty ?? true)) {
-    await oxplayerInvalidateLocalSession(read, account);
+  final statusCode = response.statusCode;
+  final accessOk = response.isSuccessful && (response.body?.accessToken?.isNotEmpty ?? false);
+
+  if (!accessOk) {
+    if (statusCode == 401 || statusCode == 403) {
+      await oxplayerInvalidateLocalSession(read, account);
+    }
     return false;
   }
 
