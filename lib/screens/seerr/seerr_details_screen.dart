@@ -8,6 +8,8 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:fladder/models/items/images_models.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
 import 'package:fladder/providers/seerr/seerr_details_provider.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
 import 'package:fladder/screens/seerr/seerr_media_management.dart';
@@ -389,11 +391,16 @@ class SeerrDetailsScreen extends ConsumerWidget {
                       seasonStatuses: state.seasonStatuses,
                     ).padding(padding),
                   if (state.people.isNotEmpty)
-                    PeopleRow(
-                      people: state.people,
-                      contentPadding: padding,
-                      onTap: () {},
-                    ),
+                    OxplayerEnv.isEnabled
+                        ? OxSeerrPeopleRow(
+                            people: state.people,
+                            contentPadding: padding,
+                          )
+                        : PeopleRow(
+                            people: state.people,
+                            contentPadding: padding,
+                            onTap: () {},
+                          ),
                   if (state.recommended.isNotEmpty)
                     SeerrPosterRow(
                       posters: state.recommended,
