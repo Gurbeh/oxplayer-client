@@ -206,6 +206,18 @@ class User extends _$User {
     userState = user.copyWith(seerrCredentials: updated);
   }
 
+  /// Atomic OX Seerr proxy credentials (server URL + proxy header) for VIP/admin users.
+  void setSeerrProxyCredentials({required String proxyBase}) {
+    final user = state;
+    if (user == null) return;
+    userState = user.copyWith(
+      seerrCredentials: SeerrCredentialsModel(
+        serverUrl: proxyBase.trim(),
+        customHeaders: const {'ox-seerr-proxy': '1'},
+      ),
+    );
+  }
+
   void logoutSeerr() {
     final user = state;
     if (user == null) return;

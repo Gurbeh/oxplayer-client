@@ -51,10 +51,7 @@ Future<void> oxplayerConfigureSeerrFromServer(WidgetRef ref) async {
     if (proxyPath.isEmpty) return;
 
     final proxyBase = proxyPath.startsWith('http') ? proxyPath : '$base$proxyPath';
-    ref.read(userProvider.notifier).setSeerrServerUrl(proxyBase);
-    ref.read(userProvider.notifier).setSeerrSessionCookie('');
-    ref.read(userProvider.notifier).setSeerrApiKey('');
-    ref.read(userProvider.notifier).setSeerrCustomHeaders(const {'ox-seerr-proxy': '1'});
+    ref.read(userProvider.notifier).setSeerrProxyCredentials(proxyBase: proxyBase);
   } catch (_) {
     // Transient failure — [oxplayerMaybeConfigureSeerr] will retry on next home mount.
   }
