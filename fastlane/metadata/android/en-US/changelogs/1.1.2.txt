@@ -1,0 +1,1 @@
+Client-side stream discovery: pick a healthy edge node before playback, with automatic failover to alternate streamers on errors.

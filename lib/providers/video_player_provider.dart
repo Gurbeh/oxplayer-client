@@ -11,7 +11,9 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/media_playback_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/playback_queue_state.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
+import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/settings/video_player_settings_provider.dart';
@@ -149,6 +151,9 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     final effectiveStartPosition = await model.resolvedStartPosition(startPosition);
 
     if (media != null) {
+      if (OxplayerEnv.isEnabled) {
+        OxplayerStreamNodeSession.reset();
+      }
       ref.read(playBackModel.notifier).update((state) => newPlaybackModel);
       await state.loadVideo(model, effectiveStartPosition, true);
       await state.setVolume(ref.read(videoPlayerSettingsProvider).volume);
@@ -165,7 +170,7 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
 
       await state.play();
 
-      if (_isOxStreamRemuxUrl(media.url)) {
+      if (_isOxStreamRemuxUrl(media.url) || (OxplayerEnv.isEnabled && oxplayerIsOxStreamUrl(media.url))) {
         OxplayerStreamRepairBridge.register(ref, newPlaybackModel);
         final runtime = model.item.overview.runTime;
         mediaState.update((state) => state.copyWith(

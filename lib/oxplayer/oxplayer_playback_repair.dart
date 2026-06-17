@@ -9,10 +9,16 @@ import 'package:fladder/models/video_stream_model.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_force_repair_interceptor.dart';
 import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
+import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
 import 'package:fladder/providers/video_player_provider.dart';
 
-bool oxplayerIsOxStreamUrl(String? url) =>
-    url != null && (url.contains('/stream.ts') || url.contains('stream.ts?'));
+bool oxplayerIsOxStreamUrl(String? url) {
+  if (url == null) return false;
+  if (url.contains('/stream.ts') || url.contains('stream.ts?')) return true;
+  final uri = Uri.tryParse(url);
+  if (uri == null) return false;
+  return RegExp(r'/v/\d+\.').hasMatch(uri.path);
+}
 
 PlaybackType? _playbackTypeForModel(PlaybackModel model) => switch (model) {
       DirectPlaybackModel _ => PlaybackType.directStream,
@@ -84,12 +90,20 @@ Future<bool> oxplayerMaybeRetryPlayAfterLoadFailure({
   return ref.read(videoPlayerProvider.notifier).loadPlaybackItem(refreshed, startPosition);
 }
 
-/// Called from lib_mpv when ox-stream load retries are exhausted; returns a fresh stream URL once.
+/// Called from lib_mpv when ox-stream load retries are exhausted; tries node failover then force-repair.
 Future<String?> oxplayerTryRepairStreamUrl(String deadUrl) async {
   if (!OxplayerEnv.isEnabled || !oxplayerIsOxStreamUrl(deadUrl)) return null;
-  if (OxplayerStreamRepairBridge.runtimeRepairUsed) return null;
 
   final r = OxplayerStreamRepairBridge.ref;
+  if (r != null) {
+    final failoverUrl = await oxplayerFailoverStreamUrl(r, deadUrl);
+    if (failoverUrl != null && failoverUrl != deadUrl) {
+      return failoverUrl;
+    }
+  }
+
+  if (OxplayerStreamRepairBridge.runtimeRepairUsed) return null;
+
   final model = OxplayerStreamRepairBridge.model;
   if (r == null || model == null) return null;
 

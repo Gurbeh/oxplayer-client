@@ -21,6 +21,7 @@ import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
+import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
 import 'package:fladder/providers/settings/subtitle_settings_provider.dart';
 import 'package:fladder/screens/video_player/video_player.dart' as video_screen;
 import 'package:fladder/util/subtitle_position_calculator.dart';
@@ -266,7 +267,19 @@ class LibMPV extends BasePlayer {
           await Future.delayed(const Duration(milliseconds: 150));
           if (DateTime.now().isAfter(_firstLoadAttempt.add(_maxRetryDuration))) {
             log("Max retry duration reached, stopping retries.");
-            if (OxplayerEnv.isEnabled && _isOxStreamRemuxUrl(url)) {
+            if (OxplayerEnv.isEnabled && oxplayerIsOxStreamUrl(url)) {
+              final bridgeRef = OxplayerStreamRepairBridge.ref;
+              final failoverUrl = bridgeRef != null
+                  ? await oxplayerFailoverStreamUrl(bridgeRef, url)
+                  : null;
+              if (failoverUrl != null && failoverUrl != url) {
+                log("Failover ox-stream to alternate node");
+                _firstLoadAttempt = DateTime.now();
+                await setStartPosition(startPosition);
+                await _player?.open(mpv.Media(failoverUrl), play: play);
+                _retryTimer?.reset();
+                return;
+              }
               final repairedUrl = await oxplayerTryRepairStreamUrl(url);
               if (repairedUrl != null) {
                 log("Retrying ox-stream with force-repair URL");
@@ -285,6 +298,20 @@ class LibMPV extends BasePlayer {
             _retryTimer?.cancel();
             _retryTimer = null;
           } else {
+            if (OxplayerEnv.isEnabled && oxplayerIsOxStreamUrl(url)) {
+              final bridgeRef = OxplayerStreamRepairBridge.ref;
+              final failoverUrl = bridgeRef != null
+                  ? await oxplayerFailoverStreamUrl(bridgeRef, url)
+                  : null;
+              if (failoverUrl != null && failoverUrl != url) {
+                log("Failover ox-stream to alternate node (retry)");
+                _firstLoadAttempt = DateTime.now();
+                await setStartPosition(startPosition);
+                await _player?.open(mpv.Media(failoverUrl), play: play);
+                _retryTimer?.reset();
+                return;
+              }
+            }
             log("Retrying to load video $url");
             await setStartPosition(startPosition);
             await _player?.open(mpv.Media(url), play: play);

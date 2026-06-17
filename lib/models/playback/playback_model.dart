@@ -31,6 +31,8 @@ import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/models/syncing/sync_item.dart';
 import 'package:fladder/models/video_stream_model.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_media_source.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
 import 'package:fladder/profiles/default_profile.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/connectivity_provider.dart';
@@ -444,8 +446,11 @@ class PlaybackModelHelper {
       final chapters = item.overview.chapters ?? [];
 
       final mediaPath = isValidVideoUrl(mediaSource.path ?? "");
+      final resolvedMediaPath = mediaPath != null && OxplayerEnv.isEnabled
+          ? await oxplayerResolveStreamPlaybackUrl(ref, mediaPath)
+          : mediaPath;
 
-      if (type == PlaybackType.tv && mediaPath != null) {
+      if (type == PlaybackType.tv && resolvedMediaPath != null) {
         final tvModel = TvPlaybackModel(
           channel: item as ChannelModel,
           isNativePlayerBackend: isNativePlayer,
@@ -454,7 +459,7 @@ class PlaybackModelHelper {
           playbackQueue: oldModel?.playbackQueue,
           queueSource: queueSource,
           playbackInfo: playbackInfo,
-          media: Media(url: mediaPath),
+          media: Media(url: resolvedMediaPath),
         );
         tvModel.startTracking(ref);
         return tvModel;
@@ -490,7 +495,7 @@ class PlaybackModelHelper {
           chapters: chapters,
           playbackInfo: playbackInfo,
           trickPlay: trickPlay,
-          media: Media(url: mediaPath ?? playbackUrl),
+          media: Media(url: resolvedMediaPath ?? playbackUrl),
           mediaStreams: mediaStreamsWithUrls,
           bitRateOptions: qualityOptions,
         );
@@ -629,6 +634,9 @@ class PlaybackModelHelper {
       );
 
       final mediaPath = isValidVideoUrl(mediaSource.path ?? "");
+      final resolvedMediaPath = mediaPath != null && OxplayerEnv.isEnabled
+          ? await oxplayerResolveStreamPlaybackUrl(ref, mediaPath)
+          : mediaPath;
 
       newModel = DirectPlaybackModel(
         item: playbackModel.item,
@@ -638,7 +646,7 @@ class PlaybackModelHelper {
         chapters: playbackModel.chapters,
         playbackInfo: playbackInfo,
         trickPlay: playbackModel.trickPlay,
-        media: Media(url: mediaPath ?? directPlay),
+        media: Media(url: resolvedMediaPath ?? directPlay),
         mediaStreams: mediaStreamsWithUrls,
         bitRateOptions: playbackModel.bitRateOptions,
       );
