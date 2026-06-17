@@ -1,0 +1,1 @@
+Selective Android in-app updates: major Play releases use the native immediate flow; minor and patch updates show a TV-friendly optional dialog with skip and remind-later.

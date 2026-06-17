@@ -16,7 +16,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.1.2+2
+version: 1.1.3+3
 
 environment:
   sdk: ">=3.1.3 <4.0.0"
@@ -148,6 +148,7 @@ dependencies:
   chinese_font_library: ^1.2.0
   qr_flutter: ^4.1.0
   flutter_dotenv: ^5.2.1
+  in_app_update: ^4.2.5
 
 dependency_overrides:
   # Upstream includes web subtitle fix (oncuechange .toJS); DonutWare fork still broken on web.

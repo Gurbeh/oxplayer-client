@@ -7,6 +7,7 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/bootstrap/app_bootstrap.dart';
+import 'package:fladder/oxplayer/oxplayer_bootstrap.dart';
 import 'package:fladder/oxplayer/oxplayer_sentry.dart';
 import 'package:fladder/bootstrap/platform/platform_app_wrapper.dart';
 import 'package:fladder/l10n/generated/app_localizations.dart';
@@ -32,7 +33,11 @@ void main(List<String> args) async {
     await OxplayerSentry.init();
   }
 
+  await OxplayerBootstrap.beforeAppBootstrap(args);
+
   final bootstrap = await bootstrapApplication(args);
+
+  await OxplayerBootstrap.afterAppBootstrap(bootstrap);
 
   runApp(
     ProviderScope(
@@ -43,8 +48,10 @@ void main(List<String> args) async {
         argumentsStateProvider.overrideWith((ref) => bootstrap.argumentsModel),
         syncProvider.overrideWith((ref) => SyncNotifier(ref, bootstrap.applicationDirectory)),
       ],
-      child: AdaptiveLayoutBuilder(
-        child: (context) => const Main(),
+      child: OxplayerBootstrap.wrapRoot(
+        AdaptiveLayoutBuilder(
+          child: (context) => const Main(),
+        ),
       ),
     ),
   );
