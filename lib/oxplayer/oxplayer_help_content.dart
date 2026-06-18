@@ -52,9 +52,7 @@ class OxplayerHelpContent extends StatelessWidget {
           const SizedBox(height: 20),
         ],
         Text(
-          link != null && bot != null
-              ? '${context.localized.oxplayerHelpBody}\n\nOpen @$bot in Telegram and send /login to sign in.'
-              : context.localized.oxplayerHelpBody,
+          context.localized.oxplayerHelpBody,
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyLarge,
         ),

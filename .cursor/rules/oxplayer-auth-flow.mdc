@@ -7,7 +7,7 @@ alwaysApply: false
 # OXPlayer Auth Flow
 
 Vanilla Fladder logs in with a Jellyfin username/password.
-OXPlayer replaces this with **main-bot claim-code login** — no Jellyfin credentials and no TDLib sign-in UI.
+OXPlayer replaces this with **Telegram sign-in via the main bot** — no Jellyfin credentials and no TDLib sign-in UI.
 
 ## Login sequence
 
@@ -16,12 +16,12 @@ OXPlayer replaces this with **main-bot claim-code login** — no Jellyfin creden
    └─ Splash: oxplayerRestoreSession() — GET /Users/Me; on 401 try refresh; else logout → /ox-login
 
 2. User sees OxplayerLoginScreen  (route: /ox-login)
-   └─ FladderLogo + OxplayerTelegramLoginPanel (QR + Sign in with Telegram)
+   └─ FladderLogo + OxplayerTelegramLoginPanel (QR + Sign in with Telegram) — primary
    └─ Hidden tester: press and hold the login QR for 5s → POST /auth/test-account
    └─ App creates login attempt → opens `?start=li_<attemptId>` → long-poll until bot completes
-   └─ Fallback: OxplayerClaimCodeLoginPanel (6-char code from bot /login)
+   └─ Fallback: OxplayerClaimCodeLoginPanel (6-char code from bot `/login`)
 
-3. Jellyfin AuthenticateByName (username `ox`, password = code)
+3. Jellyfin AuthenticateByName (username `ox`, password = code or attempt token)
    ← session token + `X-Ox-Refresh-Token` header (stored in SharedPreferences)
 
 4. Token stored → FladderConfig.baseUrl = OxplayerEnv.apiBaseUrl

@@ -13,9 +13,10 @@ const faqs: { q: string; a: ReactNode }[] = [
     q: "How do I connect Telegram?",
     a: (
       <>
-        Open <TelegramBotLink {...OXPLAYER_BOT} /> in Telegram and sign in to the OXPlayer app with a login code
-        from the bot. OXPlayer uses its own sign-in — not Telegram Login — and we never collect your Telegram
-        account data, password, or private chats. We only process media you send or forward to our bot.
+        Open OXPlayer and tap <b>Sign in with Telegram</b>. Approve the device request in{" "}
+        <TelegramBotLink {...OXPLAYER_BOT} /> — the app signs you in automatically. OXPlayer uses its own sign-in —
+        not Telegram Login — and we never collect your Telegram account data, password, or private chats. We only
+        process media you send or forward to our bot.
       </>
     ),
   },

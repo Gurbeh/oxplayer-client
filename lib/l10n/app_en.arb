@@ -2739,9 +2739,9 @@
   "@oxplayerHomeWelcome": {},
   "oxplayerHelpTitle": "Get started",
   "@oxplayerHelpTitle": {},
-  "oxplayerHelpBody": "OXPlayer is your Telegram media library in one place. Send or forward media to the bot to add it here, then browse and play from Home.",
+  "oxplayerHelpBody": "To add videos to your library, send or forward them to our Telegram bot. When processing finishes, they appear on Home with posters and metadata ready to play.",
   "@oxplayerHelpBody": {},
-  "oxplayerHelpQrCaption": "Scan with your phone to open the bot in Telegram.",
+  "oxplayerHelpQrCaption": "Scan to open the bot in Telegram and send videos.",
   "@oxplayerHelpQrCaption": {},
   "oxplayerHelpOpenBot": "Open @{username} in Telegram",
   "@oxplayerHelpOpenBot": {

@@ -4,6 +4,10 @@ export const GITHUB_REPO = "Gurbeh/oxplayer-client";
 
 export const RELEASES_PAGE_URL = `https://github.com/${GITHUB_REPO}/releases/latest`;
 
+/** Google Play listing for the Android phone app. */
+export const PLAY_STORE_ANDROID_URL =
+  "https://play.google.com/store/apps/details?id=app.oxplayer";
+
 /** Live web app (deployed from release builds). */
 export const WEB_APP_URL = `${SITE_ORIGIN}/web/`;
 
@@ -22,6 +26,10 @@ export const PLATFORM_ASSET_PATTERNS: Record<Exclude<PlatformId, "Web">, RegExp>
 export function resolvePlatformUrl(platformId: PlatformId, assets: { name: string; browser_download_url: string }[]): string {
   if (platformId === "Web") {
     return WEB_APP_URL;
+  }
+
+  if (platformId === "Android") {
+    return PLAY_STORE_ANDROID_URL;
   }
 
   const pattern = PLATFORM_ASSET_PATTERNS[platformId];

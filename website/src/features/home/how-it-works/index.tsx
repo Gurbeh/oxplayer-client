@@ -143,8 +143,8 @@ const HowItWorks = () => {
               img={assetPath("/images/FT-5.png")}
               des={
                 <>
-                  Your library syncs through <TelegramBotLink {...OXPLAYER_BOT} />. Open the bot in Telegram,
-                  get a login code, and sign in to OXPlayer — no Telegram login required. We only handle media
+                  Your library syncs through <TelegramBotLink {...OXPLAYER_BOT} />. Open OXPlayer, tap{" "}
+                  <b>Sign in with Telegram</b>, and approve the request in the bot when prompted. We only handle media
                   you send or forward to the bot.
                 </>
               }

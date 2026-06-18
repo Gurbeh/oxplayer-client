@@ -21,7 +21,7 @@ const TelegramPrivacyNote = () => {
             className="text-primary hover:underline font-medium"
           />
           .<br />
-          Sign in to OXPlayer with a login code from the bot — no Telegram login required.
+          Sign in from OXPlayer with <b>Sign in with Telegram</b> and approve in the bot — no Telegram login required.
           <br />
           We only process media you send to our bot; we cannot access your account or private chats.
         </Paragraph>
