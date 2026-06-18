@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -9,10 +10,16 @@ import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/src/video_player_helper.g.dart';
 
 abstract final class OxplayerSentry {
-  static Future<void> init() async {
+  static bool _handlersChained = false;
+
+  /// Initializes Sentry and runs [appRunner] inside the SDK zone (required for async errors).
+  static Future<void> init(Future<void> Function() appRunner) async {
     await OxplayerDotenv.ensureLoaded();
     final dsn = OxplayerEnv.sentryDsn;
-    if (dsn == null) return;
+    if (dsn == null) {
+      await appRunner();
+      return;
+    }
 
     final packageInfo = await PackageInfo.fromPlatform();
     final release = 'oxplayer-client@${packageInfo.version}+${packageInfo.buildNumber}';
@@ -33,7 +40,32 @@ abstract final class OxplayerSentry {
           options.enableNdkScopeSync = false;
         }
       },
+      appRunner: appRunner,
     );
+  }
+
+  /// Re-wraps Flutter/platform error handlers after upstream [CrashLogNotifier] installs its own.
+  /// Without this, local crash logs work but nothing is sent to Sentry.
+  static void chainErrorHandlers() {
+    if (!Sentry.isEnabled || _handlersChained) return;
+    _handlersChained = true;
+
+    final previousFlutterError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      previousFlutterError?.call(details);
+      unawaited(_captureFlutterError(details));
+    };
+
+    final previousPlatformError = PlatformDispatcher.instance.onError;
+    PlatformDispatcher.instance.onError = (error, stack) {
+      final handled = previousPlatformError?.call(error, stack) ?? false;
+      unawaited(Sentry.captureException(error, stackTrace: stack));
+      return handled;
+    };
+  }
+
+  static Future<void> _captureFlutterError(FlutterErrorDetails details) async {
+    await Sentry.captureException(details.exception, stackTrace: details.stack);
   }
 
   static Future<bool> _isLeanBackTv() async {

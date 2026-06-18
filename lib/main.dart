@@ -29,32 +29,39 @@ import 'package:fladder/widgets/media_query_scaler.dart';
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (!kIsWeb) {
-    await OxplayerSentry.init();
-  }
+  Future<void> runOxApp() async {
+    await OxplayerBootstrap.beforeAppBootstrap(args);
 
-  await OxplayerBootstrap.beforeAppBootstrap(args);
+    final bootstrap = await bootstrapApplication(args);
 
-  final bootstrap = await bootstrapApplication(args);
+    await OxplayerBootstrap.afterAppBootstrap(bootstrap);
+    if (!kIsWeb) {
+      OxplayerSentry.chainErrorHandlers();
+    }
 
-  await OxplayerBootstrap.afterAppBootstrap(bootstrap);
-
-  runApp(
-    ProviderScope(
-      overrides: [
-        sharedPreferencesProvider.overrideWith((ref) => bootstrap.sharedPreferences),
-        applicationInfoProvider.overrideWith((ref) => bootstrap.applicationInfo),
-        crashLogProvider.overrideWith((ref) => bootstrap.crashProvider),
-        argumentsStateProvider.overrideWith((ref) => bootstrap.argumentsModel),
-        syncProvider.overrideWith((ref) => SyncNotifier(ref, bootstrap.applicationDirectory)),
-      ],
-      child: OxplayerBootstrap.wrapRoot(
-        AdaptiveLayoutBuilder(
-          child: (context) => const Main(),
+    runApp(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWith((ref) => bootstrap.sharedPreferences),
+          applicationInfoProvider.overrideWith((ref) => bootstrap.applicationInfo),
+          crashLogProvider.overrideWith((ref) => bootstrap.crashProvider),
+          argumentsStateProvider.overrideWith((ref) => bootstrap.argumentsModel),
+          syncProvider.overrideWith((ref) => SyncNotifier(ref, bootstrap.applicationDirectory)),
+        ],
+        child: OxplayerBootstrap.wrapRoot(
+          AdaptiveLayoutBuilder(
+            child: (context) => const Main(),
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
+
+  if (!kIsWeb) {
+    await OxplayerSentry.init(runOxApp);
+  } else {
+    await runOxApp();
+  }
 }
 
 class Main extends ConsumerWidget {
