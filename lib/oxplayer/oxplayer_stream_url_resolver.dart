@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_nodes_api.dart';
 import 'package:fladder/providers/user_provider.dart';
 
@@ -47,7 +50,15 @@ Future<String?> oxplayerResolveStreamPlaybackUrl(
     accessToken: token,
     forceRefresh: forceRefreshNodes,
   );
-  if (nodes.isEmpty) return apiMintedUrl;
+  if (nodes.isEmpty) {
+    unawaited(OxplayerPlaybackTelemetry.reportFailure(
+      stage: 'stream_nodes',
+      reason: 'no_healthy_nodes',
+      streamUrl: apiMintedUrl,
+      transient: true,
+    ));
+    return apiMintedUrl;
+  }
 
   OxplayerStreamNodeSession.nodes = nodes;
   final pick = oxplayerPickRandomStreamNode(

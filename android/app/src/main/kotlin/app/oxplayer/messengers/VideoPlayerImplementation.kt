@@ -41,6 +41,10 @@ class VideoPlayerImplementation(
     /** One-shot listener: Ox loopback + resume must load from t=0 first, then seek (see [open]). */
     private var loopbackResumeListener: Player.Listener? = null
 
+    /** When [open] runs before ExoPlayer is bound, retry with this URL after [init]. */
+    private var pendingOpenUrl: String? = null
+    private var pendingOpenPlay: Boolean = true
+
     val isTVMode: Flow<Boolean> = playbackData.asStateFlow().map {
         it?.mediaInfo?.playbackType == PlaybackType.TV
     }
@@ -112,11 +116,14 @@ class VideoPlayerImplementation(
                 if (exo == null) {
                     Log.w(
                         OX_NATIVE_PLY_TAG,
-                        "open skip: ExoPlayer not ready yet (init will open again when host is bound)",
+                        "open defer: ExoPlayer not ready yet (will retry when host is bound)",
                     )
+                    pendingOpenUrl = url
+                    pendingOpenPlay = play
                     callback(Result.success(false))
                     return@postDelayed
                 }
+                pendingOpenUrl = null
                 val pd = playbackData.value
                 Log.d(
                     OX_NATIVE_PLY_TAG,
@@ -262,6 +269,18 @@ class VideoPlayerImplementation(
     fun init(exoPlayer: ExoPlayer?) {
         player = exoPlayer
         subsInitialized = false
+        if (exoPlayer == null) {
+            pendingOpenUrl = null
+            return
+        }
+        val deferredUrl = pendingOpenUrl
+        val deferredPlay = pendingOpenPlay
+        if (!deferredUrl.isNullOrBlank()) {
+            pendingOpenUrl = null
+            Log.d(OX_NATIVE_PLY_TAG, "init applying deferred open urlLen=${deferredUrl.length} play=$deferredPlay")
+            open(deferredUrl, deferredPlay, callback = {})
+            return
+        }
         //exoPlayer initializes after the playbackData is set for the first load
         playbackData.value?.let { playData ->
             VideoPlayerObject.setAudioTrackIndex(playData.defaultAudioTrack.toInt(), true)

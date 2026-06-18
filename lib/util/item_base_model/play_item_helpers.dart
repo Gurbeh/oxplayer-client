@@ -25,6 +25,7 @@ import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/tv_playback_model.dart';
 import 'package:fladder/models/video_stream_model.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_native_playback.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/providers/api_provider.dart';
@@ -945,10 +946,23 @@ Future<void> _playVideo(
 
   final actualStartPosition = startPosition ?? await current.startDuration() ?? Duration.zero;
 
+  final nativeOpenedEarly =
+      OxplayerEnv.isEnabled && context.mounted && await oxplayerOpenNativePlayerEarly(ref, context);
+
   var loadedCorrectly = await ref.read(videoPlayerProvider.notifier).loadPlaybackItem(
         current,
         actualStartPosition,
       );
+
+  Timer? stuckWatch;
+  if (loadedCorrectly && OxplayerEnv.isEnabled) {
+    stuckWatch = oxplayerScheduleNativeStuckPlaybackWatch(
+      ref: ref,
+      itemId: current.item.id,
+      streamUrl: current.media?.url,
+      catalogDuration: current.item.overview.runTime,
+    );
+  }
 
   if (!loadedCorrectly && OxplayerEnv.isEnabled) {
     loadedCorrectly = await oxplayerMaybeRetryPlayAfterLoadFailure(
@@ -959,6 +973,7 @@ Future<void> _playVideo(
   }
 
   if (!loadedCorrectly) {
+    stuckWatch?.cancel();
     if (context.mounted) {
       unawaited(OxplayerPlaybackTelemetry.reportFailure(
         stage: 'player_load',
@@ -976,15 +991,23 @@ Future<void> _playVideo(
     return;
   }
 
-  if (cancelOperation?.isCanceled ?? false) return;
+  if (cancelOperation?.isCanceled ?? false) {
+    stuckWatch?.cancel();
+    return;
+  }
 
   try {
     Navigator.of(context, rootNavigator: true).pop();
   } catch (_) {}
 
-  if (cancelOperation?.isCanceled ?? false) return;
+  if (cancelOperation?.isCanceled ?? false) {
+    stuckWatch?.cancel();
+    return;
+  }
 
-  await ref.read(videoPlayerProvider.notifier).openPlayer(context);
+  if (!nativeOpenedEarly) {
+    await ref.read(videoPlayerProvider.notifier).openPlayer(context);
+  }
   if (AdaptiveLayout.of(context).isDesktop && defaultTargetPlatform != TargetPlatform.macOS) {
     fullScreenHelper.closeFullScreen(ref);
   }

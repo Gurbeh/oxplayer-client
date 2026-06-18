@@ -161,12 +161,23 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
       await state.setAudioTrack(null, model);
       await state.setSubtitleTrack(null, model);
 
-      ref.read(mediaPlaybackProvider.notifier).update((state) => state.copyWith(
-            state: useMinimizedPlayer ? VideoPlayerState.minimized : VideoPlayerState.fullScreen,
-            buffering: true,
-            errorPlaying: false,
-            skippedSegments: {},
-          ));
+      final runtime = model.item.overview.runTime;
+      ref.read(mediaPlaybackProvider.notifier).update((playback) {
+        var next = playback.copyWith(
+          state: useMinimizedPlayer ? VideoPlayerState.minimized : VideoPlayerState.fullScreen,
+          buffering: true,
+          errorPlaying: false,
+          skippedSegments: {},
+        );
+        if (OxplayerEnv.isEnabled) {
+          next = next.copyWith(
+            position: effectiveStartPosition,
+            lastPosition: effectiveStartPosition,
+            duration: (runtime != null && runtime > Duration.zero) ? runtime : next.duration,
+          );
+        }
+        return next;
+      });
 
       await state.play();
 

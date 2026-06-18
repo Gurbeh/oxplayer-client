@@ -7,6 +7,8 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/models/funding_model.dart' as funding;
 import 'package:fladder/oxplayer/oxplayer_about_error_logs_button.dart';
+import 'package:fladder/oxplayer/oxplayer_about_settings_page.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/screens/crash_screen/crash_screen.dart';
 import 'package:fladder/screens/settings/settings_scaffold.dart';
 import 'package:fladder/screens/settings/widgets/settings_update_information.dart';
@@ -44,6 +46,10 @@ class AboutSettingsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (OxplayerConfig.isEnabled) {
+      return const OxplayerAboutSettingsPage();
+    }
+
     final applicationInfo = ref.watch(applicationInfoProvider);
 
     return SettingsScaffold(

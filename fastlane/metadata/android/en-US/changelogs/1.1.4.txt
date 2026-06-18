@@ -1,0 +1,1 @@
+Fix TV playback sometimes stuck at 00:00 until reopening. Report playback and stream errors to Sentry. Improve crash reporting reliability on Android TV.

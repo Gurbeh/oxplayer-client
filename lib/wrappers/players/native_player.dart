@@ -10,6 +10,7 @@ import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/transcode_playback_model.dart';
 import 'package:fladder/models/playback/tv_playback_model.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/src/video_player_helper.g.dart';
 import 'package:fladder/wrappers/players/base_player.dart';
 import 'package:fladder/wrappers/players/player_states.dart';
@@ -35,8 +36,23 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
   }
 
   @override
-  Future<void> loadVideo(String url, bool play, {Duration startPosition = Duration.zero}) async =>
-      player.open(url, play);
+  Future<void> loadVideo(String url, bool play, {Duration startPosition = Duration.zero}) async {
+    const maxAttempts = 4;
+    const retryDelay = Duration(milliseconds: 350);
+
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      final ok = await player.open(url, play);
+      if (ok) return;
+      if (attempt < maxAttempts) {
+        await Future<void>.delayed(retryDelay);
+      } else {
+        unawaited(OxplayerPlaybackTelemetry.reportNativeOpenFailed(
+          url: url,
+          attempt: attempt,
+        ));
+      }
+    }
+  }
 
   @override
   Future<StartResult> open(BuildContext newContext) async {
@@ -103,11 +119,15 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
 
   @override
   void onPlaybackStateChanged(PlaybackState state) {
+    final durationMs = state.duration;
+    final duration = durationMs > 0 ? Duration(milliseconds: durationMs) : Duration.zero;
     lastState = lastState.update(
       playing: state.playing,
       position: Duration(milliseconds: state.position),
       buffer: Duration(milliseconds: state.buffered),
       buffering: state.buffering,
+      completed: state.completed,
+      duration: duration,
     );
     _stateController.add(lastState);
   }

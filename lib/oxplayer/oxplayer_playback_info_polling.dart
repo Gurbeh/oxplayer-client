@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:chopper/chopper.dart';
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 
 /// Default retry interval when the server omits `Retry-After` and `retry_after`.
 const int oxplayerPlaybackHydrateRetryAfterDefaultSec = 5;
@@ -33,9 +35,16 @@ Future<Response<PlaybackInfoResponse>> oxplayerPollPlaybackInfoUntilReady(
 
     if (status == _httpAccepted) {
       if (DateTime.now().isAfter(deadline)) {
-        throw OxplayerPlaybackHydrateTimeoutException(
+        final ex = OxplayerPlaybackHydrateTimeoutException(
           lastRetryAfterSec: oxplayerPlaybackHydrateRetryAfterSeconds(response),
         );
+        unawaited(OxplayerPlaybackTelemetry.reportFailure(
+          stage: 'playback_info',
+          reason: 'hydrate_timeout',
+          httpStatus: status,
+          transient: false,
+        ));
+        throw ex;
       }
       final delay = Duration(seconds: oxplayerPlaybackHydrateRetryAfterSeconds(response));
       await Future<void>.delayed(delay);
@@ -43,6 +52,11 @@ Future<Response<PlaybackInfoResponse>> oxplayerPollPlaybackInfoUntilReady(
     }
 
     if (status >= 400) {
+      unawaited(OxplayerPlaybackTelemetry.reportFailure(
+        stage: 'playback_info',
+        reason: 'http_$status',
+        httpStatus: status,
+      ));
       return response;
     }
 
