@@ -22,6 +22,7 @@ abstract final class OxplayerBootstrap {
     await OxUpdateService.checkOnLaunch(
       sharedPreferences: result.sharedPreferences,
       currentVersion: result.applicationInfo.version,
+      currentBuildNumber: result.applicationInfo.buildNumber,
     );
   }
 

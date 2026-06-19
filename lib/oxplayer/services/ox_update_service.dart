@@ -58,6 +58,20 @@ final class OxSemver {
 
   bool isMajorUpdateComparedTo(OxSemver other) => major > other.major;
 
+  /// Inverse of `android/app/build.gradle` `versionCode` formula.
+  static OxSemver? fromVersionCode(int code) {
+    if (code < 0) return null;
+
+    final major = code ~/ 100000;
+    final remainder = code % 100000;
+    final minor = remainder ~/ 1000;
+    final patch = remainder % 1000;
+
+    if (major == 0 && minor == 0 && patch == 0) return null;
+
+    return OxSemver(major: major, minor: minor, patch: patch);
+  }
+
   @override
   String toString() => '$major.$minor.$patch';
 }
@@ -66,11 +80,13 @@ final class OxOptionalUpdatePrompt {
   const OxOptionalUpdatePrompt({
     required this.currentVersion,
     required this.targetVersion,
+    required this.skipKey,
     required this.sharedPreferences,
   });
 
   final String currentVersion;
   final String targetVersion;
+  final String skipKey;
   final SharedPreferences sharedPreferences;
 }
 
@@ -86,6 +102,7 @@ abstract final class OxUpdateService {
   static Future<void> checkOnLaunch({
     required SharedPreferences sharedPreferences,
     required String currentVersion,
+    required String currentBuildNumber,
   }) async {
     if (!OxplayerConfig.isEnabled) return;
     if (kIsWeb || !Platform.isAndroid) return;
@@ -96,41 +113,34 @@ abstract final class OxUpdateService {
         return;
       }
 
-      final targetVersion = await _resolveTargetVersion();
-      if (targetVersion == null) {
-        developer.log(
-          'Play reports an update but no target semver is configured',
-          name: 'OxUpdateService',
-        );
+      final currentVersionCode = int.tryParse(currentBuildNumber);
+      final playVersionCode = updateInfo.availableVersionCode;
+      if (currentVersionCode != null &&
+          playVersionCode != null &&
+          playVersionCode <= currentVersionCode) {
         return;
       }
 
-      final skipped = sharedPreferences.getString(kOxSkippedVersionKey);
-      if (skipped == targetVersion) {
+      final resolved = await _resolveUpdateTarget(updateInfo: updateInfo);
+      final skipKey = resolved?.skipKey ??
+          (playVersionCode != null ? 'code:$playVersionCode' : 'play-update');
+      if (sharedPreferences.getString(kOxSkippedVersionKey) == skipKey) {
         return;
       }
 
-      final current = OxSemver.parse(currentVersion);
-      final target = OxSemver.parse(targetVersion);
-      if (current == null || target == null) {
-        developer.log(
-          'Unable to parse versions (current=$currentVersion target=$targetVersion)',
-          name: 'OxUpdateService',
-        );
-        return;
-      }
+      final current = OxSemver.parse(currentVersion) ?? const OxSemver(major: 0, minor: 0, patch: 0);
+      final targetLabel = resolved?.displayVersion ?? 'latest';
+      final targetSemver = resolved?.targetSemver ??
+          (playVersionCode != null ? OxSemver.fromVersionCode(playVersionCode) : null);
 
-      if (!target.isNewerThan(current)) {
-        return;
-      }
-
-      if (target.isMajorUpdateComparedTo(current)) {
+      if (targetSemver != null && targetSemver.isMajorUpdateComparedTo(current)) {
         if (updateInfo.immediateUpdateAllowed) {
           await InAppUpdate.performImmediateUpdate();
         } else {
           _pendingOptionalPrompt = OxOptionalUpdatePrompt(
             currentVersion: current.toString(),
-            targetVersion: target.toString(),
+            targetVersion: targetLabel,
+            skipKey: skipKey,
             sharedPreferences: sharedPreferences,
           );
         }
@@ -139,7 +149,8 @@ abstract final class OxUpdateService {
 
       _pendingOptionalPrompt = OxOptionalUpdatePrompt(
         currentVersion: current.toString(),
-        targetVersion: target.toString(),
+        targetVersion: targetLabel,
+        skipKey: skipKey,
         sharedPreferences: sharedPreferences,
       );
     } catch (error, stackTrace) {
@@ -165,10 +176,73 @@ abstract final class OxUpdateService {
     );
   }
 
-  static Future<String?> _resolveTargetVersion() async {
+  static Future<({String displayVersion, String skipKey, OxSemver? targetSemver})?> _resolveUpdateTarget({
+    required AppUpdateInfo updateInfo,
+  }) async {
+    final candidates = <OxSemver>[];
+
+    final playCode = updateInfo.availableVersionCode;
+    if (playCode != null) {
+      final fromPlay = OxSemver.fromVersionCode(playCode);
+      if (fromPlay != null) candidates.add(fromPlay);
+
+      final fromMap = _semverFromVersionMapForCode(playCode);
+      if (fromMap != null) candidates.add(fromMap);
+    }
+
+    for (final configured in await _fetchConfiguredTargetSemvers()) {
+      candidates.add(configured);
+    }
+
+    OxSemver? best;
+    for (final candidate in candidates) {
+      if (best == null || candidate.isNewerThan(best)) {
+        best = candidate;
+      }
+    }
+
+    final skipKey = playCode != null ? 'code:$playCode' : best?.toString();
+    if (skipKey == null) return null;
+
+    return (
+      displayVersion: best?.toString() ?? 'latest',
+      skipKey: skipKey,
+      targetSemver: best ?? (playCode != null ? OxSemver.fromVersionCode(playCode) : null),
+    );
+  }
+
+  static Future<List<OxSemver>> _fetchConfiguredTargetSemvers() async {
+    final semvers = <OxSemver>[];
+
     final fromApi = await _fetchTargetVersionFromBackend();
-    if (fromApi != null) return fromApi;
-    return _targetVersionFromConfig();
+    final apiSemver = fromApi == null ? null : OxSemver.parse(fromApi);
+    if (apiSemver != null) semvers.add(apiSemver);
+
+    final fromConfig = _targetVersionFromConfig();
+    final configSemver = fromConfig == null ? null : OxSemver.parse(fromConfig);
+    if (configSemver != null) semvers.add(configSemver);
+
+    return semvers;
+  }
+
+  static OxSemver? _semverFromVersionMapForCode(int versionCode) {
+    const define = String.fromEnvironment(
+      'OXPLAYER_ANDROID_VERSION_MAP',
+      defaultValue: '',
+    );
+    final raw = define.trim().isNotEmpty
+        ? define.trim()
+        : OxplayerDotenv.get('OXPLAYER_ANDROID_VERSION_MAP').trim();
+    if (raw.isEmpty) return null;
+
+    for (final entry in raw.split(',')) {
+      final parts = entry.split(':');
+      if (parts.length != 2) continue;
+      if (int.tryParse(parts[0].trim()) != versionCode) continue;
+      return OxSemver.parse(parts[1]);
+    }
+
+    return null;
   }
 
   static Future<String?> _fetchTargetVersionFromBackend() async {
@@ -251,9 +325,9 @@ abstract final class OxUpdateService {
 
   static Future<void> skipVersion({
     required SharedPreferences sharedPreferences,
-    required String targetVersion,
+    required String skipKey,
   }) async {
-    await sharedPreferences.setString(kOxSkippedVersionKey, targetVersion);
+    await sharedPreferences.setString(kOxSkippedVersionKey, skipKey);
   }
 }
 
@@ -269,7 +343,9 @@ class _OxOptionalUpdateDialog extends StatelessWidget {
     return AlertDialog(
       title: const Text('Update available'),
       content: Text(
-        'Version ${prompt.targetVersion} is available. You are on ${prompt.currentVersion}.',
+        prompt.targetVersion == 'latest'
+            ? 'A new version is available on Google Play. You are on ${prompt.currentVersion}.'
+            : 'Version ${prompt.targetVersion} is available. You are on ${prompt.currentVersion}.',
       ),
       actionsAlignment: MainAxisAlignment.start,
       actions: [
@@ -289,7 +365,7 @@ class _OxOptionalUpdateDialog extends StatelessWidget {
           onPressed: () async {
             await OxUpdateService.skipVersion(
               sharedPreferences: prompt.sharedPreferences,
-              targetVersion: prompt.targetVersion,
+              skipKey: prompt.skipKey,
             );
             if (context.mounted) Navigator.of(context).pop();
           },
