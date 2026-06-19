@@ -44,13 +44,17 @@ class OxplayerAboutSettingsPage extends ConsumerWidget {
             endIndent: 16,
           ),
         ),
-        IconButton.filledTonal(
-          onPressed: () => launchUrl(context, _oxplayerWebsite),
-          icon: const Column(
-            children: [
-              Icon(IconsaxPlusLinear.global),
-              Text(_oxplayerWebsiteLabel),
-            ],
+        SizedBox(
+          width: 100,
+          child: IconButton.filledTonal(
+            onPressed: () => launchUrl(context, _oxplayerWebsite),
+            icon: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(IconsaxPlusLinear.global),
+                Text(_oxplayerWebsiteLabel),
+              ],
+            ),
           ),
         ),
         Row(
