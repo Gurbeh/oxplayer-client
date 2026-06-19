@@ -62,6 +62,9 @@ object VideoPlayerObject {
 
     fun setSubtitleTrackIndex(value: Int, init: Boolean = false) {
         currentSubtitleTrackIndex.value = value
+        implementation.playbackData.value = implementation.playbackData.value?.copy(
+            defaultSubtrack = value.toLong(),
+        )
         if (!init) {
             videoPlayerControls?.swapSubtitleTrack(value.toLong(), callback = {})
         }
@@ -69,6 +72,9 @@ object VideoPlayerObject {
 
     fun setAudioTrackIndex(value: Int, init: Boolean = false) {
         currentAudioTrackIndex.value = value
+        implementation.playbackData.value = implementation.playbackData.value?.copy(
+            defaultAudioTrack = value.toLong(),
+        )
         if (!init) {
             videoPlayerControls?.swapAudioTrack(value.toLong(), callback = {})
         }

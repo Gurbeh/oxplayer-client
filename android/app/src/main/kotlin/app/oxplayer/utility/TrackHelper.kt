@@ -78,15 +78,14 @@ fun ExoPlayer.setInternalAudioTrack(audioTrack: InternalTrack) {
 @OptIn(UnstableApi::class)
 fun ExoPlayer.clearAudioTrack(disable: Boolean = true) {
     val selector = trackSelector as? DefaultTrackSelector ?: return
-    selector.setParameters(
-        selector.buildUponParameters()
-            .setRendererDisabled(C.TRACK_TYPE_AUDIO, disable)
-            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, disable)
-            .build()
-    )
+    val builder = selector.buildUponParameters()
+        .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, disable)
+    if (disable) {
+        builder.clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+    }
+    selector.setParameters(builder.build())
 
-    this.trackSelectionParameters = selector.parameters.buildUpon()
-        .build()
+    this.trackSelectionParameters = selector.parameters
 }
 
 @OptIn(UnstableApi::class)

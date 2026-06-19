@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/providers/settings/video_player_settings_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
@@ -17,13 +18,12 @@ bool oxplayerUsesNativePlayer(WidgetRef ref) {
   return ref.read(videoPlayerSettingsProvider).wantedPlayer == PlayerOptions.nativePlayer;
 }
 
-/// Launch the native player activity before loading media so ExoPlayer exists when [open] runs.
+/// Intentionally disabled: launching the activity before [loadPlaybackItem] causes ExoPlayer
+/// to bind and sit idle while Dart finishes stop()/network work. The user sees a black screen
+/// and presses Back before the URL arrives. The standard flow (openPlayer after loadPlaybackItem)
+/// is correct: pendingOpenUrl is set by open(), then init() picks it up when ExoPlayer binds.
 Future<bool> oxplayerOpenNativePlayerEarly(WidgetRef ref, BuildContext context) async {
-  if (!oxplayerUsesNativePlayer(ref) || !context.mounted) return false;
-  await ref.read(videoPlayerProvider.notifier).openPlayer(context);
-  // Compose + ExoPlayer init on TV can lag behind the activity transition.
-  await Future<void>.delayed(const Duration(milliseconds: 450));
-  return true;
+  return false;
 }
 
 /// After load, detect a stuck 00:00 / no-progress state and report + retry once.
@@ -36,8 +36,12 @@ Timer? oxplayerScheduleNativeStuckPlaybackWatch({
   if (!oxplayerUsesNativePlayer(ref)) return null;
 
   return Timer(const Duration(seconds: 12), () async {
-    final playback = ref.read(mediaPlaybackProvider);
-    final model = ref.read(playBackModel);
+    // Detail screen may be popped; use session ref registered during loadPlaybackItem.
+    final sessionRef = OxplayerStreamRepairBridge.ref;
+    if (sessionRef == null) return;
+
+    final playback = sessionRef.read(mediaPlaybackProvider);
+    final model = sessionRef.read(playBackModel);
     if (model == null || model.item.id != itemId) return;
 
     final stuck = !playback.playing &&
@@ -57,6 +61,6 @@ Timer? oxplayerScheduleNativeStuckPlaybackWatch({
 
     // One silent reload — matches user workaround of closing and reopening.
     final start = playback.position;
-    await ref.read(videoPlayerProvider.notifier).loadPlaybackItem(model, start);
+    await sessionRef.read(videoPlayerProvider.notifier).loadPlaybackItem(model, start);
   });
 }

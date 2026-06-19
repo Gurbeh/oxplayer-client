@@ -84,7 +84,7 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
 
   @override
   Future<int> setAudioTrack(AudioStreamModel? model, PlaybackModel playbackModel) async {
-    return model?.index ?? 0;
+    return model?.index ?? -1;
   }
 
   @override
@@ -92,7 +92,7 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
 
   @override
   Future<int> setSubtitleTrack(SubStreamModel? model, PlaybackModel playbackModel) async {
-    return model?.index ?? 0;
+    return model?.index ?? -1;
   }
 
   @override

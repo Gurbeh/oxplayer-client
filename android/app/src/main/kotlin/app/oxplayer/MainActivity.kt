@@ -106,8 +106,8 @@ class MainActivity : AudioServiceFragmentActivity(), NativeVideoActivity {
     }
 
     override fun disposeActivity() {
-        VideoPlayerObject.implementation.player?.stop()
-        VideoPlayerObject.implementation.player?.release()
+        VideoPlayerObject.implementation.playbackData.value = null
+        VideoPlayerObject.implementation.stop()
         VideoPlayerObject.currentActivity?.finish()
     }
 

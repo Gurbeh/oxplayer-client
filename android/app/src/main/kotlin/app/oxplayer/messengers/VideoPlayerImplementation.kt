@@ -165,8 +165,6 @@ class VideoPlayerImplementation(
                 if (isHls) {
                     mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
                 }
-                // Do not force VIDEO_MP4 for Ox loopback: TDLib files may be Matroska or non-standard MP4;
-                // wrong MIME pins Mp4Extractor and yields EOF. Rely on loopback `Content-Type` + Exo sniffing.
 
                 val mediaItem = mediaItemBuilder.build()
 
@@ -183,8 +181,6 @@ class VideoPlayerImplementation(
                 }
                 loopbackResumeListener = null
 
-                // Telegram TDLib loopback: starting at a large resume time makes ProgressiveMediaPeriod + Mp4Extractor
-                // issue range reads before the container is sniffed from the start → EOFException. Load from 0, then seek.
                 val deferSeekForLoopbackResume = isOxLoopback && !isHls && startPosition > 0L
 
                 if (deferSeekForLoopbackResume) {
@@ -237,7 +233,6 @@ class VideoPlayerImplementation(
         }
     }
 
-
     override fun setLooping(looping: Boolean) {
         player?.repeatMode = if (looping) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
     }
@@ -263,7 +258,15 @@ class VideoPlayerImplementation(
     }
 
     override fun stop() {
+        loopbackResumeListener?.let { old ->
+            try {
+                player?.removeListener(old)
+            } catch (_: Exception) {
+            }
+        }
+        loopbackResumeListener = null
         player?.stop()
+        player?.clearMediaItems()
     }
 
     fun init(exoPlayer: ExoPlayer?) {
@@ -281,12 +284,19 @@ class VideoPlayerImplementation(
             open(deferredUrl, deferredPlay, callback = {})
             return
         }
-        //exoPlayer initializes after the playbackData is set for the first load
         playbackData.value?.let { playData ->
             VideoPlayerObject.setAudioTrackIndex(playData.defaultAudioTrack.toInt(), true)
             VideoPlayerObject.setSubtitleTrackIndex(playData.defaultSubtrack.toInt(), true)
             open(playData.url, true, callback = {})
         }
+    }
+
+    /** Only clears the binding when the releasing instance is still current (activity switch race). */
+    fun releasePlayer(exoPlayer: ExoPlayer): Boolean {
+        if (player !== exoPlayer) return false
+        player = null
+        subsInitialized = false
+        return true
     }
 }
 
@@ -304,7 +314,8 @@ fun ExoPlayer.properlySetSubAndAudioTracks(playableData: PlayableData) {
     }
     val exo = this
     try {
-        val currentSubIndex = playableData.defaultSubtrack
+        // User picks in native UI update current*Index + playbackData; prefer that over stale defaults.
+        val currentSubIndex = VideoPlayerObject.currentSubtitleTrackIndex.value.toLong()
         val internalSubTracks = this.getSubtitleTracks()
         val listPos = playableData.subtitleTracks.indexOfFirst { it.index == currentSubIndex }
         val wantedSubIndex: Int = when {
@@ -312,9 +323,6 @@ fun ExoPlayer.properlySetSubAndAudioTracks(playableData: PlayableData) {
             currentSubIndex > 0 &&
                 internalSubTracks.isNotEmpty() &&
                 listPos < 0 -> {
-                // defaultSubtrack is a Jellyfin/global stream index that no longer matches any
-                // pigeon row (e.g. mux-only rebuild uses 1..n). Old logic used listPos-1 == -2
-                // and cleared subtitles — user saw "selected" in UI but nothing on screen.
                 0
             }
             else -> listPos - 1
@@ -326,9 +334,6 @@ fun ExoPlayer.properlySetSubAndAudioTracks(playableData: PlayableData) {
             // Exo text tracks not mapped yet; a later onTracksChanged will schedule again.
         } else {
             val subTrack = internalSubTracks[wantedSubIndex]
-            // Media3/ASS: first override often does not paint on SubtitleView until the user
-            // turns subtitles off and back on. Clear text renderer, then apply on the next
-            // frame(s) — same effect without requiring manual toggle.
             clearSubtitleTrack()
             Handler(Looper.getMainLooper()).post {
                 try {
@@ -344,7 +349,7 @@ fun ExoPlayer.properlySetSubAndAudioTracks(playableData: PlayableData) {
             }
         }
 
-        val currentAudioIndex = playableData.defaultAudioTrack
+        val currentAudioIndex = VideoPlayerObject.currentAudioTrackIndex.value.toLong()
         val indexOfAudioTrack =
             playableData.audioTracks.indexOfFirst { it.index == currentAudioIndex }
         val internalAudioTracks = this.getAudioTracks()
@@ -358,8 +363,10 @@ fun ExoPlayer.properlySetSubAndAudioTracks(playableData: PlayableData) {
         }
         if (internalAudioTracks.isEmpty()) {
             clearAudioTrack()
+        } else if (currentAudioIndex < 0) {
+            clearAudioTrack(disable = true)
         } else if (wantedAudioIndex < 0) {
-            // Off / no match / first list slot maps to wanted -1: still pick first real track.
+            // Jellyfin stream index not in pigeon list — fall back to first mapped Exo track.
             clearAudioTrack(false)
             setInternalAudioTrack(internalAudioTracks[0])
             serverIndexForInternal(0)

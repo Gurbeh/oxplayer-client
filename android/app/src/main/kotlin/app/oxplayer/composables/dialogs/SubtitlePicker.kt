@@ -82,9 +82,12 @@ fun SubtitlePicker(
         val built = muxedFallbackSubtitleRows(internalSubTracks)
         if (built.isEmpty() || cur.subtitleTracks == built) return@LaunchedEffect
         val prevDef = cur.defaultSubtrack
+        val userPickedOff = VideoPlayerObject.currentSubtitleTrackIndex.value == -1
         // If Jellyfin default stream index does not exist on rebuilt mux rows (-1,1,2,…), keep
-        // "subtitles on" by defaulting to the first real track (index 1), not Off.
+        // "subtitles on" by defaulting to the first real track (index 1), not Off — unless the
+        // user explicitly chose Off.
         val newDef = when {
+            userPickedOff -> -1L
             built.any { it.index == prevDef } -> prevDef
             prevDef > 0 && built.size > 1 -> 1L
             else -> -1L
