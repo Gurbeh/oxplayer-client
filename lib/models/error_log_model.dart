@@ -14,13 +14,25 @@ class ErrorLogModel {
   final String message;
   final DateTime time;
   final StackTrace? stackTrace;
+  final bool sentryReported;
 
   const ErrorLogModel({
     required this.type,
     required this.message,
     required this.time,
     required this.stackTrace,
+    this.sentryReported = false,
   });
+
+  ErrorLogModel copyWith({bool? sentryReported}) {
+    return ErrorLogModel(
+      type: type,
+      message: message,
+      time: time,
+      stackTrace: stackTrace,
+      sentryReported: sentryReported ?? this.sentryReported,
+    );
+  }
 
   factory ErrorLogModel.fromLogRecord(LogRecord record) {
     late ErrorType type;
@@ -37,6 +49,7 @@ class ErrorLogModel {
       message: record.message,
       time: record.time,
       stackTrace: record.stackTrace,
+      sentryReported: false,
     );
   }
 
@@ -77,6 +90,7 @@ class ErrorLogModel {
         'level': type.name,
         'message': message,
         'stackTrace': stackTrace?.toString(),
+        if (sentryReported) 'sentryReported': true,
       };
 
   static ErrorLogModel fromJson(Map<String, dynamic> json) {
@@ -85,6 +99,7 @@ class ErrorLogModel {
       message: json['message'],
       stackTrace: json['stackTrace'] != null ? StackTrace.fromString(json['stackTrace']) : null,
       time: DateTime.parse(json['time']),
+      sentryReported: json['sentryReported'] == true,
     );
   }
 }

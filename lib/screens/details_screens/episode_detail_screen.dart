@@ -91,6 +91,7 @@ class _ItemDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
                                 ref,
                                 startPosition: restart ? Duration.zero : null,
                               );
+                              if (!mounted) return;
                               ref.read(providerInstance.notifier).fetchDetails(widget.item);
                             },
                             onLongPressed: (restart) async {
@@ -100,6 +101,7 @@ class _ItemDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
                                 showPlaybackOption: true,
                                 startPosition: restart ? Duration.zero : null,
                               );
+                              if (!mounted) return;
                               ref.read(providerInstance.notifier).fetchDetails(widget.item);
                             },
                           )
@@ -184,6 +186,7 @@ class _ItemDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
                       contentPadding: padding,
                       onPressed: (chapter) async {
                         await details.episode?.play(detailsContext, ref, startPosition: chapter.startPosition);
+                        if (!mounted) return;
                         ref.read(providerInstance.notifier).fetchDetails(widget.item);
                       },
                     ),

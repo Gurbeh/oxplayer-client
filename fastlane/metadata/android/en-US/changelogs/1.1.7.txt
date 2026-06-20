@@ -1,0 +1,1 @@
+Fix crash after playback on TV detail screens. Upload persisted error logs to Sentry on next launch. Report slow screen navigation to Sentry.

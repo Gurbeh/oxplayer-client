@@ -8,6 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/bootstrap/app_bootstrap.dart';
 import 'package:fladder/oxplayer/oxplayer_bootstrap.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_sentry.dart';
 import 'package:fladder/bootstrap/platform/platform_app_wrapper.dart';
 import 'package:fladder/l10n/generated/app_localizations.dart';
@@ -37,6 +39,8 @@ void main(List<String> args) async {
     await OxplayerBootstrap.afterAppBootstrap(bootstrap);
     if (!kIsWeb) {
       OxplayerSentry.chainErrorHandlers();
+      await bootstrap.crashProvider.ready;
+      await bootstrap.crashProvider.flushUnreportedToSentry();
     }
 
     runApp(
@@ -164,6 +168,9 @@ class _FladderApp extends ConsumerWidget {
             themeMode: themeMode,
             routerConfig: autoRouter.config(
               deepLinkBuilder: (deepLink) => deepLinkBuilder(deepLink.uri),
+              navigatorObservers: () => OxplayerConfig.isEnabled
+                  ? [OxplayerRouteTelemetryObserver()]
+                  : const [],
             ),
           ),
         );

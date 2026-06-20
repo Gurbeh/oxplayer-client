@@ -99,6 +99,7 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                                 showPlaybackOption: true,
                                 startPosition: restart ? Duration.zero : null,
                               );
+                              if (!mounted) return;
                               ref
                                   .read(providerInstance.notifier)
                                   .fetchDetails(widget.item);
@@ -109,6 +110,7 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                                 ref,
                                 startPosition: restart ? Duration.zero : null,
                               );
+                              if (!mounted) return;
                               ref
                                   .read(providerInstance.notifier)
                                   .fetchDetails(widget.item);

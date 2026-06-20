@@ -7,6 +7,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/providers/crash_log_provider.dart';
 import 'package:fladder/src/video_player_helper.g.dart';
 
 abstract final class OxplayerSentry {
@@ -75,6 +76,11 @@ abstract final class OxplayerSentry {
     } catch (_) {
       return false;
     }
+  }
+
+  static Future<void> flushPersistedErrorLogs(CrashLogNotifier crashLog) async {
+    await crashLog.ready;
+    await crashLog.flushUnreportedToSentry();
   }
 
   static Future<void> sendTestMessage({String source = 'error_logs_hold'}) async {

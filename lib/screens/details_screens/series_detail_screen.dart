@@ -93,6 +93,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                                 ref,
                                 startPosition: restart ? Duration.zero : null,
                               );
+                              if (!mounted) return;
                               ref.read(providerId.notifier).fetchDetails(widget.item);
                             },
                             onLongPressed: (restart) async {
@@ -102,6 +103,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                                 showPlaybackOption: true,
                                 startPosition: restart ? Duration.zero : null,
                               );
+                              if (!mounted) return;
                               ref.read(providerId.notifier).fetchDetails(widget.item);
                             },
                           )
@@ -216,6 +218,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                             context,
                             ref,
                           );
+                          if (!mounted) return;
                           ref.read(providerId.notifier).fetchDetails(widget.item);
                         },
                         episodes: details.availableEpisodes ?? [],
