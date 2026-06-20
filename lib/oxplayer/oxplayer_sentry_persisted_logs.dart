@@ -67,7 +67,7 @@ abstract final class OxplayerSentryPersistedLogs {
       stackTrace: log.stackTrace,
       withScope: (scope) {
         scope
-          ..setLevel(level)
+          ..level = level
           ..setTag('source', 'persisted_error_log')
           ..setTag('error_log.type', log.type.name)
           ..setContexts('persisted_error_log', {
