@@ -1,0 +1,1 @@
+Restore debug app icon styling and fix launcher icon padding. Improve About and Settings screens.
