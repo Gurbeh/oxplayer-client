@@ -11,7 +11,7 @@ SRC = ROOT / "logo (2).svg"
 OUT_ICON = ROOT / "icons" / "oxplayer_icon.svg"
 OUT_OUTLINE = ROOT / "icons" / "oxplayer_icon_outline.svg"
 CANVAS = 1024
-PADDING = 200
+PADDING = 256
 SAFE = CANVAS - 2 * PADDING  # 624
 
 
