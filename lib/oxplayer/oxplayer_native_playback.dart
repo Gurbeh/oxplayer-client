@@ -18,6 +18,11 @@ bool oxplayerUsesNativePlayer(WidgetRef ref) {
   return ref.read(videoPlayerSettingsProvider).wantedPlayer == PlayerOptions.nativePlayer;
 }
 
+bool oxplayerUsesNativePlayerRead(Ref ref) {
+  if (kIsWeb || !Platform.isAndroid || !OxplayerConfig.isEnabled) return false;
+  return ref.read(videoPlayerSettingsProvider).wantedPlayer == PlayerOptions.nativePlayer;
+}
+
 /// Intentionally disabled: launching the activity before [loadPlaybackItem] causes ExoPlayer
 /// to bind and sit idle while Dart finishes stop()/network work. The user sees a black screen
 /// and presses Back before the URL arrives. The standard flow (openPlayer after loadPlaybackItem)
@@ -26,7 +31,10 @@ Future<bool> oxplayerOpenNativePlayerEarly(WidgetRef ref, BuildContext context) 
   return false;
 }
 
-/// After load, detect a stuck 00:00 / no-progress state and report + retry once.
+const _stuckCheckDelay = Duration(seconds: 8);
+const _maxStuckRetries = 3;
+
+/// After the player opens, detect 00:00 / no-progress on Android TV and auto-retry with force-repair.
 Timer? oxplayerScheduleNativeStuckPlaybackWatch({
   required WidgetRef ref,
   required String itemId,
@@ -35,8 +43,10 @@ Timer? oxplayerScheduleNativeStuckPlaybackWatch({
 }) {
   if (!oxplayerUsesNativePlayer(ref)) return null;
 
-  return Timer(const Duration(seconds: 12), () async {
-    // Detail screen may be popped; use session ref registered during loadPlaybackItem.
+  var retriesUsed = 0;
+  Timer? timer;
+
+  Future<void> runStuckCheck() async {
     final sessionRef = OxplayerStreamRepairBridge.ref;
     if (sessionRef == null) return;
 
@@ -44,22 +54,32 @@ Timer? oxplayerScheduleNativeStuckPlaybackWatch({
     final model = sessionRef.read(playBackModel);
     if (model == null || model.item.id != itemId) return;
 
-    final stuck = !playback.playing &&
-        playback.position <= const Duration(seconds: 1) &&
-        (playback.duration <= Duration.zero ||
-            (catalogDuration != null && playback.duration <= const Duration(seconds: 1)));
-
+    // Do not gate on duration: catalog runtime is pre-filled and hid stuck playback before.
+    final stuck = !playback.playing && playback.position <= const Duration(seconds: 1);
     if (!stuck) return;
 
-    unawaited(OxplayerPlaybackTelemetry.reportStuckPlayback(
-      itemId: itemId,
-      streamUrl: streamUrl,
-      position: playback.position,
-      catalogDuration: catalogDuration,
-      nativePlayer: true,
-    ));
+    if (retriesUsed == 0) {
+      unawaited(OxplayerPlaybackTelemetry.reportStuckPlayback(
+        itemId: itemId,
+        streamUrl: streamUrl,
+        position: playback.position,
+        catalogDuration: catalogDuration,
+        nativePlayer: true,
+      ));
+    }
 
-    // One silent reload with force-repair when stream is not ready yet.
+    if (retriesUsed >= _maxStuckRetries) {
+      unawaited(OxplayerPlaybackTelemetry.reportFailure(
+        stage: 'player_stuck',
+        reason: 'zero_progress_exhausted_retries',
+        itemId: itemId,
+        streamUrl: streamUrl,
+        extra: {'retries': retriesUsed},
+      ));
+      return;
+    }
+
+    retriesUsed++;
     final start = playback.position;
     final refreshed = await oxplayerRefreshPlaybackWithForceRepair(
       sessionRef.read,
@@ -68,5 +88,10 @@ Timer? oxplayerScheduleNativeStuckPlaybackWatch({
     );
     final retryModel = refreshed ?? model;
     await sessionRef.read(videoPlayerProvider.notifier).loadPlaybackItem(retryModel, start);
-  });
+    timer?.cancel();
+    timer = Timer(_stuckCheckDelay, () => unawaited(runStuckCheck()));
+  }
+
+  timer = Timer(_stuckCheckDelay, () => unawaited(runStuckCheck()));
+  return timer;
 }

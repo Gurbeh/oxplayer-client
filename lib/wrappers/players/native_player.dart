@@ -38,6 +38,13 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
 
   @override
   Future<void> loadVideo(String url, bool play, {Duration startPosition = Duration.zero}) async {
+    // Before VideoPlayerActivity launches, ExoPlayer is null — native open() queues
+    // pendingOpenUrl and returns false. Retrying here only wastes time and spams Sentry.
+    if (!nativeActivityStarted) {
+      await player.open(url, play);
+      return;
+    }
+
     final maxAttempts = OxplayerConfig.isEnabled ? 6 : 4;
     final retryDelay = OxplayerConfig.isEnabled
         ? const Duration(milliseconds: 500)

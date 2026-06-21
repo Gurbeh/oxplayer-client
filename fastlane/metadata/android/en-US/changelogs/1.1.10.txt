@@ -1,0 +1,1 @@
+Fix TV playback stuck at 00:00 after preparing screen closes. Auto-retry up to 3 times when ExoPlayer never starts; stop false open retries before the player activity launches.

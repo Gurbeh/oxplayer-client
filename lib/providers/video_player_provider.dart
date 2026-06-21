@@ -12,6 +12,7 @@ import 'package:fladder/models/media_playback_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/playback_queue_state.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_native_playback.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
@@ -162,6 +163,7 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
       await state.setSubtitleTrack(null, model);
 
       final runtime = model.item.overview.runTime;
+      final deferCatalogDuration = OxplayerEnv.isEnabled && oxplayerUsesNativePlayerRead(ref);
       ref.read(mediaPlaybackProvider.notifier).update((playback) {
         var next = playback.copyWith(
           state: useMinimizedPlayer ? VideoPlayerState.minimized : VideoPlayerState.fullScreen,
@@ -173,8 +175,10 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
           next = next.copyWith(
             position: effectiveStartPosition,
             lastPosition: effectiveStartPosition,
-            duration: (runtime != null && runtime > Duration.zero) ? runtime : next.duration,
           );
+          if (!deferCatalogDuration && runtime != null && runtime > Duration.zero) {
+            next = next.copyWith(duration: runtime);
+          }
         }
         return next;
       });
@@ -184,12 +188,17 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
       if (_isOxStreamRemuxUrl(media.url) || (OxplayerEnv.isEnabled && oxplayerIsOxStreamUrl(media.url))) {
         OxplayerStreamRepairBridge.register(ref, newPlaybackModel);
         final runtime = model.item.overview.runTime;
-        mediaState.update((state) => state.copyWith(
-              position: effectiveStartPosition,
-              lastPosition: effectiveStartPosition,
-              duration: runtime ?? state.duration,
-              buffering: false,
-            ));
+        mediaState.update((state) {
+          var next = state.copyWith(
+            position: effectiveStartPosition,
+            lastPosition: effectiveStartPosition,
+            buffering: false,
+          );
+          if (!deferCatalogDuration && runtime != null) {
+            next = next.copyWith(duration: runtime);
+          }
+          return next;
+        });
       }
 
       return true;
