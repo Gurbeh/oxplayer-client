@@ -59,8 +59,14 @@ Timer? oxplayerScheduleNativeStuckPlaybackWatch({
       nativePlayer: true,
     ));
 
-    // One silent reload — matches user workaround of closing and reopening.
+    // One silent reload with force-repair when stream is not ready yet.
     final start = playback.position;
-    await sessionRef.read(videoPlayerProvider.notifier).loadPlaybackItem(model, start);
+    final refreshed = await oxplayerRefreshPlaybackWithForceRepair(
+      sessionRef.read,
+      model,
+      startPosition: start,
+    );
+    final retryModel = refreshed ?? model;
+    await sessionRef.read(videoPlayerProvider.notifier).loadPlaybackItem(retryModel, start);
   });
 }

@@ -884,7 +884,9 @@ class _LoadIndicatorCancelable extends StatelessWidget {
                       spacing: 8,
                       children: [
                         Text(
-                          context.localized.loading,
+                          OxplayerEnv.isEnabled
+                              ? context.localized.oxplayerPreparingPlayback
+                              : context.localized.loading,
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         if (item != null) ...[

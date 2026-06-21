@@ -13,6 +13,8 @@ import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
 import 'package:fladder/oxplayer/ox_item_recommendations.dart';
 import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
 import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/related_provider.dart';
@@ -32,7 +34,8 @@ class MovieDetails extends _$MovieDetails {
   MovieModel? build(String arg) => null;
 
   Future<Response?> fetchDetails(ItemBaseModel item) async {
-    try {
+    Future<Response?> load() async {
+      try {
       if (item is MovieModel) {
         state = state ?? item;
       }
@@ -127,6 +130,16 @@ class MovieDetails extends _$MovieDetails {
     } catch (e) {
       return null;
     }
+    }
+
+    if (OxplayerConfig.isEnabled) {
+      return OxplayerScreenTelemetry.trackLoad(
+        screen: 'movie_detail',
+        phase: 'fetch',
+        load: load,
+      );
+    }
+    return load();
   }
 
   void setMediaStreamHelper(MediaStreamsModel changed) {

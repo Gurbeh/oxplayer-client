@@ -53,7 +53,31 @@ void main() {
       expect(result.body?.playSessionId, 'ready');
     });
 
-    test('returns 503 without further polling', () async {
+    test('retries on 503 with Retry-After then returns 200', () async {
+      var calls = 0;
+      final result = await oxplayerPollPlaybackInfoUntilReady(() async {
+        calls++;
+        if (calls < 2) {
+          return Response<PlaybackInfoResponse>(
+            http.Response(
+              '{"Message":"Stream index is being prepared; retry shortly"}',
+              503,
+              headers: {'retry-after': '1'},
+            ),
+            null,
+          );
+        }
+        return Response<PlaybackInfoResponse>(
+          http.Response('{}', 200),
+          const PlaybackInfoResponse(playSessionId: 'ready'),
+        );
+      });
+
+      expect(calls, 2);
+      expect(result.statusCode, 200);
+    });
+
+    test('returns bare 503 without retry signals immediately', () async {
       var calls = 0;
       final result = await oxplayerPollPlaybackInfoUntilReady(() async {
         calls++;

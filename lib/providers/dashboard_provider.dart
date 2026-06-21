@@ -4,6 +4,8 @@ import 'package:fladder/jellyfin/jellyfin_open_api.enums.swagger.dart';
 import 'package:fladder/models/home_model.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/channel_model.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/live_tv_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
@@ -23,8 +25,9 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
   late final JellyService api = ref.read(jellyApiProvider);
 
   Future<void> fetchNextUpAndResume() async {
-    if (state.loading) return;
-    state = state.copyWith(loading: true);
+    Future<void> load() async {
+      if (state.loading) return;
+      state = state.copyWith(loading: true);
     final viewTypes =
         ref.read(viewsProvider.select((value) => value.dashboardViews)).map((e) => e.collectionType).toSet().toList();
     final limit = 16;
@@ -127,6 +130,13 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
         [];
 
     state = state.copyWith(nextUp: next, loading: false);
+    }
+
+    if (OxplayerConfig.isEnabled) {
+      await OxplayerScreenTelemetry.trackLoad(screen: 'home', phase: 'dashboard', load: load);
+      return;
+    }
+    await load();
   }
 
   void clear() {

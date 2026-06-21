@@ -13,12 +13,13 @@ const Duration oxplayerPlaybackHydrateMaxPollDuration = Duration(minutes: 15);
 
 const int _httpOk = 200;
 const int _httpAccepted = 202;
+const int _httpServiceUnavailable = 503;
 
 typedef PlaybackInfoRequestFn = Future<Response<PlaybackInfoResponse>> Function();
 
-/// Polls [request] while the API returns HTTP 202 (media hydrate in progress).
+/// Polls [request] while the API returns HTTP 202 or retryable 503 (stream preparing).
 ///
-/// Returns the first HTTP 200 response, or the first non-202 error response (4xx/5xx).
+/// Returns the first HTTP 200 response, or the first non-retryable error response.
 /// Uses [Future.delayed] between attempts so the UI thread is never blocked.
 Future<Response<PlaybackInfoResponse>> oxplayerPollPlaybackInfoUntilReady(
   PlaybackInfoRequestFn request,
@@ -33,7 +34,7 @@ Future<Response<PlaybackInfoResponse>> oxplayerPollPlaybackInfoUntilReady(
       return response;
     }
 
-    if (status == _httpAccepted) {
+    if (_isPreparingStatus(status, response)) {
       if (DateTime.now().isAfter(deadline)) {
         final ex = OxplayerPlaybackHydrateTimeoutException(
           lastRetryAfterSec: oxplayerPlaybackHydrateRetryAfterSeconds(response),
@@ -67,6 +68,24 @@ Future<Response<PlaybackInfoResponse>> oxplayerPollPlaybackInfoUntilReady(
 
     return response;
   }
+}
+
+bool _isPreparingStatus(int status, Response<PlaybackInfoResponse> response) {
+  if (status == _httpAccepted) return true;
+  if (status != _httpServiceUnavailable) return false;
+
+  final retryAfter = response.base.headers['retry-after'];
+  if (retryAfter != null && retryAfter.trim().isNotEmpty) {
+    return true;
+  }
+
+  final rawBody = response.bodyString.trim().toLowerCase();
+  if (rawBody.isEmpty) return false;
+
+  return rawBody.contains('prepar') ||
+      rawBody.contains('probe') ||
+      rawBody.contains('index') ||
+      rawBody.contains('retry');
 }
 
 /// Parses retry delay from `Retry-After` header, then JSON `retry_after`, else [oxplayerPlaybackHydrateRetryAfterDefaultSec].

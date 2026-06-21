@@ -6,6 +6,8 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/series_model.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/sync_provider.dart';
@@ -50,7 +52,8 @@ class EpisodeDetailsProvider extends StateNotifier<EpisodeDetailModel> {
   late final JellyService api = ref.read(jellyApiProvider);
 
   Future<Response?> fetchDetails(ItemBaseModel item) async {
-    try {
+    Future<Response?> load() async {
+      try {
       final seriesResponse = await api.usersUserIdItemsItemIdGet(itemId: item.parentBaseModel.id);
       if (seriesResponse.body == null) return null;
       final episodes = await api.showsSeriesIdEpisodesGet(seriesId: item.parentBaseModel.id);
@@ -70,6 +73,16 @@ class EpisodeDetailsProvider extends StateNotifier<EpisodeDetailModel> {
       _tryToCreateOfflineState(item);
       return null;
     }
+    }
+
+    if (OxplayerConfig.isEnabled) {
+      return OxplayerScreenTelemetry.trackLoad(
+        screen: 'episode_detail',
+        phase: 'fetch',
+        load: load,
+      );
+    }
+    return load();
   }
 
   Future<void> _tryToCreateOfflineState(ItemBaseModel item) async {

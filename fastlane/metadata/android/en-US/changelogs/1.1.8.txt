@@ -1,0 +1,1 @@
+Fix playback stuck at 00:00 for newly synced movies. Show preparing-playback loading while the stream indexes. Sentry HTTP performance tracing and screen load telemetry.

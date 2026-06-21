@@ -11,6 +11,8 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/recommended_model.dart';
 import 'package:fladder/models/view_model.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/views_provider.dart';
@@ -65,15 +67,23 @@ class LibraryScreen extends _$LibraryScreen {
   LibraryScreenModel build() => LibraryScreenModel();
 
   Future<void> fetchAllLibraries() async {
-    final views = await ref.read(viewsProvider.notifier).fetchViews();
-    state = state.copyWith(
-      views: views?.views.toList() ?? [],
-    );
-    if (state.views.isEmpty) return;
-    final viewModel = state.selectedViewModel ?? state.views.firstOrNull;
-    if (viewModel == null) return;
-    selectLibrary(viewModel);
-    await loadLibrary(viewModel);
+    Future<void> load() async {
+      final views = await ref.read(viewsProvider.notifier).fetchViews();
+      state = state.copyWith(
+        views: views?.views.toList() ?? [],
+      );
+      if (state.views.isEmpty) return;
+      final viewModel = state.selectedViewModel ?? state.views.firstOrNull;
+      if (viewModel == null) return;
+      selectLibrary(viewModel);
+      await loadLibrary(viewModel);
+    }
+
+    if (OxplayerConfig.isEnabled) {
+      await OxplayerScreenTelemetry.trackLoad(screen: 'library', phase: 'fetch', load: load);
+      return;
+    }
+    await load();
   }
 
   Future<void> selectLibrary(ViewModel viewModel) async {

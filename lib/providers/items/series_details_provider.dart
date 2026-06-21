@@ -15,6 +15,8 @@ import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
 import 'package:fladder/oxplayer/ox_item_recommendations.dart';
 import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
 import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/related_provider.dart';
@@ -37,7 +39,8 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
   late final JellyService api = ref.read(jellyApiProvider);
 
   Future<Response?> fetchDetails(ItemBaseModel seriesModel) async {
-    try {
+    Future<Response?> load() async {
+      try {
       if (seriesModel is SeriesModel) {
         state = state ?? seriesModel;
       }
@@ -185,6 +188,16 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
       log("Error fetching series details: $e");
       return null;
     }
+    }
+
+    if (OxplayerConfig.isEnabled) {
+      return OxplayerScreenTelemetry.trackLoad(
+        screen: 'series_detail',
+        phase: 'fetch',
+        load: load,
+      );
+    }
+    return load();
   }
 
   void updateEpisodeInfo(EpisodeModel episode) {

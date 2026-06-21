@@ -34,6 +34,7 @@ abstract final class OxplayerSentry {
         options.environment = OxplayerEnv.sentryEnvironment ?? (kReleaseMode ? 'production' : 'development');
         options.attachStacktrace = true;
         options.sendDefaultPii = false;
+        options.tracesSampleRate = kReleaseMode ? 0.2 : 1.0;
         // TCL / armeabi-v7a TVs crash in Sentry's native FileObserver thread (OXPLAYER-CLIENT-4/5).
         // Keep Dart error reporting; disable native NDK handler on leanback devices.
         if (leanBackTv) {
