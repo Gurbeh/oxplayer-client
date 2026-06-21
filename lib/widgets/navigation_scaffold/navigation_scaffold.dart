@@ -16,6 +16,7 @@ import 'package:fladder/screens/shared/animated_fade_size.dart';
 import 'package:fladder/screens/shared/nested_bottom_appbar.dart';
 import 'package:fladder/screens/video_player/audio_player_full_screen.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
+import 'package:fladder/oxplayer/oxplayer_double_back_exit.dart';
 import 'package:fladder/widgets/navigation_scaffold/components/destination_model.dart';
 import 'package:fladder/widgets/navigation_scaffold/components/fladder_app_bar.dart';
 import 'package:fladder/widgets/navigation_scaffold/components/floating_player_bar.dart';
@@ -175,14 +176,19 @@ class _NavigationScaffoldState extends ConsumerState<NavigationScaffold> {
           )
         : const SizedBox.shrink();
 
+    final onRootTab = currentIndex == 0;
+
     return PopScope(
-      canPop: !showAudioOverlay && currentIndex == 0,
+      canPop: !showAudioOverlay && onRootTab && !OxplayerDoubleBackExit.blocksRootPop(),
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         if (showAudioOverlay) {
           return;
         }
-        if (currentIndex != 0) {
+        if (onRootTab && OxplayerDoubleBackExit.handleRootBack(context)) {
+          return;
+        }
+        if (!onRootTab) {
           widget.destinations.first.action!();
         }
       },

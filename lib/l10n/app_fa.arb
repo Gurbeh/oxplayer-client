@@ -1969,6 +1969,7 @@
     "segmentActionSkip": "پرش",
     "loading": "بارگیری",
     "oxplayerPreparingPlayback": "در حال آماده‌سازی پخش…",
+    "oxplayerPressBackAgainToExit": "برای خروج دوباره بک بزنید",
     "maxConcurrentDownloadsDesc": "حداکثر تعداد دانلودهایی که می توانند در همان زمان اجرا شوند را تنظیم کنید. 0 را برای غیرفعال کردن محدودیت تنظیم کنید.",
     "playbackTrackSelection": "انتخاب مسیر Playback",
     "rememberSubtitleSelections": "مسیر Subtitle را بر اساس آیتم قبلی تنظیم کنید",

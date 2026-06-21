@@ -2757,6 +2757,8 @@
   "@oxplayerHelpNavLabel": {},
   "oxplayerPreparingPlayback": "Preparing playback…",
   "@oxplayerPreparingPlayback": {},
+  "oxplayerPressBackAgainToExit": "Press back again to exit",
+  "@oxplayerPressBackAgainToExit": {},
   "oxplayerLoginOpenOnAndroid": "Open bot in Telegram",
   "@oxplayerLoginOpenOnAndroid": {},
   "oxplayerDeleteAccountSection": "Account",

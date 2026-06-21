@@ -5,16 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/api_result.dart';
 import 'package:fladder/models/item_base_model.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_remove_from_library_dialog.dart';
 import 'package:fladder/providers/api_provider.dart';
+import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/widgets/shared/filled_button_await.dart';
 
 Future<ApiResult<dynamic>?> showDeleteDialog(BuildContext context, ItemBaseModel item, WidgetRef ref) async {
-  if (OxplayerConfig.isEnabled) {
-    return oxplayerShowRemoveFromLibraryDialog(context, item, ref);
-  }
   Response<dynamic>? response;
   await showDialog(
     context: context,
@@ -26,7 +22,11 @@ Future<ApiResult<dynamic>?> showDeleteDialog(BuildContext context, ItemBaseModel
       ),
       scrollable: true,
       actions: [
-        ElevatedButton(onPressed: () => Navigator.of(context).pop(), child: Text(context.localized.cancel)),
+        ElevatedButton(
+          autofocus: AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad,
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(context.localized.cancel),
+        ),
         FilledButtonAwait(
           style: FilledButton.styleFrom(
             backgroundColor: Theme.of(context).colorScheme.errorContainer,
@@ -35,12 +35,12 @@ Future<ApiResult<dynamic>?> showDeleteDialog(BuildContext context, ItemBaseModel
           ),
           onPressed: () async {
             response = await ref.read(jellyApiProvider).deleteItem(item.id);
-            Navigator.of(context).pop();
+            if (context.mounted) Navigator.of(context).pop();
           },
           child: Text(
             context.localized.delete,
           ),
-        )
+        ),
       ],
     ),
   );
