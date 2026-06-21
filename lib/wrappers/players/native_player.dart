@@ -10,6 +10,7 @@ import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/transcode_playback_model.dart';
 import 'package:fladder/models/playback/tv_playback_model.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/src/video_player_helper.g.dart';
 import 'package:fladder/wrappers/players/base_player.dart';
@@ -37,8 +38,10 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
 
   @override
   Future<void> loadVideo(String url, bool play, {Duration startPosition = Duration.zero}) async {
-    const maxAttempts = 4;
-    const retryDelay = Duration(milliseconds: 350);
+    final maxAttempts = OxplayerConfig.isEnabled ? 6 : 4;
+    final retryDelay = OxplayerConfig.isEnabled
+        ? const Duration(milliseconds: 500)
+        : const Duration(milliseconds: 350);
 
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       final ok = await player.open(url, play);

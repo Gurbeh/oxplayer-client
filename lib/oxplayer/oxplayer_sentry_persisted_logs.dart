@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'package:fladder/models/error_log_model.dart';
+import 'package:fladder/oxplayer/oxplayer_sentry_filters.dart';
 
 /// Uploads errors persisted in [crash_logs.json] that were not sent before a crash/kill.
 abstract final class OxplayerSentryPersistedLogs {
@@ -52,6 +53,7 @@ abstract final class OxplayerSentryPersistedLogs {
   }
 
   static bool _shouldReportToSentry(ErrorLogModel log) {
+    if (!OxplayerSentryFilters.shouldReportPersistedLog(log.message)) return false;
     return log.type == ErrorType.severe || log.type == ErrorType.shout;
   }
 

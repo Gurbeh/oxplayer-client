@@ -272,7 +272,10 @@ class _CustomKeyboardViewState extends State<_CustomKeyboardView> {
                 keyboardActionType: widget.keyboardActionType ?? TextInputAction.done,
                 onBackspace: () {
                   setState(() {
-                    widget.controller.text = widget.controller.text.substring(0, widget.controller.text.length - 1);
+                    final text = widget.controller.text;
+                    if (text.isNotEmpty) {
+                      widget.controller.text = text.substring(0, text.length - 1);
+                    }
                     widget.onChanged();
                   });
                   startUpdate(widget.controller.text);

@@ -135,7 +135,7 @@ abstract final class OxplayerPlaybackTelemetry {
       reason: 'exo_not_ready',
       itemId: itemId,
       streamUrl: url,
-      transient: attempt < 3,
+      transient: attempt < 4,
       extra: {'attempt': attempt},
     );
   }

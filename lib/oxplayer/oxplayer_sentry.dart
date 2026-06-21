@@ -7,6 +7,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_sentry_filters.dart';
 import 'package:fladder/providers/crash_log_provider.dart';
 import 'package:fladder/src/video_player_helper.g.dart';
 
@@ -41,6 +42,7 @@ abstract final class OxplayerSentry {
           options.enableNativeCrashHandling = false;
           options.enableNdkScopeSync = false;
         }
+        options.beforeSend = OxplayerSentryFilters.beforeSend;
       },
       appRunner: appRunner,
     );
