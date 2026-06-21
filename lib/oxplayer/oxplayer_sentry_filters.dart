@@ -33,6 +33,9 @@ abstract final class OxplayerSentryFilters {
     if (lower.contains('item not in your library')) {
       return true;
     }
+    if (lower.contains('404 not found')) {
+      return true;
+    }
     if (lower.contains('null check operator used on a null value')) {
       return true;
     }
