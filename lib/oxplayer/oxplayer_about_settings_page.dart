@@ -6,7 +6,6 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:fladder/oxplayer/oxplayer_about_error_logs_button.dart';
 import 'package:fladder/screens/crash_screen/crash_screen.dart';
 import 'package:fladder/screens/settings/settings_scaffold.dart';
-import 'package:fladder/screens/settings/widgets/settings_update_information.dart';
 import 'package:fladder/screens/shared/fladder_icon.dart';
 import 'package:fladder/screens/shared/fladder_logo.dart';
 import 'package:fladder/screens/shared/media/external_urls.dart';
@@ -44,18 +43,27 @@ class OxplayerAboutSettingsPage extends ConsumerWidget {
             endIndent: 16,
           ),
         ),
-        SizedBox(
-          width: 100,
-          child: IconButton.filledTonal(
-            onPressed: () => launchUrl(context, _oxplayerWebsite),
-            icon: const Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(IconsaxPlusLinear.global),
-                Text(_oxplayerWebsiteLabel),
-              ],
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            IconButton.filledTonal(
+              style: IconButton.styleFrom(
+                padding: const EdgeInsets.all(12),
+                minimumSize: const Size(64, 64),
+              ),
+              onPressed: () => launchUrl(context, _oxplayerWebsite),
+              icon: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(IconsaxPlusLinear.global),
+                  Text(
+                    _oxplayerWebsiteLabel,
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -84,7 +92,6 @@ class OxplayerAboutSettingsPage extends ConsumerWidget {
             ),
           ],
         ),
-        const SettingsUpdateInformation(),
       ].addInBetween(const SizedBox(height: 16)),
     );
   }

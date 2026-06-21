@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/providers/update_provider.dart';
@@ -17,6 +18,7 @@ import 'package:fladder/screens/settings/settings_scaffold.dart';
 import 'package:fladder/screens/shared/default_alert_dialog.dart';
 import 'package:fladder/screens/shared/fladder_icon.dart';
 import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
+import 'package:fladder/util/application_info.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/theme_extensions.dart';
@@ -115,6 +117,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final newRelease = ref.watch(updateProvider.select((value) => value.latestRelease));
 
     final hasNewUpdate = ref.watch(hasNewUpdateProvider);
+    final showReleaseBanner = !OxplayerConfig.isEnabled && hasNewUpdate && newRelease != null;
+    final applicationInfo = ref.watch(applicationInfoProvider);
 
     final isAdmin = ref.watch(userProvider.select((value) => value?.policy?.isAdministrator ?? false));
 
@@ -128,7 +132,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           showBackButtonNested: AdaptiveLayout.inputDeviceOf(context) != InputDevice.dPad,
           showUserIcon: true,
           items: [
-            if (hasNewUpdate && newRelease != null) ...[
+            if (showReleaseBanner) ...[
               Card(
                 color: context.colors.secondaryContainer,
                 child: SettingsListTile(
@@ -172,7 +176,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             SettingsListTile(
               label: Text(context.localized.about),
-              subLabel: Text("OXPlayer, ${context.localized.latestReleases}"),
+              subLabel: Text(
+                OxplayerConfig.isEnabled
+                    ? 'OXPlayer v${applicationInfo.version}'
+                    : context.localized.aboutCreatedBy,
+              ),
               selected: containsRoute(const AboutSettingsRoute()),
               leading: Opacity(
                 opacity: 1,
