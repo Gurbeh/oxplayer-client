@@ -1,17 +1,17 @@
+import 'package:fladder/models/item_base_model.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/providers/library_search_provider.dart';
+import 'package:fladder/screens/shared/outlined_text_field.dart';
+import 'package:fladder/theme.dart';
+import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
+import 'package:fladder/util/debouncer.dart';
+import 'package:fladder/util/fladder_image.dart';
+import 'package:fladder/util/localization_helper.dart';
 import 'package:flutter/material.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:page_transition/page_transition.dart';
-
-import 'package:fladder/models/item_base_model.dart';
-import 'package:fladder/providers/library_search_provider.dart';
-import 'package:fladder/screens/shared/outlined_text_field.dart';
-import 'package:fladder/theme.dart';
-import 'package:fladder/util/debouncer.dart';
-import 'package:fladder/util/fladder_image.dart';
-import 'package:fladder/util/localization_helper.dart';
 
 class SuggestionSearchBar extends ConsumerStatefulWidget {
   final String? title;
@@ -45,6 +45,28 @@ class _SearchBarState extends ConsumerState<SuggestionSearchBar> {
   late final TextEditingController textEditingController = widget.textEditingController ?? TextEditingController();
   bool isEmpty = true;
   final FocusNode focusNode = FocusNode();
+
+  /// On TV (dPad), keep the suggestion list short so the on-screen keyboard stays visible.
+  int _dropdownSuggestionLimit(BuildContext context) {
+    if (OxplayerConfig.isEnabled && AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad) {
+      return 3;
+    }
+    return 25;
+  }
+
+  int _inlineSuggestionLimit(BuildContext context) {
+    if (OxplayerConfig.isEnabled && AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad) {
+      return 3;
+    }
+    return 5;
+  }
+
+  Future<List<ItemBaseModel>> _fetchSuggestions(String pattern, {required int limit}) async {
+    if (pattern.isEmpty || widget.key == null) return [];
+    final items =
+        await ref.read(librarySearchProvider(widget.key!).notifier).fetchSuggestions(pattern, limit: limit);
+    return items.take(limit).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -94,12 +116,8 @@ class _SearchBarState extends ConsumerState<SuggestionSearchBar> {
           },
           searchQuery: (query) async {
             if (query.isEmpty) return [];
-            if (widget.key != null) {
-              final items =
-                  await ref.read(librarySearchProvider(widget.key!).notifier).fetchSuggestions(query, limit: 5);
-              return items.map((e) => e.name).toList();
-            }
-            return [];
+            final items = await _fetchSuggestions(query, limit: _inlineSuggestionLimit(context));
+            return items.map((e) => e.name).toList();
           },
           placeHolder: widget.title ?? "${context.localized.search}...",
           decoration: InputDecoration(
@@ -182,13 +200,7 @@ class _SearchBarState extends ConsumerState<SuggestionSearchBar> {
             ),
           );
         },
-        suggestionsCallback: (pattern) async {
-          if (pattern.isEmpty) return [];
-          if (widget.key != null) {
-            return (await ref.read(librarySearchProvider(widget.key!).notifier).fetchSuggestions(pattern));
-          }
-          return [];
-        },
+        suggestionsCallback: (pattern) => _fetchSuggestions(pattern, limit: _dropdownSuggestionLimit(context)),
       ),
     );
   }
