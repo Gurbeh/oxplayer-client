@@ -6,20 +6,18 @@ abstract final class OxplayerSentryFilters {
     final message = _eventText(event);
     if (message != null && _shouldDrop(message)) return null;
     if (_isBenignAnr(event)) return null;
+    if (_isFlutterLiveTextLifecycleCrash(event)) return null;
 
     final tags = event.tags ?? {};
     if (tags['transient'] == 'true') return null;
     if (tags['perf'] == 'slow_screen' || tags['perf'] == 'slow_splash') return null;
 
-    final stack = event.exceptions?.map((e) => e.stackTrace?.frames ?? []).expand((f) => f);
-    if (stack != null) {
-      for (final frame in stack) {
-        final symbol = frame.symbol ?? '';
-        if (symbol.contains('LiveText.isLiveTextInputAvailable') ||
-            symbol.contains('LiveTextInputStatusNotifier')) {
-          return null;
-        }
-      }
+    if (_stackContainsAny(event, const [
+      'LiveText.isLiveTextInputAvailable',
+      'LiveTextInputStatusNotifier',
+      '_handleLifecycleMessage',
+    ])) {
+      return null;
     }
 
     return event;
@@ -58,14 +56,14 @@ abstract final class OxplayerSentryFilters {
     return false;
   }
 
-  /// Drops ANRs from Google Play license verification on sideloaded/emulator builds.
+  /// Drops ANRs from Google Play license verification on sideloaded/emulator builds,
+  /// and background Flutter surface teardown stalls (engine/native, not app logic).
   static bool _isBenignAnr(SentryEvent event) {
     final parts = <String>[
       _eventText(event) ?? '',
       event.message?.formatted ?? '',
       for (final ex in event.exceptions ?? const []) ex.value ?? '',
-      for (final ex in event.exceptions ?? const [])
-        for (final frame in ex.stackTrace?.frames ?? const []) frame.symbol ?? '',
+      for (final ex in event.exceptions ?? const []) ..._framesText(ex.stackTrace?.frames ?? const []),
     ];
     final text = parts.join(' ').toLowerCase();
     if (!text.contains('applicationnotresponding') && !text.contains(' anr')) {
@@ -76,6 +74,14 @@ abstract final class OxplayerSentryFilters {
         text.contains('licenseactivity') ||
         text.contains('licensecheck')) {
       return true;
+    }
+
+    if (text.contains('nativesurfacedestroyed') ||
+        text.contains('surfacedestroyed') && text.contains('flutterrenderer')) {
+      final inForeground = event.contexts.app?.inForeground;
+      if (inForeground == false) {
+        return true;
+      }
     }
 
     final viewNames = event.contexts.app?.viewNames ?? const <String>[];
@@ -93,6 +99,52 @@ abstract final class OxplayerSentryFilters {
     }
 
     return false;
+  }
+
+  /// Flutter framework bug: LiveText platform channel invoked while handling lifecycle.
+  static bool _isFlutterLiveTextLifecycleCrash(SentryEvent event) {
+    final parts = <String>[
+      _eventText(event) ?? '',
+      for (final ex in event.exceptions ?? const []) ex.value ?? '',
+      for (final ex in event.exceptions ?? const []) ..._framesText(ex.stackTrace?.frames ?? const []),
+    ];
+    final text = parts.join(' ').toLowerCase();
+    if (!text.contains('sigabrt') && !text.contains('abort')) {
+      return false;
+    }
+    return text.contains('livetext') ||
+        text.contains('_handlelifecyclemessage') ||
+        (text.contains('channelcallbackrecord') && text.contains('dispatchplatformmessage'));
+  }
+
+  static bool _stackContainsAny(SentryEvent event, List<String> needles) {
+    for (final ex in event.exceptions ?? const []) {
+      for (final frame in ex.stackTrace?.frames ?? const []) {
+        final hay = _frameText(frame).toLowerCase();
+        for (final needle in needles) {
+          if (hay.contains(needle.toLowerCase())) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  static Iterable<String> _framesText(Iterable<SentryStackFrame> frames) sync* {
+    for (final frame in frames) {
+      yield _frameText(frame);
+    }
+  }
+
+  static String _frameText(SentryStackFrame frame) {
+    return [
+      frame.symbol,
+      frame.function,
+      frame.package,
+      frame.absPath,
+      frame.fileName,
+    ].whereType<String>().join(' ');
   }
 
   static String? _eventText(SentryEvent event) {
