@@ -48,10 +48,10 @@ class JellyApi extends _$JellyApi {
         JellyfinOpenApi.create(
           interceptors: [
             JellyRequest(ref),
-            OxplayerSessionInterceptor(ref),
             if (OxplayerEnv.isEnabled) OxplayerHttpPerformanceInterceptor(),
             if (OxplayerEnv.isEnabled) OxplayerPlaybackHttpInterceptor(ref),
             if (OxplayerEnv.isEnabled) OxplayerForceRepairInterceptor(ref),
+            OxplayerSessionInterceptor(ref),
             JellyResponse(ref),
             HttpLoggingInterceptor(level: Level.basic),
           ],
