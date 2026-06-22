@@ -1,0 +1,1 @@
+Fix Android update detection: show prompt when Google Play or the server reports a newer version.

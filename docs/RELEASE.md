@@ -149,6 +149,24 @@ gh release edit vM.m.p --repo Gurbeh/oxplayer-client --draft=false
 - **`Version code … has already been used`** — expected when nightly already uploaded the same `M.m.p`. Android `versionCode` is fixed per semver (`major*100000 + minor*1000 + patch`). No action needed; promote the existing internal build in Play Console. CI treats this as non-fatal (`continue-on-error`).
 - To ship a **new** Play build, bump `M.m.p` in `pubspec.yaml` first (e.g. `1.0.1` → `1.0.2` → versionCode `100002`).
 
+### 6. Android in-app update prompt (server)
+
+After Play production has the new build, bump **`OXPLAYER_ANDROID_MARKET_VERSION`** in Infisical (`api` path) to the same `M.m.p` as `pubspec.yaml`, then restart API so `GET /ox/client/android-update` returns the new version. Apps on older builds use this as a fallback when Google Play’s in-app update API is slow or unavailable.
+
+```bash
+# Production (Hetzner) — reload Infisical secrets + restart api only
+cd /srv/oxplayer-be
+source deploy/core/.env.machine-identity
+deploy/core/entrypoint-infisical.sh docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.hetzner-core.yml \
+  -f docker-compose.infisical.yml \
+  up -d --no-deps --wait api
+
+curl -s https://api.oxplayer.app/ox/client/android-update
+# expect {"version":"M.m.p"}
+```
+
 ---
 
 ## Quick reference

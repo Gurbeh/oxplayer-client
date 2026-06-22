@@ -108,43 +108,70 @@ abstract final class OxUpdateService {
     if (kIsWeb || !Platform.isAndroid) return;
 
     try {
-      final updateInfo = await InAppUpdate.checkForUpdate();
-      if (updateInfo.updateAvailability != UpdateAvailability.updateAvailable) {
-        return;
-      }
-
+      final current = OxSemver.parse(currentVersion) ?? const OxSemver(major: 0, minor: 0, patch: 0);
       final currentVersionCode = int.tryParse(currentBuildNumber);
-      final playVersionCode = updateInfo.availableVersionCode;
-      if (currentVersionCode != null &&
-          playVersionCode != null &&
-          playVersionCode <= currentVersionCode) {
+
+      AppUpdateInfo? updateInfo;
+      try {
+        updateInfo = await InAppUpdate.checkForUpdate();
+      } catch (error, stackTrace) {
+        developer.log(
+          'Play in-app update check failed; falling back to server semver',
+          name: 'OxUpdateService',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
+
+      final playReportsUpdate =
+          updateInfo?.updateAvailability == UpdateAvailability.updateAvailable;
+      final playVersionCode = updateInfo?.availableVersionCode;
+
+      // Trust Play when it reports an update. versionCode can disagree across CI vs
+      // pubspec-derived codes, so do not treat a lower Play code as "up to date".
+      final playSignalsUpdate = playReportsUpdate &&
+          (playVersionCode == null ||
+              currentVersionCode == null ||
+              playVersionCode > currentVersionCode);
+
+      final configuredTargets = await _fetchConfiguredTargetSemvers();
+      final backendTarget = _newestSemver(configuredTargets);
+      final backendSignalsUpdate =
+          backendTarget != null && backendTarget.isNewerThan(current);
+
+      if (!playSignalsUpdate && !backendSignalsUpdate) {
         return;
       }
 
-      final resolved = await _resolveUpdateTarget(updateInfo: updateInfo);
-      final skipKey = resolved?.skipKey ??
-          (playVersionCode != null ? 'code:$playVersionCode' : 'play-update');
+      final resolved = playSignalsUpdate && updateInfo != null
+          ? await _resolveUpdateTarget(updateInfo: updateInfo)
+          : null;
+
+      final targetSemver = _pickTargetSemver(
+        resolved: resolved,
+        backendTarget: backendTarget,
+        playVersionCode: playVersionCode,
+      );
+      final targetLabel = resolved?.displayVersion ?? backendTarget?.toString() ?? 'latest';
+      final skipKey = _skipKeyForUpdate(
+        playSignalsUpdate: playSignalsUpdate,
+        playVersionCode: playVersionCode,
+        targetSemver: targetSemver,
+        targetLabel: targetLabel,
+      );
+
       if (sharedPreferences.getString(kOxSkippedVersionKey) == skipKey) {
         return;
       }
 
-      final current = OxSemver.parse(currentVersion) ?? const OxSemver(major: 0, minor: 0, patch: 0);
-      final targetLabel = resolved?.displayVersion ?? 'latest';
-      final targetSemver = resolved?.targetSemver ??
-          (playVersionCode != null ? OxSemver.fromVersionCode(playVersionCode) : null);
-
-      if (targetSemver != null && targetSemver.isMajorUpdateComparedTo(current)) {
+      if (playSignalsUpdate &&
+          updateInfo != null &&
+          targetSemver != null &&
+          targetSemver.isMajorUpdateComparedTo(current)) {
         if (updateInfo.immediateUpdateAllowed) {
           await InAppUpdate.performImmediateUpdate();
-        } else {
-          _pendingOptionalPrompt = OxOptionalUpdatePrompt(
-            currentVersion: current.toString(),
-            targetVersion: targetLabel,
-            skipKey: skipKey,
-            sharedPreferences: sharedPreferences,
-          );
+          return;
         }
-        return;
       }
 
       _pendingOptionalPrompt = OxOptionalUpdatePrompt(
@@ -161,6 +188,45 @@ abstract final class OxUpdateService {
         stackTrace: stackTrace,
       );
     }
+  }
+
+  static OxSemver? _newestSemver(Iterable<OxSemver> semvers) {
+    OxSemver? best;
+    for (final candidate in semvers) {
+      if (best == null || candidate.isNewerThan(best)) {
+        best = candidate;
+      }
+    }
+    return best;
+  }
+
+  static OxSemver? _pickTargetSemver({
+    required ({String displayVersion, String skipKey, OxSemver? targetSemver})? resolved,
+    required OxSemver? backendTarget,
+    required int? playVersionCode,
+  }) {
+    final candidates = <OxSemver>[
+      if (resolved?.targetSemver != null) resolved!.targetSemver!,
+      if (backendTarget != null) backendTarget,
+      if (playVersionCode != null)
+        if (OxSemver.fromVersionCode(playVersionCode) case final fromPlay?) fromPlay,
+    ];
+    return _newestSemver(candidates);
+  }
+
+  static String _skipKeyForUpdate({
+    required bool playSignalsUpdate,
+    required int? playVersionCode,
+    required OxSemver? targetSemver,
+    required String targetLabel,
+  }) {
+    if (playSignalsUpdate && playVersionCode != null) {
+      return 'code:$playVersionCode';
+    }
+    if (targetSemver != null) {
+      return 'semver:${targetSemver.toString()}';
+    }
+    return 'semver:$targetLabel';
   }
 
   /// Shows a deferred optional-update dialog once a [BuildContext] is available.
