@@ -95,8 +95,15 @@ abstract final class OxUpdateService {
   static final http.Client _httpClient = http.Client();
 
   static OxOptionalUpdatePrompt? _pendingOptionalPrompt;
+  static GlobalKey<NavigatorState>? _navigatorKey;
 
   static bool get hasPendingOptionalPrompt => _pendingOptionalPrompt != null;
+
+  /// Registered from [MaterialApp.router] so optional-update dialogs use a
+  /// context below the route [Navigator] (not [OxUpdatePromptHost], which sits above it).
+  static void registerNavigatorKey(GlobalKey<NavigatorState> key) {
+    _navigatorKey = key;
+  }
 
   /// Called from [OxplayerBootstrap.afterAppBootstrap] before [runApp].
   static Future<void> checkOnLaunch({
@@ -229,17 +236,16 @@ abstract final class OxUpdateService {
     return 'semver:$targetLabel';
   }
 
-  /// Shows a deferred optional-update dialog once a [BuildContext] is available.
-  static Future<void> showPendingOptionalPrompt(BuildContext context) async {
+  /// Shows a deferred optional-update dialog once the route [Navigator] is mounted.
+  static Future<void> showPendingOptionalPrompt() async {
     final prompt = _pendingOptionalPrompt;
-    if (prompt == null || !context.mounted) return;
+    if (prompt == null) return;
 
-    // Navigator may not exist on the first warm-up frame (see OXPLAYER-CLIENT-X).
-    if (Navigator.maybeOf(context) == null) {
+    final context = _navigatorKey?.currentContext;
+    if (context == null || !context.mounted || Navigator.maybeOf(context) == null) {
+      // Navigator may not exist on the first warm-up frame (see OXPLAYER-CLIENT-X).
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) {
-          showPendingOptionalPrompt(context);
-        }
+        showPendingOptionalPrompt();
       });
       return;
     }
@@ -473,7 +479,7 @@ class _OxUpdatePromptHostState extends State<OxUpdatePromptHost> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted || !OxUpdateService.hasPendingOptionalPrompt) return;
-      await OxUpdateService.showPendingOptionalPrompt(context);
+      await OxUpdateService.showPendingOptionalPrompt();
     });
   }
 

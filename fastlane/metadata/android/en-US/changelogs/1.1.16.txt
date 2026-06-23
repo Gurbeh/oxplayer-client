@@ -1,0 +1,1 @@
+Fix optional Android update dialog not appearing on older builds when a newer version is available on Play or from the server.

@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fladder/bootstrap/app_bootstrap.dart';
 import 'package:fladder/oxplayer/oxplayer_bootstrap.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/services/ox_update_service.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_sentry.dart';
 import 'package:fladder/bootstrap/platform/platform_app_wrapper.dart';
@@ -92,6 +93,10 @@ class _FladderApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (OxplayerConfig.isEnabled && !kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      OxUpdateService.registerNavigatorKey(autoRouter.navigatorKey);
+    }
+
     final isLinux = defaultTargetPlatform == TargetPlatform.linux;
     final themeMode = ref.watch(clientSettingsProvider.select((value) => value.themeMode));
     final themeColor = ref.watch(clientSettingsProvider.select((value) => value.themeColor));
