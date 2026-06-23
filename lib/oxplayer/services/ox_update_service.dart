@@ -234,6 +234,16 @@ abstract final class OxUpdateService {
     final prompt = _pendingOptionalPrompt;
     if (prompt == null || !context.mounted) return;
 
+    // Navigator may not exist on the first warm-up frame (see OXPLAYER-CLIENT-X).
+    if (Navigator.maybeOf(context) == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          showPendingOptionalPrompt(context);
+        }
+      });
+      return;
+    }
+
     _pendingOptionalPrompt = null;
     await showDialog<void>(
       context: context,
