@@ -298,7 +298,11 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.telegram),
-                    label: Text(deviceButtonLabel),
+                    label: Text(
+                      deviceButtonLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
                 if (link != null)
@@ -327,7 +331,11 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.telegram),
-              label: Text(deviceButtonLabel),
+              label: Text(
+                deviceButtonLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
         ],
         if (_error != null) ...[

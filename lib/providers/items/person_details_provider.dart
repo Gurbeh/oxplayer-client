@@ -21,15 +21,19 @@ final personDetailsProvider =
 });
 
 class PersonDetailsNotifier extends StateNotifier<PersonModel?> {
-  PersonDetailsNotifier(this.ref) : super(null);
+  PersonDetailsNotifier(this.ref) : super(null) {
+    ref.onDispose(() => _disposed = true);
+  }
 
   final Ref ref;
+  var _disposed = false;
 
   late final JellyService api = ref.read(jellyApiProvider);
   late final SeerrService seerrApi = ref.read(seerrApiProvider);
 
   Future<Response?> fetchPerson(Person person) async {
     final response = await api.usersUserIdItemsItemIdGet(itemId: person.id);
+    if (_disposed) return response;
 
     if (response.isSuccessful && response.body != null) {
       state = response.bodyOrThrow as PersonModel;
@@ -40,6 +44,8 @@ class PersonDetailsNotifier extends StateNotifier<PersonModel?> {
   }
 
   Future<Response?> fetchMovies() async {
+    if (_disposed) return null;
+
     final movies = await api.itemsGet(
       personIds: [state?.id ?? ""],
       limit: 25,
@@ -53,6 +59,7 @@ class PersonDetailsNotifier extends StateNotifier<PersonModel?> {
         BaseItemKind.movie,
       ],
     );
+    if (_disposed) return movies;
 
     final series = await api.itemsGet(
       personIds: [state?.id ?? ""],
@@ -67,6 +74,7 @@ class PersonDetailsNotifier extends StateNotifier<PersonModel?> {
         BaseItemKind.series,
       ],
     );
+    if (_disposed) return movies;
 
     state = state?.copyWith(
       movies: movies.body?.items.whereType<MovieModel>().toList(),
@@ -90,7 +98,7 @@ class PersonDetailsNotifier extends StateNotifier<PersonModel?> {
   }
 
   Future<void> fetchSeerrCredits() async {
-    if (state == null) return;
+    if (_disposed || state == null) return;
     if (OxplayerEnv.isEnabled) {
       state = state?.copyWith(seerrMovies: const [], seerrSeries: const []);
       return;
@@ -109,6 +117,7 @@ class PersonDetailsNotifier extends StateNotifier<PersonModel?> {
     }
 
     final response = await seerrApi.personCombinedCredits(personId: tmdbPersonId);
+    if (_disposed) return;
     if (!response.isSuccessful || response.body == null) {
       state = state?.copyWith(seerrMovies: const [], seerrSeries: const []);
       return;

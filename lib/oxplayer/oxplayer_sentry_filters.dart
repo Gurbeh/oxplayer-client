@@ -7,6 +7,7 @@ abstract final class OxplayerSentryFilters {
     if (message != null && _shouldDrop(message)) return null;
     if (_isBenignAnr(event)) return null;
     if (_isFlutterLiveTextLifecycleCrash(event)) return null;
+    if (_isChannelCallbackNativeNoise(event)) return null;
 
     final tags = event.tags ?? {};
     if (tags['transient'] == 'true') return null;
@@ -16,11 +17,22 @@ abstract final class OxplayerSentryFilters {
       'LiveText.isLiveTextInputAvailable',
       'LiveTextInputStatusNotifier',
       '_handleLifecycleMessage',
+      '_ChannelCallbackRecord.invoke',
     ])) {
       return null;
     }
 
     return event;
+  }
+
+  /// Drops cold-start transactions where Fladder loads home recents (one Items/Latest per library view).
+  static SentryTransaction? beforeSendTransaction(SentryTransaction transaction, Hint hint) {
+    if (_isHomeItemsLatestN1(transaction)) return null;
+    return transaction;
+  }
+
+  static bool shouldReportFlutterError(Object exception) {
+    return shouldReportPersistedLog(exception.toString());
   }
 
   static bool shouldReportPersistedLog(String message) {
@@ -42,7 +54,12 @@ abstract final class OxplayerSentryFilters {
     }
     if (lower.contains('software caused connection abort') ||
         lower.contains('connection reset') ||
-        lower.contains('connection closed')) {
+        lower.contains('connection closed') ||
+        lower.contains('connection timed out') ||
+        lower.contains('socketexception')) {
+      return true;
+    }
+    if (lower.contains('renderflex overflowed')) {
       return true;
     }
     if (lower.contains('rangeerror') &&
@@ -127,7 +144,39 @@ abstract final class OxplayerSentryFilters {
     }
     return text.contains('livetext') ||
         text.contains('_handlelifecyclemessage') ||
+        text.contains('channelcallbackrecord') ||
         (text.contains('channelcallbackrecord') && text.contains('dispatchplatformmessage'));
+  }
+
+  /// Native/Dart platform-channel noise (LiveText lifecycle, etc.).
+  static bool _isChannelCallbackNativeNoise(SentryEvent event) {
+    final parts = <String>[
+      _eventText(event) ?? '',
+      event.message?.formatted ?? '',
+      for (final ex in event.exceptions ?? const []) ex.type ?? '',
+      for (final ex in event.exceptions ?? const []) ex.value ?? '',
+      for (final ex in event.exceptions ?? const []) ..._framesText(ex.stackTrace?.frames ?? const []),
+    ];
+    final text = parts.join(' ').toLowerCase();
+    if (text.contains('channelcallbackrecord')) return true;
+    if ((text.contains('sigabrt') || text.contains('abort')) &&
+        text.contains('dispatchplatformmessage')) {
+      return true;
+    }
+    return false;
+  }
+
+  static bool _isHomeItemsLatestN1(SentryTransaction transaction) {
+    var latestCalls = 0;
+    for (final span in transaction.spans) {
+      final hay = [
+        span.context.description,
+        span.data['url'],
+        span.data['http.url'],
+      ].whereType<String>().join(' ').toLowerCase();
+      if (hay.contains('/items/latest')) latestCalls++;
+    }
+    return latestCalls >= 2;
   }
 
   static bool _stackContainsAny(SentryEvent event, List<String> needles) {

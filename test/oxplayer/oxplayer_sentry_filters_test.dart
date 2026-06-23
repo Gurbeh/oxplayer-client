@@ -83,6 +83,17 @@ void main() {
       OxplayerSentryFilters.beforeSend(
         SentryEvent(
           message: SentryMessage(
+            'Flutter error: ClientException with SocketException: Connection timed out (OS Error: Connection timed out, errno = 110)',
+          ),
+        ),
+        Hint(),
+      ),
+      isNull,
+    );
+    expect(
+      OxplayerSentryFilters.beforeSend(
+        SentryEvent(
+          message: SentryMessage(
             'Flutter error: RangeError (end): Invalid value: Only valid value is 0: -1',
           ),
         ),
@@ -90,5 +101,24 @@ void main() {
       ),
       isNull,
     );
+  });
+
+  test('drops ChannelCallbackRecord native noise', () {
+    final event = SentryEvent(
+      exceptions: [
+        SentryException(
+          type: '_ChannelCallbackRecord.invoke',
+          value: 'SIGABRT: Abort',
+        ),
+      ],
+    );
+    expect(OxplayerSentryFilters.beforeSend(event, Hint()), isNull);
+  });
+
+  test('drops RenderFlex overflow layout noise', () {
+    final event = SentryEvent(
+      message: SentryMessage('Flutter error: A RenderFlex overflowed by 89 pixels on the bottom.'),
+    );
+    expect(OxplayerSentryFilters.beforeSend(event, Hint()), isNull);
   });
 }

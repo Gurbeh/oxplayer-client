@@ -83,7 +83,7 @@ class _SelectableIconButtonState extends ConsumerState<SelectableIconButton> {
                   log(e.toString());
                 } finally {
                   if (context.mounted && widget.refreshOnEnd) await context.refreshData();
-                  setState(() => loading = false);
+                  if (mounted) setState(() => loading = false);
                 }
               },
         child: Padding(

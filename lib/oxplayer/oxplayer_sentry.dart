@@ -43,6 +43,7 @@ abstract final class OxplayerSentry {
           options.enableNdkScopeSync = false;
         }
         options.beforeSend = OxplayerSentryFilters.beforeSend;
+        options.beforeSendTransaction = OxplayerSentryFilters.beforeSendTransaction;
       },
       appRunner: appRunner,
     );
@@ -69,6 +70,7 @@ abstract final class OxplayerSentry {
   }
 
   static Future<void> _captureFlutterError(FlutterErrorDetails details) async {
+    if (!OxplayerSentryFilters.shouldReportFlutterError(details.exception)) return;
     await Sentry.captureException(details.exception, stackTrace: details.stack);
   }
 
