@@ -40,6 +40,19 @@ abstract final class OxplayerSentryFilters {
     if (lower.contains('failed host lookup') || lower.contains('no address associated with hostname')) {
       return true;
     }
+    if (lower.contains('software caused connection abort') ||
+        lower.contains('connection reset') ||
+        lower.contains('connection closed')) {
+      return true;
+    }
+    if (lower.contains('rangeerror') &&
+        lower.contains('invalid value') &&
+        lower.contains('only valid value is 0: -1')) {
+      return true;
+    }
+    if (lower.contains('channelcallbackrecord.invoke')) {
+      return true;
+    }
     if (lower.contains('item not in your library')) {
       return true;
     }

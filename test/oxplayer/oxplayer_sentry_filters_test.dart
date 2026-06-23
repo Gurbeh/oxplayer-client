@@ -61,4 +61,34 @@ void main() {
 
     expect(OxplayerSentryFilters.beforeSend(event, Hint()), isNull);
   });
+
+  test('drops DNS lookup failures', () {
+    final event = SentryEvent(
+      message: SentryMessage(
+        'Flutter error: ClientException with SocketException: Failed host lookup: api.oxplayer.app',
+      ),
+    );
+    expect(OxplayerSentryFilters.beforeSend(event, Hint()), isNull);
+  });
+
+  test('drops connection abort and intl dateSymbols noise', () {
+    expect(
+      OxplayerSentryFilters.beforeSend(
+        SentryEvent(message: SentryMessage('ClientException: Software caused connection abort')),
+        Hint(),
+      ),
+      isNull,
+    );
+    expect(
+      OxplayerSentryFilters.beforeSend(
+        SentryEvent(
+          message: SentryMessage(
+            'Flutter error: RangeError (end): Invalid value: Only valid value is 0: -1',
+          ),
+        ),
+        Hint(),
+      ),
+      isNull,
+    );
+  });
 }
