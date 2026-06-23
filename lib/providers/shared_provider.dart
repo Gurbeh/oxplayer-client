@@ -170,6 +170,20 @@ class SharedHelper {
     }
   }
 
+  /// Most recently used saved account regardless of app-lock method (OXPlayer splash).
+  AccountModel? getMostRecentAccount() {
+    try {
+      final accounts = getAccounts();
+      if (accounts.isEmpty) return null;
+      return accounts.reduce((lastLoggedIn, element) {
+        return (element.lastUsed.compareTo(lastLoggedIn.lastUsed)) > 0 ? element : lastLoggedIn;
+      });
+    } catch (e) {
+      log(e.toString());
+      return null;
+    }
+  }
+
   Future<bool?> saveAccounts(List<AccountModel> accounts) async =>
       sharedPreferences.setStringList(SharedKeys._loginCredentialsKey, accounts.map((e) => jsonEncode(e)).toList());
 

@@ -7,6 +7,7 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_settings_visibility.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/providers/update_provider.dart';
@@ -152,7 +153,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: deviceIcon,
               onTap: () => navigateTo(const ClientSettingsRoute()),
             ),
-            if (isAdmin)
+            if (isAdmin && OxplayerSettingsVisibility.showControlPanel)
               SettingsListTile(
                 label: Text(context.localized.controlPanel),
                 subLabel: Text(context.localized.controlPanelDesc),
@@ -228,15 +229,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   );
                 },
               ),
-            SettingsListTile(
-              label: Text(context.localized.switchUser),
-              icon: IconsaxPlusLinear.arrow_swap_horizontal,
-              contentColor: Colors.greenAccent,
-              onTap: () async {
-                await ref.read(userProvider.notifier).logoutUser();
-                context.router.replaceAll([const OxplayerLoginRoute()]);
-              },
-            ),
+            if (OxplayerSettingsVisibility.showSwitchUser)
+              SettingsListTile(
+                label: Text(context.localized.switchUser),
+                icon: IconsaxPlusLinear.arrow_swap_horizontal,
+                contentColor: Colors.greenAccent,
+                onTap: () async {
+                  await ref.read(userProvider.notifier).logoutUser();
+                  context.router.replaceAll([const OxplayerLoginRoute()]);
+                },
+              ),
             SettingsListTile(
               label: Text(context.localized.logout),
               icon: IconsaxPlusLinear.logout,

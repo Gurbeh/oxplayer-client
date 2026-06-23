@@ -12,7 +12,10 @@ import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/widgets/shared/sortable_item_list.dart';
 
 class LibraryOrderEditor extends ConsumerWidget {
-  const LibraryOrderEditor({super.key});
+  const LibraryOrderEditor({super.key, this.groupedFoldersOnly = false});
+
+  /// When true, only the grouped-libraries section is shown (OXPlayer).
+  final bool groupedFoldersOnly;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -24,42 +27,44 @@ class LibraryOrderEditor extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ...settingsListGroup(
-          context,
-          SettingsLabelDivider(label: context.localized.libraryOrderTitle),
-          [
-            SettingsListTile(
-              label: Text(
-                context.localized.libraryOrderDescription,
-                style: Theme.of(context).textTheme.bodyMedium,
+        if (!groupedFoldersOnly) ...[
+          ...settingsListGroup(
+            context,
+            SettingsLabelDivider(label: context.localized.libraryOrderTitle),
+            [
+              SettingsListTile(
+                label: Text(
+                  context.localized.libraryOrderDescription,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
               ),
-            ),
-            SortableItemList<String>(
-              items: orderedIds,
-              included: includedIds,
-              itemBuilder: (id) {
-                final view = views.firstWhereOrNull((v) => v.id == id);
-                return Text(view?.name ?? id);
-              },
-              onReorder: (reordered) {
-                ref.read(homePreferencesProvider.notifier).setOrderedLibraryIds(reordered);
-              },
-              onIncludeChange: (included) {
-                final excluded = orderedIds.where((id) => !included.contains(id)).toList();
-                ref.read(homePreferencesProvider.notifier).setLatestItemsExcludes(excluded);
-              },
-            ),
-            SettingsListTileCheckbox(
-              label: Text(context.localized.hidePlayedInLatestTitle),
-              subLabel: Text(context.localized.hidePlayedInLatestDescription),
-              value: preferences.hidePlayedInLatest,
-              onChanged: (value) {
-                ref.read(homePreferencesProvider.notifier).setHidePlayedInLatest(value ?? false);
-              },
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
+              SortableItemList<String>(
+                items: orderedIds,
+                included: includedIds,
+                itemBuilder: (id) {
+                  final view = views.firstWhereOrNull((v) => v.id == id);
+                  return Text(view?.name ?? id);
+                },
+                onReorder: (reordered) {
+                  ref.read(homePreferencesProvider.notifier).setOrderedLibraryIds(reordered);
+                },
+                onIncludeChange: (included) {
+                  final excluded = orderedIds.where((id) => !included.contains(id)).toList();
+                  ref.read(homePreferencesProvider.notifier).setLatestItemsExcludes(excluded);
+                },
+              ),
+              SettingsListTileCheckbox(
+                label: Text(context.localized.hidePlayedInLatestTitle),
+                subLabel: Text(context.localized.hidePlayedInLatestDescription),
+                value: preferences.hidePlayedInLatest,
+                onChanged: (value) {
+                  ref.read(homePreferencesProvider.notifier).setHidePlayedInLatest(value ?? false);
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+        ],
         ...settingsListGroup(
           context,
           SettingsLabelDivider(label: context.localized.groupedFoldersTitle),

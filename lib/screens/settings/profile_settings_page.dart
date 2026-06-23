@@ -35,6 +35,7 @@ import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/simple_duration_picker.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_profile_delete_account.dart';
+import 'package:fladder/oxplayer/oxplayer_settings_visibility.dart';
 import 'package:fladder/widgets/shared/filled_button_await.dart';
 import 'package:fladder/widgets/shared/item_actions.dart';
 
@@ -121,15 +122,16 @@ class _UserSettingsPageState extends ConsumerState<ProfileSettingsPage> with Wid
     return SettingsScaffold(
       label: context.localized.settingsProfileTitle,
       bottomActions: [
-        FilledButtonAwait(
-          onPressed: () async {
-            await FladderSnack.showResponse(
-              ref.read(homePreferencesProvider.notifier).save(),
-              successTitle: context.localized.saved,
-            );
-          },
-          child: Text(context.localized.save),
-        ),
+        if (OxplayerSettingsVisibility.showProfileHomePreferencesSave)
+          FilledButtonAwait(
+            onPressed: () async {
+              await FladderSnack.showResponse(
+                ref.read(homePreferencesProvider.notifier).save(),
+                successTitle: context.localized.saved,
+              );
+            },
+            child: Text(context.localized.save),
+          ),
       ],
       items: [
         ...settingsListGroup(
@@ -159,71 +161,75 @@ class _UserSettingsPageState extends ConsumerState<ProfileSettingsPage> with Wid
                     }
                   : null,
             ),
-            SettingsListTile(
-              label: Text(context.localized.password),
-              onTap: () => openPasswordResetDialog(context),
-            ),
+            if (OxplayerSettingsVisibility.showProfilePasswordReset)
+              SettingsListTile(
+                label: Text(context.localized.password),
+                onTap: () => openPasswordResetDialog(context),
+              ),
           ],
         ),
-        const SizedBox(height: 16),
-        ...settingsListGroup(
-          context,
-          SettingsLabelDivider(label: context.localized.subtitles),
-          [
-            Builder(builder: (context) {
-              final anyLanguageLabel = context.localized.anyLanguage;
-              final subtitleLanguagePreference =
-                  user?.userConfiguration?.subtitleLanguagePreference?.trim().toLowerCase();
-              final hasSubtitleLanguagePreference = subtitleLanguagePreference?.isNotEmpty == true;
+        if (OxplayerSettingsVisibility.showProfileSubtitlePreferences) ...[
+          const SizedBox(height: 16),
+          ...settingsListGroup(
+            context,
+            SettingsLabelDivider(label: context.localized.subtitles),
+            [
+              Builder(builder: (context) {
+                final anyLanguageLabel = context.localized.anyLanguage;
+                final subtitleLanguagePreference =
+                    user?.userConfiguration?.subtitleLanguagePreference?.trim().toLowerCase();
+                final hasSubtitleLanguagePreference = subtitleLanguagePreference?.isNotEmpty == true;
 
-              final currentCulture = cultures.firstWhereOrNull(
-                (e) => e.matchesLanguageCode(subtitleLanguagePreference),
-              );
+                final currentCulture = cultures.firstWhereOrNull(
+                  (e) => e.matchesLanguageCode(subtitleLanguagePreference),
+                );
 
-              return SettingsListTileEnum(
-                label: Text(context.localized.settingsProfileSubtitleLanguage),
-                current: !hasSubtitleLanguagePreference
-                    ? anyLanguageLabel
-                    : currentCulture?.displayName ?? context.localized.unknown,
-                itemBuilder: (context) => [
-                  ItemActionButton(
-                    selected: !hasSubtitleLanguagePreference,
-                    label: Text(anyLanguageLabel),
-                    action: () {
-                      ref.read(userProvider.notifier).updateSubtitleLanguagePreference(null);
-                    },
-                  ),
-                  ...cultures.map(
-                    (e) => ItemActionButton(
-                      selected: e.matchesLanguageCode(subtitleLanguagePreference),
-                      label: Text(e.displayName ?? e.name ?? context.localized.unknown),
+                return SettingsListTileEnum(
+                  label: Text(context.localized.settingsProfileSubtitleLanguage),
+                  current: !hasSubtitleLanguagePreference
+                      ? anyLanguageLabel
+                      : currentCulture?.displayName ?? context.localized.unknown,
+                  itemBuilder: (context) => [
+                    ItemActionButton(
+                      selected: !hasSubtitleLanguagePreference,
+                      label: Text(anyLanguageLabel),
                       action: () {
-                        ref.read(userProvider.notifier).updateSubtitleLanguagePreference(
-                            e.threeLetterISOLanguageName?.toLowerCase() ?? e.twoLetterISOLanguageName?.toLowerCase());
+                        ref.read(userProvider.notifier).updateSubtitleLanguagePreference(null);
                       },
                     ),
-                  ),
-                ],
-              );
-            }),
-            SettingsListTileEnum(
-              label: Text(context.localized.settingsProfileSubtitleMode),
-              current: user?.userConfiguration?.subtitleMode?.label(context) ?? context.localized.none,
-              itemBuilder: (context) => allowedSubModes
-                  .map(
-                    (mode) => ItemActionButton(
-                      selected: user?.userConfiguration?.subtitleMode == mode,
-                      label: Text(mode.label(context)),
-                      action: () {
-                        ref.read(userProvider.notifier).updateSubtitleMode(mode);
-                      },
+                    ...cultures.map(
+                      (e) => ItemActionButton(
+                        selected: e.matchesLanguageCode(subtitleLanguagePreference),
+                        label: Text(e.displayName ?? e.name ?? context.localized.unknown),
+                        action: () {
+                          ref.read(userProvider.notifier).updateSubtitleLanguagePreference(
+                              e.threeLetterISOLanguageName?.toLowerCase() ?? e.twoLetterISOLanguageName?.toLowerCase());
+                        },
+                      ),
                     ),
-                  )
-                  .toList(),
-            ),
-          ],
-        ),
-        if (ref.watch(supportsNotificationsProvider)) ...[
+                  ],
+                );
+              }),
+              SettingsListTileEnum(
+                label: Text(context.localized.settingsProfileSubtitleMode),
+                current: user?.userConfiguration?.subtitleMode?.label(context) ?? context.localized.none,
+                itemBuilder: (context) => allowedSubModes
+                    .map(
+                      (mode) => ItemActionButton(
+                        selected: user?.userConfiguration?.subtitleMode == mode,
+                        label: Text(mode.label(context)),
+                        action: () {
+                          ref.read(userProvider.notifier).updateSubtitleMode(mode);
+                        },
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
+          ),
+        ],
+        if (OxplayerSettingsVisibility.showProfileJellyfinNotifications &&
+            ref.watch(supportsNotificationsProvider)) ...[
           const SizedBox(height: 16),
           ...settingsListGroup(
             context,
@@ -365,45 +371,51 @@ class _UserSettingsPageState extends ConsumerState<ProfileSettingsPage> with Wid
             ],
           ),
         ],
-        const SizedBox(height: 16),
-        const LibraryOrderEditor(),
-        const SizedBox(height: 16),
-        ...settingsListGroup(
-          context,
-          SettingsLabelDivider(label: context.localized.advanced),
-          [
-            SettingsListTile(
-              label: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                spacing: 8,
-                children: [
-                  if (user?.credentials.localUrl?.isNotEmpty == true)
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: ref.watch(localConnectionAvailableProvider)
-                            ? Colors.greenAccent
-                            : Theme.of(context).colorScheme.error,
-                        shape: BoxShape.circle,
+        if (OxplayerSettingsVisibility.showProfileGroupedFolders) ...[
+          const SizedBox(height: 16),
+          LibraryOrderEditor(
+            groupedFoldersOnly: OxplayerSettingsVisibility.showProfileLibraryOrder == false,
+          ),
+        ],
+        if (OxplayerSettingsVisibility.showProfileLocalUrl) ...[
+          const SizedBox(height: 16),
+          ...settingsListGroup(
+            context,
+            SettingsLabelDivider(label: context.localized.advanced),
+            [
+              SettingsListTile(
+                label: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  spacing: 8,
+                  children: [
+                    if (user?.credentials.localUrl?.isNotEmpty == true)
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: ref.watch(localConnectionAvailableProvider)
+                              ? Colors.greenAccent
+                              : Theme.of(context).colorScheme.error,
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
-                  Text(context.localized.settingsLocalUrlTitle),
-                ],
+                    Text(context.localized.settingsLocalUrlTitle),
+                  ],
+                ),
+                subLabel: Text(user?.credentials.localUrl ?? context.localized.none),
+                onTap: () {
+                  openSimpleTextInput(
+                    context,
+                    user?.credentials.localUrl,
+                    (value) => ref.read(userProvider.notifier).setLocalURL(value),
+                    context.localized.settingsLocalUrlSetTitle,
+                    context.localized.settingsLocalUrlSetDesc,
+                  );
+                },
               ),
-              subLabel: Text(user?.credentials.localUrl ?? context.localized.none),
-              onTap: () {
-                openSimpleTextInput(
-                  context,
-                  user?.credentials.localUrl,
-                  (value) => ref.read(userProvider.notifier).setLocalURL(value),
-                  context.localized.settingsLocalUrlSetTitle,
-                  context.localized.settingsLocalUrlSetDesc,
-                );
-              },
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
         if (OxplayerEnv.apiBaseUrl != null) ...[
           const SizedBox(height: 16),
           ...oxplayerProfileDeleteAccountGroup(context, ref),

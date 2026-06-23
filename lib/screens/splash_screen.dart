@@ -6,7 +6,9 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/account_model.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_session.dart';
+import 'package:fladder/oxplayer/oxplayer_splash_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_splash_telemetry.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/shared_provider.dart';
@@ -38,7 +40,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
       _splashTiming.markAfterInitialDelay();
 
-      final AccountModel? lastUsedAccount = ref.read(sharedUtilityProvider).getActiveAccount();
+      final AccountModel? lastUsedAccount = OxplayerConfig.isEnabled
+          ? ref.read(sharedUtilityProvider).getMostRecentAccount()
+          : ref.read(sharedUtilityProvider).getActiveAccount();
       ref.read(userProvider.notifier).updateUser(lastUsedAccount);
 
       if (!context.mounted) return;
@@ -52,6 +56,22 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
       if (lastUsedAccount == null || newWindow) {
         callBackOrNavigate(false);
+        return;
+      }
+
+      if (OxplayerConfig.isEnabled) {
+        _splashTiming.markSessionRestoreStarted();
+        final result = await oxplayerResolveSplashAuth(ref, lastUsedAccount);
+        _splashTiming.markSessionRestoreEnded(result != OxplayerSplashAuthResult.needsLogin);
+        if (!context.mounted) return;
+        switch (result) {
+          case OxplayerSplashAuthResult.needsLogin:
+            callBackOrNavigate(false);
+          case OxplayerSplashAuthResult.sessionReady:
+            callBackOrNavigate(true);
+          case OxplayerSplashAuthResult.sessionWithLock:
+            navigateWithLockOnLaunch();
+        }
         return;
       }
 
@@ -101,6 +121,24 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     } else {
       // AuthGuard [redirectUntil] completes via this callback only.
       widget.loggedIn?.call(loggedIn);
+    }
+  }
+
+  void navigateWithLockOnLaunch() {
+    final destination = widget.loggedIn != null ? 'auth_guard_callback_with_lock' : 'dashboard_with_lock';
+    unawaited(_splashTiming.finishAndReport(destination: destination, loggedIn: true));
+
+    void pushLock() {
+      if (!context.mounted) return;
+      context.router.push(const LockRoute());
+    }
+
+    if (widget.loggedIn == null) {
+      context.router.replace(const DashboardRoute());
+      WidgetsBinding.instance.addPostFrameCallback((_) => pushLock());
+    } else {
+      widget.loggedIn?.call(true);
+      WidgetsBinding.instance.addPostFrameCallback((_) => pushLock());
     }
   }
 
