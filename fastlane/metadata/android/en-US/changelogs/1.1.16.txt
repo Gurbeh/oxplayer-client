@@ -1,1 +1,1 @@
-Fix optional Android update dialog not appearing on older builds when a newer version is available on Play or from the server.
+See the full changelog at: https://github.com/Gurbeh/oxplayer-client/releases/tag/v1.1.16
