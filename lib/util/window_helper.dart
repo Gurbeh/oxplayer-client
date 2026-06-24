@@ -18,7 +18,7 @@ extension WindowHelperSetup on WindowManager {
     final isMacDebug = defaultTargetPlatform == TargetPlatform.macOS && kDebugMode;
     final shouldResizeAndShow = !isMacDebug || !isFullScreen;
 
-    final options = WindowOptions(
+    const options = WindowOptions(
       backgroundColor: Colors.transparent,
       skipTaskbar: false,
       titleBarStyle: TitleBarStyle.hidden,

@@ -89,7 +89,7 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
                   ? const Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const OxplayerLoginLogo(),
+                        OxplayerLoginLogo(),
                         SizedBox(height: 24),
                         CircularProgressIndicator(),
                       ],
