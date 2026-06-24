@@ -4,7 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fladder/jellyfin/jellyfin_open_api.enums.swagger.dart';
 import 'package:fladder/models/home_model.dart';
 import 'package:fladder/models/views_model.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_help_content.dart';
+import 'package:fladder/oxplayer/oxplayer_navigation_seerr.dart';
+import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/providers/views_provider.dart';
 import 'package:fladder/util/localization_helper.dart';
 
@@ -65,6 +68,8 @@ class _OxplayerDashboardEmptyHelpSliverState extends ConsumerState<OxplayerDashb
     }
 
     final theme = Theme.of(context);
+    final seerrDiscover = OxplayerConfig.isEnabled &&
+        ref.watch(userProvider.select((u) => u?.seerrCredentials?.isConfigured == true));
 
     return SliverToBoxAdapter(
       child: Padding(
@@ -78,7 +83,9 @@ class _OxplayerDashboardEmptyHelpSliverState extends ConsumerState<OxplayerDashb
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Text(
-                context.localized.oxplayerHomeWelcome,
+                seerrDiscover
+                    ? context.localized.oxplayerHomeEmptyLibraryTitle
+                    : context.localized.oxplayerHomeWelcome,
                 textAlign: TextAlign.center,
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w600,
@@ -86,7 +93,28 @@ class _OxplayerDashboardEmptyHelpSliverState extends ConsumerState<OxplayerDashb
               ),
             ),
             const SizedBox(height: 16),
-            const OxplayerHelpContent(embedded: true),
+            if (seerrDiscover) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  context.localized.oxplayerHomeEmptyLibraryBody,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: FilledButton.icon(
+                  onPressed: () => oxplayerNavigateToSeerr(context),
+                  icon: const Icon(Icons.explore_outlined),
+                  label: Text(context.localized.oxplayerHomeEmptyLibraryDiscover),
+                ),
+              ),
+            ] else
+              const OxplayerHelpContent(embedded: true),
           ],
         ),
       ),

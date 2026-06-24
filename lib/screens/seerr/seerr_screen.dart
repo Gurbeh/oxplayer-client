@@ -4,6 +4,9 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_seerr_catalog_trending_row.dart';
+import 'package:fladder/oxplayer/providers/ox_seerr_catalog_trending.dart';
 import 'package:fladder/providers/seerr_dashboard_provider.dart';
 import 'package:fladder/providers/seerr_user_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
@@ -34,6 +37,9 @@ class _SeerrScreenState extends ConsumerState<SeerrScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(seerrDashboardProvider.notifier).fetchDashboard();
+      if (OxplayerEnv.isEnabled) {
+        ref.read(oxSeerrCatalogTrendingProvider.notifier).refresh();
+      }
     });
   }
 
@@ -64,7 +70,12 @@ class _SeerrScreenState extends ConsumerState<SeerrScreen> {
           images: backgroundImages,
         ),
         body: PullToRefresh(
-          onRefresh: () => ref.read(seerrDashboardProvider.notifier).fetchDashboard(),
+          onRefresh: () async {
+            await ref.read(seerrDashboardProvider.notifier).fetchDashboard();
+            if (OxplayerEnv.isEnabled) {
+              await ref.read(oxSeerrCatalogTrendingProvider.notifier).refresh();
+            }
+          },
           child: (context) => CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             controller: AdaptiveLayout.scrollOf(context, HomeTabs.seerr),
@@ -73,6 +84,10 @@ class _SeerrScreenState extends ConsumerState<SeerrScreen> {
                 NestedSliverAppBar(parent: context)
               else
                 const DefaultSliverTopBadding(),
+              if (OxplayerEnv.isEnabled)
+                SliverToBoxAdapter(
+                  child: OxplayerSeerrCatalogTrendingRow(contentPadding: padding),
+                ),
               if (canViewRecent && dashboardState.recentlyAdded.isNotEmpty)
                 SliverToBoxAdapter(
                   child: SeerrPosterRow(

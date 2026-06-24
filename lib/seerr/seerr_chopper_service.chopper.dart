@@ -386,6 +386,25 @@ final class _$SeerrChopperService extends SeerrChopperService {
   }
 
   @override
+  Future<Response<SeerrDiscoverResponse>> getDiscoverCatalogTrending({
+    int? take,
+    String? language,
+  }) {
+    final Uri $url = Uri.parse('/api/v1/discover/catalog-trending');
+    final Map<String, dynamic> $params = <String, dynamic>{
+      'take': take,
+      'language': language,
+    };
+    final Request $request = Request(
+      'GET',
+      $url,
+      client.baseUrl,
+      parameters: $params,
+    );
+    return client.send<SeerrDiscoverResponse, SeerrDiscoverResponse>($request);
+  }
+
+  @override
   Future<Response<SeerrDiscoverResponse>> getDiscoverMovies({
     int? page,
     String? language,

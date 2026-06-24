@@ -351,6 +351,13 @@ class SeerrService {
     return results.map(_posterFromDiscoverItem).whereType<SeerrDashboardPosterModel>().toList(growable: false);
   }
 
+  /// OX: TMDB daily trending titles that exist in the OX catalog (server-cached).
+  Future<List<SeerrDashboardPosterModel>> discoverCatalogTrending({int? take, String? language}) async {
+    final response = await _api.getDiscoverCatalogTrending(take: take, language: language);
+    final results = response.body?.results ?? const <SeerrDiscoverItem>[];
+    return results.map(_posterFromDiscoverItem).whereType<SeerrDashboardPosterModel>().toList(growable: false);
+  }
+
   SeerrMediaType? _resolveMediaType(SeerrDiscoverItem item) {
     switch (item.mediaType) {
       case SeerrMediaType.movie:

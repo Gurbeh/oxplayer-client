@@ -130,6 +130,12 @@ abstract class SeerrChopperService extends ChopperService {
     @Query('language') String? language,
   });
 
+  @GET(path: '/discover/catalog-trending')
+  Future<Response<SeerrDiscoverResponse>> getDiscoverCatalogTrending({
+    @Query('take') int? take,
+    @Query('language') String? language,
+  });
+
   @GET(path: '/discover/movies')
   Future<Response<SeerrDiscoverResponse>> getDiscoverMovies({
     @Query('page') int? page,
