@@ -1,0 +1,1 @@
+VIP/Discover users: search opens Discover (Seerr) instead of library search. Session and image auth improvements.
