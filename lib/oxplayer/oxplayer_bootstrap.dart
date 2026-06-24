@@ -4,15 +4,26 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import 'package:fladder/bootstrap/app_bootstrap.dart';
+import 'package:fladder/oxplayer/oxplayer_auth_file_service.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 import 'package:fladder/oxplayer/services/ox_update_service.dart';
+import 'package:fladder/util/custom_cache_manager.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 /// OXPlayer startup hooks — keep upstream `main.dart` thin.
 abstract final class OxplayerBootstrap {
   static Future<void> beforeAppBootstrap(List<String> args) async {
     await OxplayerDotenv.ensureLoaded();
     if (!OxplayerConfig.isEnabled) return;
+    CustomCacheManager.instance = CacheManager(
+      Config(
+        CustomCacheManager.key,
+        stalePeriod: const Duration(days: 3),
+        maxNrOfCacheObjects: 256,
+        fileService: OxplayerAuthFileService(),
+      ),
+    );
   }
 
   static Future<void> afterAppBootstrap(AppBootstrapResult result) async {

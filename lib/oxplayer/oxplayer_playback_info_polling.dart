@@ -43,7 +43,7 @@ Future<Response<PlaybackInfoResponse>> oxplayerPollPlaybackInfoUntilReady(
           stage: 'playback_info',
           reason: 'hydrate_timeout',
           httpStatus: status,
-          transient: false,
+          transient: true,
         ));
         throw ex;
       }

@@ -7,6 +7,7 @@ import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/account_model.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
+import 'package:fladder/oxplayer/oxplayer_image_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_seerr_auto_config.dart';
 import 'package:fladder/oxplayer/oxplayer_session_store.dart';
 import 'package:fladder/providers/api_provider.dart';
@@ -52,6 +53,7 @@ Future<bool> oxplayerRestoreSession(WidgetRef ref, AccountModel account) async {
 
 Future<bool> _restoreSession(OxplayerRead read, AccountModel account) async {
   read(userProvider.notifier).updateUser(account);
+  OxplayerImageAuth.syncFromAccount(account);
 
   if (account.credentials.url.trim().isEmpty) {
     return false;
@@ -92,6 +94,7 @@ Future<bool> oxplayerTryRefreshSession(OxplayerRead read) async {
 
 Future<void> oxplayerInvalidateLocalSession(OxplayerRead read, AccountModel account) async {
   await _sessionStore(read).clear(account);
+  OxplayerImageAuth.clear();
   await read(authProvider.notifier).logOutUser();
 }
 
@@ -166,6 +169,7 @@ Future<bool> _refreshSession(OxplayerRead read) async {
 
   await read(sharedUtilityProvider).addAccount(updated);
   read(userProvider.notifier).updateUser(updated);
+  OxplayerImageAuth.syncFromAccount(updated);
 
   final newRefresh = _readRefreshHeader(response);
   if (newRefresh != null) {

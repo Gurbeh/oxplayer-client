@@ -79,7 +79,10 @@ abstract final class OxplayerSentryFilters {
     if (lower.contains('null check operator used on a null value')) {
       return true;
     }
-    if (lower.contains('api.github.com')) {
+    if (lower.contains('invalid statuscode: 401') && lower.contains('/seerr/proxy/avatarproxy')) {
+      return true;
+    }
+    if (lower.contains('video playback failed: hydrate_timeout')) {
       return true;
     }
 
