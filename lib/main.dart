@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fladder/bootstrap/app_bootstrap.dart';
 import 'package:fladder/oxplayer/oxplayer_bootstrap.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/services/ox_github_update_service.dart';
 import 'package:fladder/oxplayer/services/ox_update_service.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_sentry.dart';
@@ -28,6 +29,19 @@ import 'package:fladder/util/deep_link_helper.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/themes_data.dart';
 import 'package:fladder/widgets/media_query_scaler.dart';
+
+bool get _supportsOxInAppUpdatePrompt {
+  if (kIsWeb) return false;
+  switch (defaultTargetPlatform) {
+    case TargetPlatform.android:
+    case TargetPlatform.windows:
+    case TargetPlatform.macOS:
+    case TargetPlatform.linux:
+      return true;
+    default:
+      return false;
+  }
+}
 
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -93,9 +107,11 @@ class _FladderApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (OxplayerConfig.isEnabled && !kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    if (OxplayerConfig.isEnabled && !kIsWeb && _supportsOxInAppUpdatePrompt) {
       OxUpdateService.registerNavigatorKey(autoRouter.navigatorKey);
       OxUpdateService.registerRouter(autoRouter);
+      OxGitHubUpdateService.registerNavigatorKey(autoRouter.navigatorKey);
+      OxGitHubUpdateService.registerRouter(autoRouter);
     }
 
     final isLinux = defaultTargetPlatform == TargetPlatform.linux;
@@ -174,7 +190,7 @@ class _FladderApp extends ConsumerWidget {
             themeMode: themeMode,
             routerConfig: autoRouter.config(
               deepLinkBuilder: (deepLink) => deepLinkBuilder(deepLink.uri),
-              navigatorObservers: () => OxplayerConfig.isEnabled && defaultTargetPlatform == TargetPlatform.android
+              navigatorObservers: () => OxplayerConfig.isEnabled && _supportsOxInAppUpdatePrompt
                   ? [
                       OxplayerRouteTelemetryObserver(),
                       OxUpdatePromptNavigatorObserver(),

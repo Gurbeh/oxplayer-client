@@ -7,6 +7,7 @@ import 'package:fladder/bootstrap/app_bootstrap.dart';
 import 'package:fladder/oxplayer/oxplayer_auth_file_service.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
+import 'package:fladder/oxplayer/services/ox_github_update_service.dart';
 import 'package:fladder/oxplayer/services/ox_update_service.dart';
 import 'package:fladder/util/custom_cache_manager.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
@@ -28,19 +29,35 @@ abstract final class OxplayerBootstrap {
 
   static Future<void> afterAppBootstrap(AppBootstrapResult result) async {
     if (!OxplayerConfig.isEnabled) return;
-    if (kIsWeb || !Platform.isAndroid) return;
+    if (kIsWeb) return;
 
-    await OxUpdateService.checkOnLaunch(
-      sharedPreferences: result.sharedPreferences,
-      currentVersion: result.applicationInfo.version,
-      currentBuildNumber: result.applicationInfo.buildNumber,
-    );
+    if (Platform.isAndroid) {
+      await OxUpdateService.checkOnLaunch(
+        sharedPreferences: result.sharedPreferences,
+        currentVersion: result.applicationInfo.version,
+        currentBuildNumber: result.applicationInfo.buildNumber,
+      );
+      return;
+    }
+
+    if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+      await OxGitHubUpdateService.checkOnLaunch(
+        sharedPreferences: result.sharedPreferences,
+        currentVersion: result.applicationInfo.version,
+      );
+    }
   }
 
   /// Wraps the app root so deferred update prompts can obtain a [BuildContext].
   static Widget wrapRoot(Widget child) {
     if (!OxplayerConfig.isEnabled) return child;
-    if (kIsWeb || !Platform.isAndroid) return child;
+    if (kIsWeb) return child;
+    if (!Platform.isAndroid &&
+        !Platform.isWindows &&
+        !Platform.isMacOS &&
+        !Platform.isLinux) {
+      return child;
+    }
     return OxUpdatePromptHost(child: child);
   }
 }

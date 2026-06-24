@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/services/ox_github_update_service.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 
 const String kOxSkippedVersionKey = 'ox_skipped_version';
@@ -490,10 +491,16 @@ class _OxOptionalUpdateDialog extends StatelessWidget {
 /// Retries the optional-update prompt after navigation settles past [SplashRoute].
 final class OxUpdatePromptNavigatorObserver extends NavigatorObserver {
   void _scheduleTryShow() {
-    if (!OxUpdateService.hasPendingOptionalPrompt) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      OxUpdateService.showPendingOptionalPrompt();
-    });
+    if (OxUpdateService.hasPendingOptionalPrompt) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        OxUpdateService.showPendingOptionalPrompt();
+      });
+    }
+    if (OxGitHubUpdateService.hasPendingOptionalPrompt) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        OxGitHubUpdateService.showPendingOptionalPrompt();
+      });
+    }
   }
 
   @override
@@ -520,11 +527,17 @@ class _OxUpdatePromptHostState extends State<OxUpdatePromptHost> {
   @override
   void initState() {
     super.initState();
-    if (!OxplayerConfig.isEnabled || kIsWeb || !Platform.isAndroid) return;
+    if (!OxplayerConfig.isEnabled || kIsWeb) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted || !OxUpdateService.hasPendingOptionalPrompt) return;
-      await OxUpdateService.showPendingOptionalPrompt();
+      if (!mounted) return;
+      if (OxUpdateService.hasPendingOptionalPrompt) {
+        await OxUpdateService.showPendingOptionalPrompt();
+      }
+      if (!mounted) return;
+      if (OxGitHubUpdateService.hasPendingOptionalPrompt) {
+        await OxGitHubUpdateService.showPendingOptionalPrompt();
+      }
     });
   }
 
