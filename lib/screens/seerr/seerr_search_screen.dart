@@ -8,6 +8,7 @@ import 'package:fladder/models/items/images_models.dart';
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_seerr_library_search.dart';
+import 'package:fladder/oxplayer/oxplayer_seerr_catalog.dart';
 import 'package:fladder/oxplayer/oxplayer_seerr_search_catalog_ui.dart';
 import 'package:fladder/providers/seerr_search_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
@@ -171,12 +172,16 @@ class _SeerrSearchScreenState extends ConsumerState<SeerrSearchScreen> {
     );
 
     final searchResults = searchState.results;
+    final query = searchState.query.trim();
     final catalogOnly = OxplayerConfig.isEnabled ? ref.watch(oxplayerSeerrCatalogOnlyFilterProvider) : false;
+    final partitionedSeerrResults = OxplayerConfig.isEnabled && query.isNotEmpty && !catalogOnly
+        ? oxplayerPartitionSeerrSearchResults(searchResults)
+        : null;
     final catalogQuery = OxplayerSeerrCatalogSearchQuery(
       term: searchState.query,
       mediaType: oxplayerSeerrCatalogMediaTypeFilter(searchState.searchMode),
     );
-    final catalogSearch = catalogOnly && searchState.query.trim().isNotEmpty
+    final catalogSearch = catalogOnly && query.isNotEmpty
         ? ref.watch(oxplayerSeerrCatalogSearchProvider(catalogQuery))
         : null;
 
@@ -190,9 +195,13 @@ class _SeerrSearchScreenState extends ConsumerState<SeerrSearchScreen> {
           const [];
       gridLoading = catalogSearch?.isLoading ?? false;
     } else {
-      gridResults = searchResults;
+      gridResults = partitionedSeerrResults?.rest ?? searchResults;
       gridLoading = searchState.isLoading;
     }
+
+    final catalogRowHasResults = partitionedSeerrResults?.inCatalog.isNotEmpty == true;
+    final showNoResults =
+        gridResults.isEmpty && !catalogRowHasResults && !gridLoading && !searchState.isLoading;
 
     if (backgroundImages.isEmpty) {
       backgroundImages = searchResults.map((e) => e.images).nonNulls.toList(growable: false);
@@ -346,7 +355,7 @@ class _SeerrSearchScreenState extends ConsumerState<SeerrSearchScreen> {
                     ),
                   ),
                 ),
-                if (gridResults.isEmpty && !gridLoading && !searchState.isLoading)
+                if (showNoResults)
                   SliverFillRemaining(
                     hasScrollBody: false,
                     child: Center(
@@ -356,10 +365,12 @@ class _SeerrSearchScreenState extends ConsumerState<SeerrSearchScreen> {
                 else ...[
                   if (OxplayerConfig.isEnabled)
                     OxplayerSeerrSearchCatalogRow(
+                      inCatalog: partitionedSeerrResults?.inCatalog,
                       results: searchResults,
                       query: searchState.query,
                     ),
-                  SliverPadding(
+                  if (gridResults.isNotEmpty)
+                    SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     sliver: Builder(
                       builder: (context) {

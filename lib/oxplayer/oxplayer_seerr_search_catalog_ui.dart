@@ -29,10 +29,12 @@ class OxplayerSeerrCatalogFilterChip extends ConsumerWidget {
 }
 
 class OxplayerSeerrSearchCatalogRow extends ConsumerWidget {
+  final List<SeerrDashboardPosterModel>? inCatalog;
   final List<SeerrDashboardPosterModel> results;
   final String query;
 
   const OxplayerSeerrSearchCatalogRow({
+    this.inCatalog,
     required this.results,
     required this.query,
     super.key,
@@ -45,8 +47,8 @@ class OxplayerSeerrSearchCatalogRow extends ConsumerWidget {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
     }
 
-    final inCatalog = oxplayerPartitionSeerrSearchResults(results).inCatalog;
-    if (inCatalog.isEmpty) {
+    final catalogHits = inCatalog ?? oxplayerPartitionSeerrSearchResults(results).inCatalog;
+    if (catalogHits.isEmpty) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
     }
 
@@ -58,7 +60,7 @@ class OxplayerSeerrSearchCatalogRow extends ConsumerWidget {
           right: AdaptiveLayout.adaptivePadding(context).right,
         ),
         child: SeerrPosterRow(
-          posters: inCatalog,
+          posters: catalogHits,
           label: context.localized.library(1),
         ),
       ),
