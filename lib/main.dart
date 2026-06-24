@@ -95,6 +95,7 @@ class _FladderApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (OxplayerConfig.isEnabled && !kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       OxUpdateService.registerNavigatorKey(autoRouter.navigatorKey);
+      OxUpdateService.registerRouter(autoRouter);
     }
 
     final isLinux = defaultTargetPlatform == TargetPlatform.linux;
@@ -173,9 +174,14 @@ class _FladderApp extends ConsumerWidget {
             themeMode: themeMode,
             routerConfig: autoRouter.config(
               deepLinkBuilder: (deepLink) => deepLinkBuilder(deepLink.uri),
-              navigatorObservers: () => OxplayerConfig.isEnabled
-                  ? [OxplayerRouteTelemetryObserver()]
-                  : const [],
+              navigatorObservers: () => OxplayerConfig.isEnabled && defaultTargetPlatform == TargetPlatform.android
+                  ? [
+                      OxplayerRouteTelemetryObserver(),
+                      OxUpdatePromptNavigatorObserver(),
+                    ]
+                  : OxplayerConfig.isEnabled
+                      ? [OxplayerRouteTelemetryObserver()]
+                      : const [],
             ),
           ),
         );

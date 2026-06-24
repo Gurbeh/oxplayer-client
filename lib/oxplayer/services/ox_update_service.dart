@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
 
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -13,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/routes/auto_router.gr.dart';
 
 const String kOxSkippedVersionKey = 'ox_skipped_version';
 
@@ -96,6 +98,8 @@ abstract final class OxUpdateService {
 
   static OxOptionalUpdatePrompt? _pendingOptionalPrompt;
   static GlobalKey<NavigatorState>? _navigatorKey;
+  static StackRouter? _router;
+  static bool _dialogShowing = false;
 
   static bool get hasPendingOptionalPrompt => _pendingOptionalPrompt != null;
 
@@ -103,6 +107,17 @@ abstract final class OxUpdateService {
   /// context below the route [Navigator] (not [OxUpdatePromptHost], which sits above it).
   static void registerNavigatorKey(GlobalKey<NavigatorState> key) {
     _navigatorKey = key;
+  }
+
+  /// Registered from [_FladderApp] so we can wait until splash navigation finishes.
+  static void registerRouter(StackRouter router) {
+    _router = router;
+  }
+
+  static bool _isPastSplashScreen() {
+    final router = _router;
+    if (router == null) return false;
+    return router.current.name != SplashRoute.name;
   }
 
   /// Called from [OxplayerBootstrap.afterAppBootstrap] before [runApp].
@@ -236,10 +251,15 @@ abstract final class OxUpdateService {
     return 'semver:$targetLabel';
   }
 
-  /// Shows a deferred optional-update dialog once the route [Navigator] is mounted.
+  /// Shows a deferred optional-update dialog once the route [Navigator] is mounted
+  /// and initial splash → home/login navigation has finished.
   static Future<void> showPendingOptionalPrompt() async {
     final prompt = _pendingOptionalPrompt;
-    if (prompt == null) return;
+    if (prompt == null || _dialogShowing) return;
+
+    if (!_isPastSplashScreen()) {
+      return;
+    }
 
     final context = _navigatorKey?.currentContext;
     if (context == null || !context.mounted || Navigator.maybeOf(context) == null) {
@@ -250,12 +270,18 @@ abstract final class OxUpdateService {
       return;
     }
 
-    _pendingOptionalPrompt = null;
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => _OxOptionalUpdateDialog(prompt: prompt),
-    );
+    _dialogShowing = true;
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        useRootNavigator: true,
+        builder: (dialogContext) => _OxOptionalUpdateDialog(prompt: prompt),
+      );
+      _pendingOptionalPrompt = null;
+    } finally {
+      _dialogShowing = false;
+    }
   }
 
   static Future<({String displayVersion, String skipKey, OxSemver? targetSemver})?> _resolveUpdateTarget({
@@ -459,6 +485,25 @@ class _OxOptionalUpdateDialog extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Retries the optional-update prompt after navigation settles past [SplashRoute].
+final class OxUpdatePromptNavigatorObserver extends NavigatorObserver {
+  void _scheduleTryShow() {
+    if (!OxUpdateService.hasPendingOptionalPrompt) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      OxUpdateService.showPendingOptionalPrompt();
+    });
+  }
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) => _scheduleTryShow();
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) => _scheduleTryShow();
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) => _scheduleTryShow();
 }
 
 /// Defers optional-update UI until the widget tree has a [BuildContext].
