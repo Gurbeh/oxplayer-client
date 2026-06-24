@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/models/settings/client_settings_model.dart';
+import 'package:fladder/oxplayer/oxplayer_search_navigation.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
+import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/routes/auto_router.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
@@ -145,7 +147,7 @@ class TopNavigationBar extends ConsumerWidget {
                           height: 45,
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
-                            child: actionButton(context).normal,
+                            child: actionButton(context, ref).normal,
                           ),
                         ),
                         Flexible(
@@ -231,7 +233,10 @@ class TopNavigationBar extends ConsumerWidget {
     );
   }
 
-  AdaptiveFab actionButton(BuildContext context) {
+  AdaptiveFab actionButton(BuildContext context, WidgetRef ref) {
+    final seerrConfigured = ref.watch(
+      userProvider.select((user) => user?.seerrCredentials?.isConfigured ?? false),
+    );
     return ((currentIndex >= 0 && currentIndex < destinations.length)
             ? destinations[currentIndex].floatingActionButton
             : null) ??
@@ -239,7 +244,10 @@ class TopNavigationBar extends ConsumerWidget {
           context: context,
           title: context.localized.search,
           key: const Key("Search"),
-          onPressed: () => context.router.navigate(LibrarySearchRoute()),
+          onPressed: () => oxplayerNavigateToSearch(
+            context,
+            seerrConfigured: seerrConfigured,
+          ),
           child: const Icon(IconsaxPlusLinear.search_normal_1),
         );
   }

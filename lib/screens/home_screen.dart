@@ -8,6 +8,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'package:fladder/models/settings/client_settings_model.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_search_navigation.dart';
 import 'package:fladder/oxplayer/oxplayer_seerr_bootstrap.dart';
 import 'package:fladder/providers/dashboard_mode_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
@@ -140,7 +141,10 @@ class HomeScreen extends ConsumerWidget {
                   context: context,
                   title: context.localized.search,
                   key: Key(e.name.capitalize()),
-                  onPressed: () => context.router.navigate(LibrarySearchRoute()),
+                  onPressed: () => oxplayerNavigateToSearch(
+                    context,
+                    seerrConfigured: seerrAuthenticated,
+                  ),
                   child: const Icon(IconsaxPlusLinear.search_normal_1),
                 ),
               );
@@ -212,7 +216,10 @@ class HomeScreen extends ConsumerWidget {
                   context: context,
                   title: context.localized.search,
                   key: Key(e.name.capitalize()),
-                  onPressed: () => context.router.navigate(LibrarySearchRoute()),
+                  onPressed: () => oxplayerNavigateToSearch(
+                    context,
+                    seerrConfigured: seerrAuthenticated,
+                  ),
                   child: const Icon(IconsaxPlusLinear.search_status),
                 ),
               );
@@ -229,7 +236,10 @@ class HomeScreen extends ConsumerWidget {
               ref.read(clientSettingsProvider.notifier).toggleSideBar();
               return true;
             case GlobalHotKeys.search:
-              context.navigateTo(LibrarySearchRoute());
+              oxplayerNavigateToSearch(
+                context,
+                seerrConfigured: seerrAuthenticated,
+              );
               return true;
             case GlobalHotKeys.exit:
               Future.microtask(() async {
