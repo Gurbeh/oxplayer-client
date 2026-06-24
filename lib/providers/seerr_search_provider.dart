@@ -76,7 +76,7 @@ class SeerrSearch extends _$SeerrSearch {
   Future<void> submit([String? value]) async {
     final query = (value ?? state.query);
 
-    if (query.isNotEmpty && state.searchMode != SeerrSearchMode.search) {
+    if (query.isNotEmpty && state.searchMode == SeerrSearchMode.trending) {
       state = state.copyWith(searchMode: SeerrSearchMode.search);
     }
 
@@ -128,49 +128,73 @@ class SeerrSearch extends _$SeerrSearch {
           break;
 
         case SeerrSearchMode.discoverMovies:
-          final codes = _buildCertificationFilter();
-          final response = await api.discoverMovies(
-            page: page,
-            sortBy: state.filters.sortBy.valueForMode(SeerrSearchMode.discoverMovies),
-            genre: _getGenreIds(),
-            studio: state.filters.studio?.id,
-            primaryReleaseDateGte: _getYearGte(),
-            primaryReleaseDateLte: _getYearLte(),
-            voteAverageGte: state.filters.voteAverageGte,
-            voteAverageLte: state.filters.voteAverageLte,
-            withRuntimeGte: state.filters.runtimeGte,
-            withRuntimeLte: state.filters.runtimeLte,
-            watchRegion: state.filters.watchRegion,
-            watchProviders: _getWatchProviderIds(),
-            certification: codes,
-            certificationCountry: state.filters.watchRegion ?? 'US',
-            certificationMode: codes != null ? 'exact' : null,
-          );
-          final results = response.body?.results ?? [];
-          totalPages = response.body?.totalPages;
-          for (final result in results) {
-            final poster = api.posterFromDiscoverItem(result);
-            if (poster != null) items.add(poster);
+          if (state.query.trim().isNotEmpty) {
+            final response = await api.search(query: state.query, page: page);
+            final results = response.body?.results ?? [];
+            totalPages = response.body?.totalPages;
+            for (final result in results) {
+              final poster = api.posterFromDiscoverItem(result);
+              if (poster != null && poster.type == SeerrMediaType.movie) {
+                items.add(poster);
+              }
+            }
+          } else {
+            final codes = _buildCertificationFilter();
+            final response = await api.discoverMovies(
+              page: page,
+              sortBy: state.filters.sortBy.valueForMode(SeerrSearchMode.discoverMovies),
+              genre: _getGenreIds(),
+              studio: state.filters.studio?.id,
+              primaryReleaseDateGte: _getYearGte(),
+              primaryReleaseDateLte: _getYearLte(),
+              voteAverageGte: state.filters.voteAverageGte,
+              voteAverageLte: state.filters.voteAverageLte,
+              withRuntimeGte: state.filters.runtimeGte,
+              withRuntimeLte: state.filters.runtimeLte,
+              watchRegion: state.filters.watchRegion,
+              watchProviders: _getWatchProviderIds(),
+              certification: codes,
+              certificationCountry: state.filters.watchRegion ?? 'US',
+              certificationMode: codes != null ? 'exact' : null,
+            );
+            final results = response.body?.results ?? [];
+            totalPages = response.body?.totalPages;
+            for (final result in results) {
+              final poster = api.posterFromDiscoverItem(result);
+              if (poster != null) items.add(poster);
+            }
           }
           break;
 
         case SeerrSearchMode.discoverTv:
-          final response = await api.discoverTv(
-            page: page,
-            sortBy: state.filters.sortBy.valueForMode(SeerrSearchMode.discoverTv),
-            genre: _getGenreIds(),
-            firstAirDateGte: _getYearGte(),
-            firstAirDateLte: _getYearLte(),
-            voteAverageGte: state.filters.voteAverageGte,
-            voteAverageLte: state.filters.voteAverageLte,
-            watchRegion: state.filters.watchRegion,
-            watchProviders: _getWatchProviderIds(),
-          );
-          final results = response.body?.results ?? [];
-          totalPages = response.body?.totalPages;
-          for (final result in results) {
-            final poster = api.posterFromDiscoverItem(result);
-            if (poster != null) items.add(poster);
+          if (state.query.trim().isNotEmpty) {
+            final response = await api.search(query: state.query, page: page);
+            final results = response.body?.results ?? [];
+            totalPages = response.body?.totalPages;
+            for (final result in results) {
+              final poster = api.posterFromDiscoverItem(result);
+              if (poster != null && poster.type == SeerrMediaType.tvshow) {
+                items.add(poster);
+              }
+            }
+          } else {
+            final response = await api.discoverTv(
+              page: page,
+              sortBy: state.filters.sortBy.valueForMode(SeerrSearchMode.discoverTv),
+              genre: _getGenreIds(),
+              firstAirDateGte: _getYearGte(),
+              firstAirDateLte: _getYearLte(),
+              voteAverageGte: state.filters.voteAverageGte,
+              voteAverageLte: state.filters.voteAverageLte,
+              watchRegion: state.filters.watchRegion,
+              watchProviders: _getWatchProviderIds(),
+            );
+            final results = response.body?.results ?? [];
+            totalPages = response.body?.totalPages;
+            for (final result in results) {
+              final poster = api.posterFromDiscoverItem(result);
+              if (poster != null) items.add(poster);
+            }
           }
           break;
       }

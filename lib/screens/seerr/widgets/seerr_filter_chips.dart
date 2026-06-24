@@ -5,6 +5,8 @@ import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_seerr_search_catalog_ui.dart';
 import 'package:fladder/providers/seerr_search_provider.dart';
 import 'package:fladder/screens/seerr/widgets/seerr_filter_dialogs.dart';
 import 'package:fladder/screens/shared/chips/category_chip.dart';
@@ -29,6 +31,9 @@ class SeerrFilterChips extends ConsumerWidget {
     final showFilters = searchMode == SeerrSearchMode.discoverMovies || searchMode == SeerrSearchMode.discoverTv;
 
     final chips = [
+      if (OxplayerConfig.isEnabled &&
+          (searchMode == SeerrSearchMode.search || searchState.query.trim().isNotEmpty))
+        const OxplayerSeerrCatalogFilterChip(),
       if (showFilters) ...[
         if (filters.genres.isNotEmpty)
           CategoryChip<SeerrGenre>(
@@ -149,6 +154,7 @@ class SeerrFilterChips extends ConsumerWidget {
           const VerticalDivider(),
           ...chips.mapIndexed(
             (index, element) {
+              if (chips.length == 1) return element;
               final position = index == 0
                   ? PositionContext.first
                   : (index == chips.length - 1 ? PositionContext.last : PositionContext.middle);

@@ -6,6 +6,9 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/models/items/images_models.dart';
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_seerr_library_search.dart';
+import 'package:fladder/oxplayer/oxplayer_seerr_search_catalog_ui.dart';
 import 'package:fladder/providers/seerr_search_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/screens/seerr/widgets/seerr_filter_chips.dart';
@@ -85,6 +88,19 @@ class _SeerrSearchScreenState extends ConsumerState<SeerrSearchScreen> {
   Future<void> _refreshSearch() async {
     final state = ref.read(seerrSearchProvider);
     final notifier = ref.read(seerrSearchProvider.notifier);
+    final catalogOnly = OxplayerConfig.isEnabled && ref.read(oxplayerSeerrCatalogOnlyFilterProvider);
+
+    if (catalogOnly && state.query.trim().isNotEmpty) {
+      ref.invalidate(
+        oxplayerSeerrCatalogSearchProvider(
+          OxplayerSeerrCatalogSearchQuery(
+            term: state.query,
+            mediaType: oxplayerSeerrCatalogMediaTypeFilter(state.searchMode),
+          ),
+        ),
+      );
+      return;
+    }
 
     if (_forceSubmitOnRefresh) {
       _forceSubmitOnRefresh = false;
@@ -155,6 +171,28 @@ class _SeerrSearchScreenState extends ConsumerState<SeerrSearchScreen> {
     );
 
     final searchResults = searchState.results;
+    final catalogOnly = OxplayerConfig.isEnabled ? ref.watch(oxplayerSeerrCatalogOnlyFilterProvider) : false;
+    final catalogQuery = OxplayerSeerrCatalogSearchQuery(
+      term: searchState.query,
+      mediaType: oxplayerSeerrCatalogMediaTypeFilter(searchState.searchMode),
+    );
+    final catalogSearch = catalogOnly && searchState.query.trim().isNotEmpty
+        ? ref.watch(oxplayerSeerrCatalogSearchProvider(catalogQuery))
+        : null;
+
+    final List<SeerrDashboardPosterModel> gridResults;
+    final bool gridLoading;
+    if (OxplayerConfig.isEnabled && catalogOnly) {
+      gridResults = catalogSearch?.maybeWhen(
+            data: (value) => value,
+            orElse: () => const <SeerrDashboardPosterModel>[],
+          ) ??
+          const [];
+      gridLoading = catalogSearch?.isLoading ?? false;
+    } else {
+      gridResults = searchResults;
+      gridLoading = searchState.isLoading;
+    }
 
     if (backgroundImages.isEmpty) {
       backgroundImages = searchResults.map((e) => e.images).nonNulls.toList(growable: false);
@@ -247,7 +285,10 @@ class _SeerrSearchScreenState extends ConsumerState<SeerrSearchScreen> {
                                       onSubmitted: (value) => _triggerSubmitViaRefresh(value: value),
                                       onChanged: (value) {
                                         ref.read(seerrSearchProvider.notifier).setQuery(value);
-                                        if (searchState.searchMode == SeerrSearchMode.search) {
+                                        final mode = searchState.searchMode;
+                                        if (mode == SeerrSearchMode.search ||
+                                            mode == SeerrSearchMode.discoverMovies ||
+                                            mode == SeerrSearchMode.discoverTv) {
                                           debouncer.run(() {
                                             _triggerSubmitViaRefresh();
                                           });
@@ -305,7 +346,7 @@ class _SeerrSearchScreenState extends ConsumerState<SeerrSearchScreen> {
                     ),
                   ),
                 ),
-                if (searchResults.isEmpty && !searchState.isLoading)
+                if (gridResults.isEmpty && !gridLoading && !searchState.isLoading)
                   SliverFillRemaining(
                     hasScrollBody: false,
                     child: Center(
@@ -313,6 +354,11 @@ class _SeerrSearchScreenState extends ConsumerState<SeerrSearchScreen> {
                     ),
                   )
                 else ...[
+                  if (OxplayerConfig.isEnabled)
+                    OxplayerSeerrSearchCatalogRow(
+                      results: searchResults,
+                      query: searchState.query,
+                    ),
                   SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     sliver: Builder(
@@ -325,7 +371,7 @@ class _SeerrSearchScreenState extends ConsumerState<SeerrSearchScreen> {
                         final crossAxisCount = ((width / cellWidth).floor()).clamp(2, 10);
 
                         return GridFocusTraveler(
-                          itemCount: searchResults.length,
+                          itemCount: gridResults.length,
                           crossAxisCount: crossAxisCount,
                           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: crossAxisCount,
@@ -334,7 +380,7 @@ class _SeerrSearchScreenState extends ConsumerState<SeerrSearchScreen> {
                             childAspectRatio: 0.55,
                           ),
                           itemBuilder: (context, selectedIndex, index) {
-                            final poster = searchResults[index];
+                            final poster = gridResults[index];
                             return SeerrPosterCard(
                               key: Key(poster.id),
                               poster: poster,

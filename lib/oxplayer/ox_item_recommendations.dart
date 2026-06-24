@@ -4,12 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
-import 'package:fladder/models/item_base_model.dart';
-import 'package:fladder/models/items/images_models.dart';
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
+import 'package:fladder/oxplayer/oxplayer_seerr_catalog_poster.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
-import 'package:fladder/seerr/seerr_models.dart';
 
 /// TMDB recommendations for a catalog item via OX Jellyfin shim (`GET /Items/{id}/Recommendations`).
 Future<List<SeerrDashboardPosterModel>> oxFetchItemRecommendations(
@@ -46,39 +44,11 @@ Future<List<SeerrDashboardPosterModel>> oxFetchItemRecommendations(
     for (final raw in items) {
       if (raw is! Map<String, dynamic>) continue;
       final dto = BaseItemDto.fromJsonFactory(raw);
-      final poster = _posterFromBaseDto(dto, ref);
+      final poster = oxplayerPosterFromCatalogDto(dto, ref);
       if (poster != null) posters.add(poster);
     }
     return posters;
   } catch (_) {
     return const [];
   }
-}
-
-SeerrDashboardPosterModel? _posterFromBaseDto(BaseItemDto dto, Ref ref) {
-  final id = dto.id?.trim() ?? '';
-  if (id.isEmpty) return null;
-
-  final tmdbRaw = dto.providerIds?['Tmdb'] ?? dto.providerIds?['tmdb'];
-  final tmdbId = switch (tmdbRaw) {
-    final int n => n,
-    final String s => int.tryParse(s) ?? 0,
-    _ => 0,
-  };
-
-  final isSeries = dto.type == BaseItemKind.series;
-  final type = isSeries ? SeerrMediaType.tvshow : SeerrMediaType.movie;
-  final itemModel = ItemBaseModel.fromBaseDto(dto, ref);
-
-  return SeerrDashboardPosterModel(
-    id: id,
-    type: type,
-    tmdbId: tmdbId,
-    jellyfinItemId: id,
-    title: dto.name ?? '',
-    overview: dto.overview ?? '',
-    images: itemModel.images ?? ImagesData(),
-    mediaStatus: SeerrMediaStatus.available,
-    releaseYear: dto.productionYear?.toString(),
-  );
 }

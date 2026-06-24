@@ -1,0 +1,1 @@
+Seerr search: Library filter searches Jellyfin catalog; TMDB discover modes keep typed query; search navigation opens TMDB-wide search for Seerr users.
