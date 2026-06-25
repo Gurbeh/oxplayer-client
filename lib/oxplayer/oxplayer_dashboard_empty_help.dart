@@ -9,6 +9,8 @@ import 'package:fladder/oxplayer/oxplayer_help_content.dart';
 import 'package:fladder/oxplayer/oxplayer_navigation_seerr.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/providers/views_provider.dart';
+import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
+import 'package:fladder/util/focus_provider.dart';
 import 'package:fladder/util/localization_helper.dart';
 
 bool oxplayerIsHomeLibraryEmpty({
@@ -105,17 +107,61 @@ class _OxplayerDashboardEmptyHelpSliverState extends ConsumerState<OxplayerDashb
                 ),
               ),
               const SizedBox(height: 24),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: FilledButton.icon(
-                  onPressed: () => oxplayerNavigateToSeerr(context),
-                  icon: const Icon(Icons.explore_outlined),
-                  label: Text(context.localized.oxplayerHomeEmptyLibraryDiscover),
+              Center(
+                child: _EmptyLibraryDiscoverButton(
+                  label: context.localized.oxplayerHomeEmptyLibraryDiscover,
+                  onTap: () => oxplayerNavigateToSeerr(context),
                 ),
               ),
             ] else
               const OxplayerHelpContent(embedded: true),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// TV-friendly discover CTA — [FocusButton] handles d-pad select/enter keys.
+class _EmptyLibraryDiscoverButton extends StatelessWidget {
+  const _EmptyLibraryDiscoverButton({
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final radius = BorderRadius.circular(20);
+    final isDpad = AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad;
+
+    return FocusButton(
+      onTap: onTap,
+      autoFocus: isDpad,
+      borderRadius: radius,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primary,
+          borderRadius: radius,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.explore_outlined, color: theme.colorScheme.onPrimary),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.onPrimary,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
