@@ -7,9 +7,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/account_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_pending_route.dart';
 import 'package:fladder/oxplayer/oxplayer_session.dart';
 import 'package:fladder/oxplayer/oxplayer_splash_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_splash_telemetry.dart';
+import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/shared_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
@@ -114,9 +116,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     if (widget.loggedIn == null) {
       if (loggedIn) {
-        context.router.replace(const DashboardRoute());
+        if (OxplayerConfig.isEnabled) {
+          oxplayerFlushBufferedPendingPath(ref);
+          unawaited(oxplayerNavigateAfterLogin(context, ref));
+        } else {
+          context.router.replace(const DashboardRoute());
+        }
       } else {
-        context.router.replace(const OxplayerLoginRoute());
+        oxplayerFlushBufferedPendingPath(ref);
+        if (OxplayerConfig.isEnabled) {
+          context.router.replace(const OxplayerLoginRoute());
+          ref.read(authProvider.notifier).initModel();
+        } else {
+          context.router.replace(LoginRoute());
+        }
       }
     } else {
       // AuthGuard [redirectUntil] completes via this callback only.

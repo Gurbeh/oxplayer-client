@@ -10,13 +10,17 @@ import 'package:fladder/seerr/seerr_chopper_service.dart';
 import 'package:fladder/seerr/seerr_json_converter.dart';
 import 'package:fladder/seerr/seerr_models.dart';
 
+import 'package:fladder/util/deep_link_helper.dart';
+
 const String updateTaskName = 'nl.jknaapen.fladder.update_notifications_check';
 const String updateTaskNameDebug = 'nl.jknaapen.fladder.update_notifications_check_debug';
 
 class NotificationHelpers {
-  static String buildDetailsDeepLink(String id) => 'fladder:///details?id=${Uri.encodeComponent(id)}';
+  static String buildDetailsDeepLink(String id) =>
+      '$kOxplayerDeepLinkScheme:///details?id=${Uri.encodeComponent(id)}';
 
-  static String buildSeerrDeepLink(String mediaType, int tmdbId) => 'fladder:///seerr/$mediaType/$tmdbId';
+  static String buildSeerrDeepLink(String mediaType, int tmdbId) =>
+      '$kOxplayerDeepLinkScheme:///seerr/$mediaType/$tmdbId';
 
   static List<LastSeenModel> replaceOrAppendLastSeen(List<LastSeenModel> servers, LastSeenModel saved) {
     final exists = servers.any((s) => s.userId == saved.userId);

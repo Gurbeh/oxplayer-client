@@ -53,9 +53,17 @@
 			<string>fetch</string>
 		</array>
 
-		<!-- URL scheme for deep linking (example: fladder://details?id=xyz) -->
+		<!-- URL schemes for deep linking -->
 		<key>CFBundleURLTypes</key>
 		<array>
+			<dict>
+				<key>CFBundleURLName</key>
+				<string>oxplayer</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>oxplayer</string>
+				</array>
+			</dict>
 			<dict>
 				<key>CFBundleURLName</key>
 				<string>fladder</string>

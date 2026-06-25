@@ -6,7 +6,7 @@ abstract final class OxplayerSettingsVisibility {
 
   static bool get showControlPanel => !isOxMode;
 
-  static bool get showSwitchUser => !isOxMode;
+  static bool get showSwitchUser => true;
 
   static bool get showProfilePasswordReset => !isOxMode;
 

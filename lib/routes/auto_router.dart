@@ -1,6 +1,10 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_navigation.dart';
+import 'package:fladder/oxplayer/oxplayer_pending_route.dart';
+import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/login/lock_screen.dart';
@@ -161,7 +165,13 @@ class AuthGuard extends AutoRouteGuard {
       if (value) {
         resolver.next(true);
       } else {
-        router.replace(const OxplayerLoginRoute());
+        if (OxplayerConfig.isEnabled) {
+          oxplayerFlushBufferedPendingPath(ref);
+          router.replaceAll(oxplayerSignOutRouteList(ref));
+          ref.read(authProvider.notifier).initModel();
+        } else {
+          router.replace(LoginRoute());
+        }
       }
     }));
 

@@ -57,6 +57,7 @@ jobs:
           npm ci --include=dev
           NODE_ENV=production npm run build
           npm run verify:export
+          node scripts/patch-404-share.mjs
 
       - uses: subosito/flutter-action@v2
         with:

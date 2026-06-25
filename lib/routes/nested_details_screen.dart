@@ -5,9 +5,12 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/item_base_model.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/providers/items/item_details_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
+import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
 import 'package:fladder/util/fladder_image.dart';
+import 'package:fladder/util/localization_helper.dart';
 
 @RoutePage()
 class DetailsScreen extends ConsumerStatefulWidget {
@@ -59,7 +62,12 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
               currentWidget = response.detailScreenWidget;
             });
           } else {
-            const DashboardRoute().navigate(context);
+            if (OxplayerConfig.isEnabled && context.mounted) {
+              FladderSnack.show(context.localized.shareItemUnavailable, context: context);
+            }
+            if (context.mounted) {
+              const DashboardRoute().navigate(context);
+            }
           }
         }
       }

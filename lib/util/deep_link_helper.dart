@@ -4,12 +4,19 @@ import 'dart:developer';
 
 import 'package:auto_route/auto_route.dart' show DeepLink, PageRouteInfo;
 
+import 'package:fladder/oxplayer/oxplayer_pending_route.dart';
+import 'package:fladder/oxplayer/oxplayer_share.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
+
+/// Custom URL scheme used by OXPlayer native deep links.
+const kOxplayerDeepLinkScheme = 'oxplayer';
 
 FutureOr<DeepLink> deepLinkBuilder(Uri? payload) {
   final route = payloadToRoute(payload);
   if (route != null) {
-    return DeepLink.path(pageRouteInfoToPath(route));
+    final path = pageRouteInfoToPath(route);
+    oxplayerBufferPendingPath(path);
+    return DeepLink.path(path);
   }
   return DeepLink.defaultPath;
 }
@@ -74,11 +81,19 @@ String encodeAuthLink(AuthLinkData data) {
 
 String buildAuthUrl(AuthLinkData data) {
   final payload = encodeAuthLink(data);
-  return 'fladder:///login?authLink=$payload';
+  return '$kOxplayerDeepLinkScheme:///login?authLink=$payload';
 }
 
 PageRouteInfo? payloadToRoute(Uri? payload) {
   if (payload == null) return null;
+
+  final shareId = oxplayerCatalogIdFromShareUri(payload);
+  if (shareId != null &&
+      (oxplayerIsShareWebHost(payload) ||
+          payload.scheme == kOxplayerDeepLinkScheme ||
+          payload.scheme == 'fladder')) {
+    return DetailsRoute(id: shareId);
+  }
 
   if (payload.path.contains('/login')) {
     final authLink = payload.queryParameters['authLink'];
@@ -99,7 +114,10 @@ PageRouteInfo? payloadToRoute(Uri? payload) {
     return const SeerrRoute();
   }
   if (payload.path.contains('/details')) {
-    return DetailsRoute(id: payload.queryParameters['id']!);
+    final id = payload.queryParameters['id'];
+    if (id != null && id.isNotEmpty) {
+      return DetailsRoute(id: id);
+    }
   }
   return null;
 }

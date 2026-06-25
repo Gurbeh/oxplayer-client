@@ -7,6 +7,7 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_navigation.dart';
 import 'package:fladder/oxplayer/oxplayer_settings_visibility.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/auth_provider.dart';
@@ -235,8 +236,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 icon: IconsaxPlusLinear.arrow_swap_horizontal,
                 contentColor: Colors.greenAccent,
                 onTap: () async {
-                  await ref.read(userProvider.notifier).logoutUser();
-                  context.router.replaceAll([const OxplayerLoginRoute()]);
+                  await ref.read(authProvider.notifier).switchUser();
+                  if (context.mounted) {
+                    context.router.replaceAll(oxplayerSignOutRouteList(ref));
+                    await ref.read(authProvider.notifier).initModel();
+                  }
                 },
               ),
             SettingsListTile(
@@ -267,7 +271,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         onPressed: () async {
                           await ref.read(authProvider.notifier).logOutUser();
                           if (context.mounted) {
-                            context.router.replaceAll([const OxplayerLoginRoute()]);
+                            context.router.replaceAll(oxplayerSignOutRouteList(ref));
+                            await ref.read(authProvider.notifier).initModel();
                           }
                         },
                         child: Text(context.localized.logout),

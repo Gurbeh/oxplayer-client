@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.oxplayer",
+      "sha256_cert_fingerprints": [
+        "d74f7a041f542921c1d6fae4e5947d334dcaf880c24addbfb4a221e4cd83a099"
+      ]
+    }
+  }
+]

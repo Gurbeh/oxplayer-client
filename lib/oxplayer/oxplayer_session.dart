@@ -14,7 +14,7 @@ import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/providers/shared_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
-import 'package:fladder/routes/auto_router.gr.dart';
+import 'package:fladder/oxplayer/oxplayer_navigation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 const kOxJellyfinRefreshUsername = '__ox_refresh__';
@@ -95,7 +95,12 @@ Future<bool> oxplayerTryRefreshSession(OxplayerRead read) async {
 Future<void> oxplayerInvalidateLocalSession(OxplayerRead read, AccountModel account) async {
   await _sessionStore(read).clear(account);
   OxplayerImageAuth.clear();
-  await read(authProvider.notifier).logOutUser();
+  final cleared = account.copyWith(
+    credentials: account.credentials.copyWith(token: ''),
+  );
+  await read(sharedUtilityProvider).updateAccountInfo(cleared);
+  read(authProvider.notifier).clearAllProviders();
+  read(oxplayerSessionRevokedProvider.notifier).state++;
 }
 
 /// Listen for server-driven session invalidation. Call from [State.initState] only
@@ -103,7 +108,8 @@ Future<void> oxplayerInvalidateLocalSession(OxplayerRead read, AccountModel acco
 ProviderSubscription<int> oxplayerAttachSessionRevokedListener(WidgetRef ref, StackRouter router) {
   return ref.listenManual<int>(oxplayerSessionRevokedProvider, (previous, next) {
     if (next == 0 || next == previous) return;
-    router.replaceAll([const OxplayerLoginRoute()]);
+    router.replaceAll(oxplayerSignOutRouteList(ref));
+    ref.read(authProvider.notifier).initModel();
   });
 }
 

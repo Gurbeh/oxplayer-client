@@ -5,9 +5,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:fladder/oxplayer/oxplayer_account_delete_api.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_session.dart';
+import 'package:fladder/oxplayer/oxplayer_navigation.dart';
+import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
-import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/settings/settings_list_tile.dart';
 import 'package:fladder/screens/settings/widgets/settings_label_divider.dart';
 import 'package:fladder/screens/settings/widgets/settings_list_group.dart';
@@ -80,9 +80,10 @@ Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref) async {
     return;
   }
 
-  await oxplayerInvalidateLocalSession(ref.read, account);
+  await ref.read(authProvider.notifier).logOutUser();
   if (!context.mounted) return;
-  await context.router.replaceAll([const OxplayerLoginRoute()]);
+  await context.router.replaceAll(oxplayerSignOutRouteList(ref));
+  await ref.read(authProvider.notifier).initModel();
 }
 
 /// Opens the main-bot delete-account deep link (privacy policy fallback).

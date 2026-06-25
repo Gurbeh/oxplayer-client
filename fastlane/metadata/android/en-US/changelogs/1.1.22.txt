@@ -1,0 +1,3 @@
+Multi-account: switch between Telegram profiles, add accounts, and improved back navigation on login.
+Share: copy oxplayer.app links for movies, series, seasons, and episodes (opens in app when available).
+Website share landing page and Android app link support for shared titles.

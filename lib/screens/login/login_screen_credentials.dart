@@ -27,6 +27,7 @@ import 'package:fladder/screens/shared/passcode_input.dart';
 import 'package:fladder/util/auth_service.dart';
 import 'package:fladder/util/deep_link_helper.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_pending_route.dart';
 import 'package:fladder/oxplayer/oxplayer_seerr_auto_config.dart';
 import 'package:fladder/util/fladder_config.dart';
 import 'package:fladder/util/localization_helper.dart';
@@ -429,7 +430,8 @@ class _LoginScreenCredentialsState extends ConsumerState<LoginScreenCredentials>
 
 Future<void> loggedInGoToHome(BuildContext context, WidgetRef ref) async {
   if (OxplayerEnv.isEnabled) {
-    await oxplayerConfigureSeerrFromServer(ref);
+    await oxplayerNavigateAfterLogin(context, ref);
+    return;
   }
   ref.read(lockScreenActiveProvider.notifier).update((state) => false);
   if (context.mounted) {

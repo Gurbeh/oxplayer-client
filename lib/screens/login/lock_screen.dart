@@ -6,6 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/models/account_model.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_navigation.dart';
+import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/login/widgets/login_icon.dart';
@@ -109,9 +112,17 @@ class _LockScreenState extends ConsumerState<LockScreen> with WidgetsBindingObse
         child: Scaffold(
           floatingActionButton: FloatingActionButton(
             tooltip: context.localized.login,
-            onPressed: () {
+            onPressed: () async {
               ref.read(lockScreenActiveProvider.notifier).update((state) => false);
-              context.router.replaceAll([const OxplayerLoginRoute()]);
+              if (OxplayerConfig.isEnabled) {
+                await ref.read(authProvider.notifier).switchUser();
+                if (context.mounted) {
+                  context.router.replaceAll(oxplayerSignOutRouteList(ref));
+                  await ref.read(authProvider.notifier).initModel();
+                }
+              } else {
+                context.router.replaceAll([LoginRoute()]);
+              }
             },
             child: const Icon(IconsaxPlusLinear.arrow_swap_horizontal),
           ),
