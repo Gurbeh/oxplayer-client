@@ -1,50 +1,83 @@
-name: "🐛 Bug Report"
-description: Create a new ticket for a bug.
-title: "<TITLE>"
-type: "Bug"
+name: Bug report
+description: Something is broken in the OXPlayer app
+title: "BUG: "
+labels:
+  - bug
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **Before filing:** If Fladder works against real Jellyfin but OXPlayer fails on the same flow, the bug is often in [oxplayer-be](https://github.com/Aryan-mor/oxplayer-be/issues/new/choose) (API shim), not Fladder client code.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - lib/oxplayer (OX-specific)
+        - Home / library / empty or wrong content
+        - Playback / streaming
+        - Seerr / requests
+        - Login / session
+        - Settings
+        - Website
+        - Crash / performance
+        - Not sure
+    validations:
+      required: true
+
   - type: textarea
     id: description
     attributes:
-      label: "Description"
-      description: Please enter an explicit description of your issue
-      placeholder: Short and explicit description of your incident...
+      label: Description
+      description: What is wrong?
+      placeholder: Short and explicit description...
     validations:
       required: true
+
   - type: textarea
     id: reprod
     attributes:
-      label: "Reproduction steps"
-      description: Please provide clear steps to reproduce the bug
+      label: Reproduction steps
       placeholder: |
-        1. Go to '...'
-        2. Click on '....'
-        3. Scroll down to '....'
-        4. See error
-      render: bash
+        1. Open OXPlayer on Android
+        2. Sign in with Telegram
+        3. Open Home
+        4. See empty screen
+      render: markdown
     validations:
       required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
   - type: textarea
     id: screenshot
     attributes:
-      label: "Screenshots"
-      description: If applicable, add screenshots to help explain your problem.
-      placeholder: "Drag and drop screenshots here, or paste image URLs using ![description](image-url)"
-    validations:
-      required: false
+      label: Screenshots
+      placeholder: Drag and drop in a follow-up comment, or paste image URLs
+
   - type: textarea
     id: logs
     attributes:
-      label: "Logs"
-      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
-      render: bash
-    validations:
-      required: false
+      label: Logs
+      render: shell
+
   - type: dropdown
     id: platform
     attributes:
-      label: "Platform"
-      description: What platform(s) do you see the problem on?
+      label: Platform
       multiple: true
       options:
         - Android
@@ -56,17 +89,28 @@ body:
         - Web
     validations:
       required: true
+
   - type: input
     id: version
     attributes:
-      label: App Version
-      description: What version of Fladder are you using?
-      placeholder: e.g. v0.7.0 (267)
+      label: App version
+      description: OXPlayer build or version
+      placeholder: e.g. 1.0.0+42
+
   - type: input
     id: server
     attributes:
-      label: Jellyfin server
-      description: What is your Jellyfin setup
-      placeholder: e.g. 10.11.2 on docker,windows,macos
+      label: OXPlayer API / environment
+      placeholder: e.g. prod API, dev stack, user role VIP/admin
     validations:
       required: true
+
+  - type: checkboxes
+    id: triage
+    attributes:
+      label: Triage hints (optional)
+      options:
+        - label: "Compared API response to Jellyfin docs or curl"
+          required: false
+        - label: "Likely oxplayer-be — please move or link issue there"
+          required: false

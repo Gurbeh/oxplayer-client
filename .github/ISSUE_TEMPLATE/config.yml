@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: "💡 Feature Request"
-    url: "https://github.com/DonutWare/Fladder/discussions/new?category=ideas"
-    about: "Suggest a new feature or enhancement."
+  - name: OXPlayer API / server (oxplayer-be)
+    url: https://github.com/Aryan-mor/oxplayer-be/issues/new/choose
+    about: Empty home/library, wrong JSON from API, Seerr proxy, main-bot, catalog — fix the backend shim, not Fladder UI code.
+  - name: Upstream Fladder (DonutWare)
+    url: https://github.com/DonutWare/fladder/discussions/new?category=ideas
+    about: Ideas that belong in upstream Fladder only — not OX-specific product work.

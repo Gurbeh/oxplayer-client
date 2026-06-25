@@ -1,0 +1,36 @@
+name: Investigation / unclear
+description: Rough idea — needs triage (bug vs feature, client vs backend)
+title: "TRIAGE: "
+labels:
+  - question
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Not sure yet? Write freely (Farsi or English). A maintainer can move this to bug/feature or split to oxplayer-be.
+
+  - type: textarea
+    id: raw_notes
+    attributes:
+      label: Raw notes
+      placeholder: "مثلاً: تو welcome چیزایی که می‌خوام نیست"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Where did you notice it?
+      placeholder: "OXPlayer Android, web, after login, Seerr modal, etc."
+
+  - type: dropdown
+    id: guess
+    attributes:
+      label: Your best guess
+      options:
+        - Probably a client bug
+        - Probably a backend / API bug (oxplayer-be)
+        - Probably a feature
+        - No idea
+    validations:
+      required: true

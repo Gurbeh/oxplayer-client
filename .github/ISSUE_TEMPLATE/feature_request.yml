@@ -1,0 +1,73 @@
+name: Feature request
+description: New OXPlayer capability or product improvement
+title: "FEAT: "
+labels:
+  - feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **OXPlayer product features** belong here — not upstream Fladder.
+
+        If the API returns wrong data, file in [oxplayer-be](https://github.com/Aryan-mor/oxplayer-be/issues/new/choose) instead.
+        Rough notes in Farsi or English are fine.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - lib/oxplayer (OX-specific UI / flows)
+        - Home / library / catalog screens
+        - Playback / player
+        - Seerr / media requests UI
+        - Auth / Sign in with Telegram
+        - Settings / profile
+        - Website (website/)
+        - Android / iOS / desktop packaging
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What pain does this solve? Who benefits?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should the user see or be able to do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      placeholder: "Do nothing; workaround; upstream Fladder already has this"
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority (your view)
+      options:
+        - Nice to have
+        - Should have soon
+        - Critical for next release
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope notes (optional)
+      options:
+        - label: "Likely needs oxplayer-be API changes too"
+          required: false
+        - label: "Should live under lib/oxplayer/ (not upstream Fladder files)"
+          required: false
