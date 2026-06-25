@@ -16,6 +16,7 @@ import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/services/ox_github_update_service.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
+import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 
 const String kOxSkippedVersionKey = 'ox_skipped_version';
 
@@ -440,50 +441,98 @@ abstract final class OxUpdateService {
   }
 }
 
-class _OxOptionalUpdateDialog extends StatelessWidget {
+class _OxOptionalUpdateDialog extends StatefulWidget {
   const _OxOptionalUpdateDialog({required this.prompt});
 
   final OxOptionalUpdatePrompt prompt;
 
   @override
+  State<_OxOptionalUpdateDialog> createState() => _OxOptionalUpdateDialogState();
+}
+
+class _OxOptionalUpdateDialogState extends State<_OxOptionalUpdateDialog> {
+  final FocusScopeNode _focusScope = FocusScopeNode(debugLabel: 'OxOptionalUpdateDialog');
+  final FocusNode _primaryActionFocus = FocusNode(debugLabel: 'OxUpdatePrimaryAction');
+
+  @override
+  void initState() {
+    super.initState();
+    _focusScope.addListener(_reclaimFocusIfNeeded);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _requestInitialFocus();
+      // Home TV rows can steal focus on the same frame they mount.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _requestInitialFocus());
+    });
+  }
+
+  void _reclaimFocusIfNeeded() {
+    if (!mounted || _focusScope.focusedChild != null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _requestInitialFocus());
+  }
+
+  void _requestInitialFocus() {
+    if (!mounted) return;
+    if (_primaryActionFocus.canRequestFocus) {
+      _focusScope.requestFocus(_primaryActionFocus);
+    } else {
+      _focusScope.requestFocus();
+    }
+  }
+
+  @override
+  void dispose() {
+    _focusScope.removeListener(_reclaimFocusIfNeeded);
+    _primaryActionFocus.dispose();
+    _focusScope.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final prompt = widget.prompt;
+    final isDpad = AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad;
 
-    return AlertDialog(
-      title: const Text('Update available'),
-      content: Text(
-        prompt.targetVersion == 'latest'
-            ? 'A new version is available on Google Play. You are on ${prompt.currentVersion}.'
-            : 'Version ${prompt.targetVersion} is available. You are on ${prompt.currentVersion}.',
-      ),
-      actionsAlignment: MainAxisAlignment.start,
-      actions: [
-        TextButton(
-          autofocus: true,
-          onPressed: () async {
-            await OxUpdateService.openPlayStoreListing();
-            if (context.mounted) Navigator.of(context).pop();
-          },
-          child: const Text('Update'),
+    return FocusScope(
+      node: _focusScope,
+      autofocus: true,
+      child: AlertDialog(
+        title: const Text('Update available'),
+        content: Text(
+          prompt.targetVersion == 'latest'
+              ? 'A new version is available on Google Play. You are on ${prompt.currentVersion}.'
+              : 'Version ${prompt.targetVersion} is available. You are on ${prompt.currentVersion}.',
         ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Remind Me Later'),
-        ),
-        TextButton(
-          onPressed: () async {
-            await OxUpdateService.skipVersion(
-              sharedPreferences: prompt.sharedPreferences,
-              skipKey: prompt.skipKey,
-            );
-            if (context.mounted) Navigator.of(context).pop();
-          },
-          child: Text(
-            'Skip This Version',
-            style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+        actionsAlignment: MainAxisAlignment.start,
+        actions: [
+          TextButton(
+            focusNode: _primaryActionFocus,
+            autofocus: isDpad,
+            onPressed: () async {
+              await OxUpdateService.openPlayStoreListing();
+              if (context.mounted) Navigator.of(context).pop();
+            },
+            child: const Text('Update'),
           ),
-        ),
-      ],
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Remind Me Later'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await OxUpdateService.skipVersion(
+                sharedPreferences: prompt.sharedPreferences,
+                skipKey: prompt.skipKey,
+              );
+              if (context.mounted) Navigator.of(context).pop();
+            },
+            child: Text(
+              'Skip This Version',
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
