@@ -6,7 +6,7 @@ import Paragraph from "@/components/ui/Paragraph";
 import { SITE_ORIGIN } from "@/config/site";
 import PlatformDownloads from "@/features/home/PlatformDownloads";
 import clsx from "clsx";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -40,17 +40,18 @@ export default function ShareLanding({ catalogId }: ShareLandingProps) {
   const valid = UUID_RE.test(id);
   const platform = useMemo(() => detectPlatform(), []);
 
-  const shareUrl = `${SITE_ORIGIN}/share/${id}`;
   const webAppUrl = `${SITE_ORIGIN}/web/#/details?id=${encodeURIComponent(id)}`;
   const customSchemeUrl = `oxplayer:///share/${id}`;
-  const androidIntent = `intent://share/${id}#Intent;scheme=https;host=oxplayer.app;package=app.oxplayer;S.browser_fallback_url=${encodeURIComponent(shareUrl)};end`;
 
-  const openInAppHref =
-    platform === "android"
-      ? androidIntent
-      : platform === "ios"
-        ? shareUrl
-        : customSchemeUrl;
+  // Custom scheme works for dev (app.oxplayer.dev) and prod (app.oxplayer) builds.
+  const openInAppHref = customSchemeUrl;
+
+  useEffect(() => {
+    if (!valid || platform === "desktop") return;
+    // App Links often fail inside in-app browsers (Telegram, WhatsApp) or on debug
+    // builds — try opening the native app immediately as a fallback.
+    window.location.assign(customSchemeUrl);
+  }, [customSchemeUrl, platform, valid]);
 
   if (!valid) {
     return (
