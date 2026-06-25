@@ -1,12 +1,6 @@
-import 'package:flutter/material.dart';
-
 import 'package:auto_route/auto_route.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_seerr_catalog_trending_row.dart';
-import 'package:fladder/oxplayer/providers/ox_seerr_catalog_trending.dart';
 import 'package:fladder/providers/seerr_dashboard_provider.dart';
 import 'package:fladder/providers/seerr_user_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
@@ -22,6 +16,8 @@ import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/sliver_list_padding.dart';
 import 'package:fladder/widgets/navigation_scaffold/components/background_image.dart';
 import 'package:fladder/widgets/shared/pull_to_refresh.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 @RoutePage()
 class SeerrScreen extends ConsumerStatefulWidget {
@@ -37,9 +33,6 @@ class _SeerrScreenState extends ConsumerState<SeerrScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(seerrDashboardProvider.notifier).fetchDashboard();
-      if (OxplayerEnv.isEnabled) {
-        ref.read(oxSeerrCatalogTrendingProvider.notifier).refresh();
-      }
     });
   }
 
@@ -54,6 +47,8 @@ class _SeerrScreenState extends ConsumerState<SeerrScreen> {
     final dashboardState = ref.watch(seerrDashboardProvider);
     final canViewRecent = ref.watch(seerrUserProvider.select((state) => state?.canViewRecent ?? false));
     final backgroundImages = [
+      ...dashboardState.catalogAvailableMovies,
+      ...dashboardState.catalogAvailableSeries,
       ...dashboardState.recentlyAdded,
       ...dashboardState.recentRequests,
       ...dashboardState.trending,
@@ -70,12 +65,7 @@ class _SeerrScreenState extends ConsumerState<SeerrScreen> {
           images: backgroundImages,
         ),
         body: PullToRefresh(
-          onRefresh: () async {
-            await ref.read(seerrDashboardProvider.notifier).fetchDashboard();
-            if (OxplayerEnv.isEnabled) {
-              await ref.read(oxSeerrCatalogTrendingProvider.notifier).refresh();
-            }
-          },
+          onRefresh: () => ref.read(seerrDashboardProvider.notifier).fetchDashboard(),
           child: (context) => CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             controller: AdaptiveLayout.scrollOf(context, HomeTabs.seerr),
@@ -84,9 +74,27 @@ class _SeerrScreenState extends ConsumerState<SeerrScreen> {
                 NestedSliverAppBar(parent: context)
               else
                 const DefaultSliverTopBadding(),
-              if (OxplayerEnv.isEnabled)
+              if (OxplayerEnv.isEnabled && dashboardState.catalogAvailableMovies.isNotEmpty)
                 SliverToBoxAdapter(
-                  child: OxplayerSeerrCatalogTrendingRow(contentPadding: padding),
+                  child: SeerrPosterRow(
+                    label: context.localized.oxplayerSeerrCatalogAvailableMovies,
+                    posters: dashboardState.catalogAvailableMovies,
+                    contentPadding: padding,
+                    onLabelClick: () => context.pushRoute(
+                      SeerrSearchRoute(mode: SeerrSearchMode.catalogAvailableMovies),
+                    ),
+                  ),
+                ),
+              if (OxplayerEnv.isEnabled && dashboardState.catalogAvailableSeries.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: SeerrPosterRow(
+                    label: context.localized.oxplayerSeerrCatalogAvailableSeries,
+                    posters: dashboardState.catalogAvailableSeries,
+                    contentPadding: padding,
+                    onLabelClick: () => context.pushRoute(
+                      SeerrSearchRoute(mode: SeerrSearchMode.catalogAvailableSeries),
+                    ),
+                  ),
                 ),
               if (canViewRecent && dashboardState.recentlyAdded.isNotEmpty)
                 SliverToBoxAdapter(

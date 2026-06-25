@@ -1,16 +1,14 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
-
 import 'package:chopper/chopper.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:fladder/models/items/images_models.dart';
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
 import 'package:fladder/models/seerr/seerr_item_models.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/seerr/seerr_chopper_service.dart';
 import 'package:fladder/seerr/seerr_models.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 const tmbdUrl = 'https://image.tmdb.org/t/p/original';
 const kBrowserManagedCookie = '__browser_managed__';
@@ -351,11 +349,40 @@ class SeerrService {
     return results.map(_posterFromDiscoverItem).whereType<SeerrDashboardPosterModel>().toList(growable: false);
   }
 
-  /// OX: TMDB daily trending titles that exist in the OX catalog (server-cached).
-  Future<List<SeerrDashboardPosterModel>> discoverCatalogTrending({int? take, String? language}) async {
-    final response = await _api.getDiscoverCatalogTrending(take: take, language: language);
+  /// OX: catalog titles in the OX database (prefer TMDB trending order when cached).
+  Future<List<SeerrDashboardPosterModel>> discoverCatalogTrending({
+    int? take,
+    String? mediaType,
+    String? language,
+  }) async {
+    final response = await _api.getDiscoverCatalogTrending(
+      take: take,
+      mediaType: mediaType,
+      language: language,
+    );
+    if (!response.isSuccessful || response.body == null) {
+      return const [];
+    }
     final results = response.body?.results ?? const <SeerrDiscoverItem>[];
-    return results.map(_posterFromDiscoverItem).whereType<SeerrDashboardPosterModel>().toList(growable: false);
+    if (results.isEmpty) return const [];
+
+    final futures = results.map((item) async {
+      var poster = _posterFromDiscoverItem(item);
+      final tmdbId = item.id ?? item.mediaInfo?.tmdbId;
+      if (tmdbId != null &&
+          (poster == null || poster.images.isEmpty || poster.title.trim().isEmpty)) {
+        final enriched = await fetchDashboardPosterFromIds(
+          tmdbId: tmdbId,
+          tvdbId: item.mediaInfo?.tvdbId,
+          language: language,
+          mediaType: item.mediaType,
+        );
+        if (enriched != null) return enriched;
+      }
+      return poster;
+    });
+    final posters = await Future.wait(futures);
+    return posters.whereType<SeerrDashboardPosterModel>().toList(growable: false);
   }
 
   SeerrMediaType? _resolveMediaType(SeerrDiscoverItem item) {

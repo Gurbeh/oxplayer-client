@@ -84,7 +84,9 @@ enum SeerrSearchMode {
   search,
   trending,
   discoverMovies,
-  discoverTv;
+  discoverTv,
+  catalogAvailableMovies,
+  catalogAvailableSeries;
 
   String label(BuildContext context) {
     switch (this) {
@@ -96,6 +98,10 @@ enum SeerrSearchMode {
         return context.localized.mediaTypeMovie(2);
       case SeerrSearchMode.discoverTv:
         return context.localized.mediaTypeSeries(2);
+      case SeerrSearchMode.catalogAvailableMovies:
+        return context.localized.oxplayerSeerrCatalogAvailableMovies;
+      case SeerrSearchMode.catalogAvailableSeries:
+        return context.localized.oxplayerSeerrCatalogAvailableSeries;
     }
   }
 
@@ -104,6 +110,8 @@ enum SeerrSearchMode {
         SeerrSearchMode.trending => IconsaxPlusBold.trend_up,
         SeerrSearchMode.discoverMovies => FladderItemType.movie.selectedicon,
         SeerrSearchMode.discoverTv => FladderItemType.series.selectedicon,
+        SeerrSearchMode.catalogAvailableMovies => FladderItemType.movie.selectedicon,
+        SeerrSearchMode.catalogAvailableSeries => FladderItemType.series.selectedicon,
       };
 }
 

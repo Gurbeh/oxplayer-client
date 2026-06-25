@@ -2,6 +2,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
 import 'package:fladder/models/seerr/seerr_item_models.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/providers/seerr_api_provider.dart';
 import 'package:fladder/providers/seerr_service_provider.dart';
 import 'package:fladder/providers/seerr_user_provider.dart';
@@ -21,7 +22,7 @@ class SeerrDashboard extends _$SeerrDashboard {
 
   Future<void> fetchDashboard() async {
     await ref.read(seerrUserProvider.notifier).refreshUser();
-    await Future.wait([
+    final fetches = <Future<void>>[
       fetchRecentlyAdded(),
       fetchRecentRequests(),
       fetchTrending(),
@@ -29,7 +30,11 @@ class SeerrDashboard extends _$SeerrDashboard {
       fetchPopularSeries(),
       fetchExpectedMovies(),
       fetchExpectedSeries(),
-    ]);
+    ];
+    if (OxplayerEnv.isEnabled) {
+      fetches.add(fetchCatalogAvailable());
+    }
+    await Future.wait(fetches);
   }
 
   Future<void> fetchRecentlyAdded() async {
@@ -85,6 +90,29 @@ class SeerrDashboard extends _$SeerrDashboard {
 
   Future<void> fetchTrending() async =>
       _safeSet(() => api.discoverTrending(), (items) => state.copyWith(trending: items));
+
+  Future<void> fetchCatalogAvailable() async {
+    if (!OxplayerEnv.isEnabled) return;
+    if (ref.read(userProvider)?.seerrCredentials?.isConfigured != true) {
+      state = state.copyWith(
+        catalogAvailableMovies: const [],
+        catalogAvailableSeries: const [],
+      );
+      return;
+    }
+    try {
+      final results = await Future.wait([
+        api.discoverCatalogTrending(take: 20, mediaType: 'movie'),
+        api.discoverCatalogTrending(take: 20, mediaType: 'tv'),
+      ]);
+      state = state.copyWith(
+        catalogAvailableMovies: results[0],
+        catalogAvailableSeries: results[1],
+      );
+    } catch (_) {
+      return;
+    }
+  }
 
   Future<void> fetchPopularMovies() async =>
       _safeSet(() => api.discoverPopularMovies(), (items) => state.copyWith(popularMovies: items));

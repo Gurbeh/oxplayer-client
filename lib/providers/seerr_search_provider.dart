@@ -76,7 +76,10 @@ class SeerrSearch extends _$SeerrSearch {
   Future<void> submit([String? value]) async {
     final query = (value ?? state.query);
 
-    if (query.isNotEmpty && state.searchMode == SeerrSearchMode.trending) {
+    if (query.isNotEmpty &&
+        (state.searchMode == SeerrSearchMode.trending ||
+            state.searchMode == SeerrSearchMode.catalogAvailableMovies ||
+            state.searchMode == SeerrSearchMode.catalogAvailableSeries)) {
       state = state.copyWith(searchMode: SeerrSearchMode.search);
     }
 
@@ -196,6 +199,20 @@ class SeerrSearch extends _$SeerrSearch {
               if (poster != null) items.add(poster);
             }
           }
+          break;
+
+        case SeerrSearchMode.catalogAvailableMovies:
+          if (page <= 1) {
+            items = await api.discoverCatalogTrending(take: 120, mediaType: 'movie');
+          }
+          totalPages = 1;
+          break;
+
+        case SeerrSearchMode.catalogAvailableSeries:
+          if (page <= 1) {
+            items = await api.discoverCatalogTrending(take: 120, mediaType: 'tv');
+          }
+          totalPages = 1;
           break;
       }
 

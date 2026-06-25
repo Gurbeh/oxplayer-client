@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
+import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/providers/seerr_api_provider.dart';
 import 'package:fladder/providers/seerr_search_provider.dart';
 import 'package:fladder/screens/shared/outlined_text_field.dart';
@@ -63,6 +64,13 @@ Future<void> openSearchModeDialog(
           child: ListView(
             shrinkWrap: true,
             children: SeerrSearchMode.values
+                .where((mode) {
+                  if (mode == SeerrSearchMode.catalogAvailableMovies ||
+                      mode == SeerrSearchMode.catalogAvailableSeries) {
+                    return OxplayerEnv.isEnabled;
+                  }
+                  return true;
+                })
                 .map(
                   (mode) => CheckboxListTile(
                     value: mode == selectedMode,

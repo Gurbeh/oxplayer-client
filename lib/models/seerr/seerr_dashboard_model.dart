@@ -254,6 +254,8 @@ class SeerrDashboardRequestItem {
 class SeerrDashboardModel {
   final List<SeerrDashboardPosterModel> recentlyAdded;
   final List<SeerrDashboardPosterModel> recentRequests;
+  final List<SeerrDashboardPosterModel> catalogAvailableMovies;
+  final List<SeerrDashboardPosterModel> catalogAvailableSeries;
   final List<SeerrDashboardPosterModel> trending;
   final List<SeerrDashboardPosterModel> popularMovies;
   final List<SeerrDashboardPosterModel> popularSeries;
@@ -263,6 +265,8 @@ class SeerrDashboardModel {
   const SeerrDashboardModel({
     this.recentlyAdded = const [],
     this.recentRequests = const [],
+    this.catalogAvailableMovies = const [],
+    this.catalogAvailableSeries = const [],
     this.trending = const [],
     this.popularMovies = const [],
     this.popularSeries = const [],
@@ -273,6 +277,8 @@ class SeerrDashboardModel {
   SeerrDashboardModel copyWith({
     List<SeerrDashboardPosterModel>? recentlyAdded,
     List<SeerrDashboardPosterModel>? recentRequests,
+    List<SeerrDashboardPosterModel>? catalogAvailableMovies,
+    List<SeerrDashboardPosterModel>? catalogAvailableSeries,
     List<SeerrDashboardPosterModel>? trending,
     List<SeerrDashboardPosterModel>? popularMovies,
     List<SeerrDashboardPosterModel>? popularSeries,
@@ -282,6 +288,8 @@ class SeerrDashboardModel {
     return SeerrDashboardModel(
       recentlyAdded: recentlyAdded ?? this.recentlyAdded,
       recentRequests: recentRequests ?? this.recentRequests,
+      catalogAvailableMovies: catalogAvailableMovies ?? this.catalogAvailableMovies,
+      catalogAvailableSeries: catalogAvailableSeries ?? this.catalogAvailableSeries,
       trending: trending ?? this.trending,
       popularMovies: popularMovies ?? this.popularMovies,
       popularSeries: popularSeries ?? this.popularSeries,
