@@ -7,6 +7,7 @@ import 'package:fladder/bootstrap/app_bootstrap.dart';
 import 'package:fladder/oxplayer/oxplayer_auth_file_service.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
+import 'package:fladder/oxplayer/oxplayer_sentry_user_sync.dart';
 import 'package:fladder/oxplayer/services/ox_github_update_service.dart';
 import 'package:fladder/oxplayer/services/ox_update_service.dart';
 import 'package:fladder/util/custom_cache_manager.dart';
@@ -52,12 +53,14 @@ abstract final class OxplayerBootstrap {
   static Widget wrapRoot(Widget child) {
     if (!OxplayerConfig.isEnabled) return child;
     if (kIsWeb) return child;
-    if (!Platform.isAndroid &&
-        !Platform.isWindows &&
-        !Platform.isMacOS &&
-        !Platform.isLinux) {
-      return child;
+
+    var wrapped = child;
+    if (Platform.isAndroid ||
+        Platform.isWindows ||
+        Platform.isMacOS ||
+        Platform.isLinux) {
+      wrapped = OxUpdatePromptHost(child: wrapped);
     }
-    return OxUpdatePromptHost(child: child);
+    return OxplayerSentryUserSync(child: wrapped);
   }
 }

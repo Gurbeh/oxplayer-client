@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
+import 'package:fladder/models/account_model.dart';
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_sentry_filters.dart';
@@ -98,5 +99,24 @@ abstract final class OxplayerSentry {
           ..setTag('test', 'true');
       },
     );
+  }
+
+  /// Binds or clears the Sentry user from the signed-in Jellyfin account (id only — no PII).
+  static void syncUser(AccountModel? account) {
+    if (!Sentry.isEnabled) return;
+    Sentry.configureScope((scope) {
+      if (account == null) {
+        scope.setUser(null);
+        return;
+      }
+      final jellyfinUserId = account.id.trim();
+      if (jellyfinUserId.isEmpty) {
+        scope.setUser(null);
+        return;
+      }
+      scope
+        ..setUser(SentryUser(id: jellyfinUserId))
+        ..setTag('server_id', account.credentials.serverId);
+    });
   }
 }
