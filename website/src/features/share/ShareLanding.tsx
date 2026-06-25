@@ -15,11 +15,12 @@ type ShareLandingProps = {
   catalogId: string;
 };
 
-function detectPlatform(): "android" | "ios" | "desktop" {
+function detectPlatform(): "android" | "ios" | "windows" | "desktop" {
   if (typeof navigator === "undefined") return "desktop";
   const ua = navigator.userAgent || "";
   if (/android/i.test(ua)) return "android";
   if (/iPhone|iPad|iPod/i.test(ua)) return "ios";
+  if (/Windows/i.test(ua)) return "windows";
   return "desktop";
 }
 
@@ -77,7 +78,7 @@ export default function ShareLanding({ catalogId }: ShareLandingProps) {
           <a href={openInAppHref} className={linkButtonClass}>
             Open in app
           </a>
-          {platform === "desktop" ? (
+          {platform === "desktop" || platform === "windows" ? (
             <a href={webAppUrl} className={secondaryLinkClass}>
               Open in web player
             </a>
