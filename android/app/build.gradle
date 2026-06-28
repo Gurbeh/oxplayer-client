@@ -40,15 +40,14 @@ android {
             // mixed plugin .so sets (MPV, FFmpeg) on mid-tier ARM devices.
             useLegacyPackaging = true
             excludes += ["lib/x86/**"]
+            // libc++_shared is shared across media_kit, fvp/mdk, and other JNI deps.
             pickFirsts += [
                     "lib/x86_64/libc++_shared.so",
                     "lib/arm64-v8a/libc++_shared.so",
                     "lib/armeabi-v7a/libc++_shared.so",
-
-                    "lib/x86_64/libass.so",
-                    "lib/arm64-v8a/libass.so",
-                    "lib/armeabi-v7a/libass.so",
             ]
+            // Do not pickFirst libass/libffmpeg here: media_kit and fvp/mdk ship different
+            // builds; release merges were keeping media_kit's copy and crashing fvp JNI_OnLoad.
         }
     }
     namespace = "app.oxplayer"
@@ -157,4 +156,42 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-compose:3.3.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
     implementation("com.materialkolor:material-kolor:4.0.5")
+}
+
+// media_kit and fvp/mdk both ship libffmpeg.so + libass.so. Release merges must keep fvp's
+// copies or JNI_OnLoad in libfvp_plugin crashes (SIGSEGV in libmdk SetGlobalOption).
+tasks.configureEach { task ->
+    if (!task.name.matches(/merge.*NativeLibs/)) {
+        return
+    }
+    task.doFirst {
+        def dropNames = ["libffmpeg.so", "libass.so"] as Set
+        def dropPathHints = [
+                "media_kit",
+                "media-kit",
+                "donutware",
+                "ass-media",
+                "ass-kt",
+                "media3-ffmpeg",
+                "jetified-ass",
+        ] as Set
+        task.inputs.files.each { input ->
+            def roots = (input instanceof File) ? [input] : input.files
+            roots?.each { root ->
+                if (!root.exists()) {
+                    return
+                }
+                root.eachFileRecurse { file ->
+                    if (!file.isFile()) {
+                        return
+                    }
+                    def path = file.absolutePath.toLowerCase()
+                    if (dropPathHints.any { path.contains(it) } && dropNames.contains(file.name)) {
+                        logger.lifecycle("OXPlayer: drop duplicate JNI ${file.name} from ${file.parent}")
+                        file.delete()
+                    }
+                }
+            }
+        }
+    }
 }
