@@ -2072,5 +2072,17 @@
     "oxplayerDeleteAccountDialogTitle": "حساب حذف شود؟",
     "oxplayerDeleteAccountDialogBody": "حساب OXPlayer، کتابخانه و دستگاه‌های واردشده برای همیشه حذف می‌شود. بعداً می‌توانید با تلگرام به‌عنوان حساب جدید وارد شوید. این کار قابل بازگشت نیست.",
     "oxplayerDeleteAccountConfirm": "حذف حساب",
-    "oxplayerDeleteAccountFailed": "حذف حساب انجام نشد. دوباره تلاش کنید یا از ربات تلگرام استفاده کنید."
+    "oxplayerDeleteAccountFailed": "حذف حساب انجام نشد. دوباره تلاش کنید یا از ربات تلگرام استفاده کنید.",
+    "oxplayerReportIssue": "گزارش مشکل",
+    "oxplayerReportIssueTitle": "گزارش مشکل پخش",
+    "oxplayerReportIssueChooseCategory": "چه مشکلی پیش آمد؟",
+    "oxplayerReportIssueBrokenSubtitles": "زیرنویس خراب",
+    "oxplayerReportIssueDualAudio": "نسخه دوبله / دو صدا نیست",
+    "oxplayerReportIssueBadVideo": "کیفیت تصویر ضعیف",
+    "oxplayerReportIssueOther": "سایر",
+    "oxplayerReportIssueOtherHint": "مشکل را توضیح دهید",
+    "oxplayerReportIssueSubmit": "ارسال گزارش",
+    "oxplayerReportIssueSuccess": "گزارش ثبت شد. تیم بررسی می‌کند.",
+    "oxplayerReportIssueFailed": "ارسال گزارش ناموفق بود. بعداً دوباره تلاش کنید.",
+    "oxplayerReportIssueContextFailed": "این عنوان هنوز برای گزارش مشکل در دسترس نیست."
 }

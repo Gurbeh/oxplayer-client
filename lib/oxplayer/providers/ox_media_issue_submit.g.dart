@@ -1,26 +1,27 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'seerr_dashboard_provider.dart';
+part of 'ox_media_issue_submit.dart';
 
 // **************************************************************************
 // RiverpodGenerator
 // **************************************************************************
 
-String _$seerrDashboardHash() => r'bc8104716d693e781fdbe11d13c5171f5742d3a3';
+String _$oxMediaIssueSubmitHash() =>
+    r'32acfe46d61dda06dbf7588c927f5c461f64f015';
 
-/// See also [SeerrDashboard].
-@ProviderFor(SeerrDashboard)
-final seerrDashboardProvider =
-    AutoDisposeNotifierProvider<SeerrDashboard, SeerrDashboardModel>.internal(
-  SeerrDashboard.new,
-  name: r'seerrDashboardProvider',
+/// See also [OxMediaIssueSubmit].
+@ProviderFor(OxMediaIssueSubmit)
+final oxMediaIssueSubmitProvider =
+    AutoDisposeAsyncNotifierProvider<OxMediaIssueSubmit, void>.internal(
+  OxMediaIssueSubmit.new,
+  name: r'oxMediaIssueSubmitProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
       ? null
-      : _$seerrDashboardHash,
+      : _$oxMediaIssueSubmitHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
 
-typedef _$SeerrDashboard = AutoDisposeNotifier<SeerrDashboardModel>;
+typedef _$OxMediaIssueSubmit = AutoDisposeAsyncNotifier<void>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

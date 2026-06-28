@@ -15,6 +15,7 @@ import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_media_issue_action.dart';
 import 'package:fladder/oxplayer/oxplayer_share_action.dart';
 import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
@@ -295,9 +296,10 @@ extension ItemBaseModelExtensions on ItemBaseModel {
           label: Text(userData.isFavourite ? context.localized.removeAsFavorite : context.localized.addAsFavorite),
         ),
       ...(OxplayerConfig.isEnabled ? oxplayerShareActions(context, this) : const <ItemAction>[]),
+      ...(OxplayerConfig.isEnabled ? oxplayerMediaIssueActions(context, ref, this) : const <ItemAction>[]),
       ...otherActions,
       ItemActionDivider(),
-      if (!exclude.contains(ItemActions.editMetaData) && isAdmin)
+      if (!exclude.contains(ItemActions.editMetaData) && isAdmin && !OxplayerConfig.isEnabled)
         ItemActionButton(
           icon: const Icon(IconsaxPlusLinear.edit),
           action: () async {
@@ -308,7 +310,7 @@ extension ItemBaseModelExtensions on ItemBaseModel {
           },
           label: Text(context.localized.editMetadata),
         ),
-      if (!exclude.contains(ItemActions.refreshMetaData) && isAdmin)
+      if (!exclude.contains(ItemActions.refreshMetaData) && isAdmin && !OxplayerConfig.isEnabled)
         ItemActionButton(
           icon: const Icon(IconsaxPlusLinear.global_refresh),
           action: () async {
