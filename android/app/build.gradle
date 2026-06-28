@@ -158,40 +158,28 @@ dependencies {
     implementation("com.materialkolor:material-kolor:4.0.5")
 }
 
-// media_kit and fvp/mdk both ship libffmpeg.so + libass.so. Release merges must keep fvp's
-// copies or JNI_OnLoad in libfvp_plugin crashes (SIGSEGV in libmdk SetGlobalOption).
-tasks.configureEach { task ->
-    if (!task.name.matches(/merge.*NativeLibs/)) {
-        return
-    }
-    task.doFirst {
-        def dropNames = ["libffmpeg.so", "libass.so"] as Set
-        def dropPathHints = [
-                "media_kit",
-                "media-kit",
-                "donutware",
-                "ass-media",
-                "ass-kt",
-                "media3-ffmpeg",
-                "jetified-ass",
-        ] as Set
-        task.inputs.files.each { input ->
-            def roots = (input instanceof File) ? [input] : input.files
-            roots?.each { root ->
-                if (!root.exists()) {
-                    return
-                }
-                root.eachFileRecurse { file ->
-                    if (!file.isFile()) {
-                        return
-                    }
-                    def path = file.absolutePath.toLowerCase()
-                    if (dropPathHints.any { path.contains(it) } && dropNames.contains(file.name)) {
-                        logger.lifecycle("OXPlayer: drop duplicate JNI ${file.name} from ${file.parent}")
-                        file.delete()
-                    }
-                }
-            }
+// FvpPlugin loads broken release MDK JNI at class init (SIGSEGV before Dart runs). Android uses MPV by default.
+def stripFvpFromPluginRegistrant = tasks.register("stripFvpFromPluginRegistrant") {
+    doLast {
+        def registrant = file("src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java")
+        if (!registrant.exists()) {
+            return
+        }
+        def text = registrant.text
+        if (!text.contains("com.mediadevkit.fvp.FvpPlugin")) {
+            return
+        }
+        def patched = text.replaceAll(
+                /(?s)\s*try \{\s*flutterEngine\.getPlugins\(\)\.add\(new com\.mediadevkit\.fvp\.FvpPlugin\(\)\);\s*\} catch \(Exception e\) \{\s*Log\.e\(TAG, "Error registering plugin fvp[^"]*", e\);\s*\}/,
+                "\n    // OXPlayer: FvpPlugin omitted on Android (release MDK JNI crashes at JNI_OnLoad; use MPV)."
+        )
+        if (patched != text) {
+            registrant.write(patched)
+            logger.lifecycle("OXPlayer: stripped FvpPlugin from GeneratedPluginRegistrant.java")
         }
     }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn stripFvpFromPluginRegistrant
 }

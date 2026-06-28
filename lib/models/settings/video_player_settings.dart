@@ -113,8 +113,14 @@ abstract class VideoPlayerSettingsModel with _$VideoPlayerSettingsModel {
 
   factory VideoPlayerSettingsModel.fromJson(Map<String, dynamic> json) => _$VideoPlayerSettingsModelFromJson(json);
 
-  PlayerOptions get wantedPlayer =>
-      leanBackMode ? PlayerOptions.nativePlayer : playerOptions ?? PlayerOptions.platformDefaults;
+  PlayerOptions get wantedPlayer {
+    final selected =
+        leanBackMode ? PlayerOptions.nativePlayer : playerOptions ?? PlayerOptions.platformDefaults;
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android && selected == PlayerOptions.libMDK) {
+      return PlayerOptions.libMPV;
+    }
+    return selected;
+  }
 
   Map<VideoHotKeys, KeyCombination> get currentShortcuts =>
       _defaultVideoHotKeys.map((key, value) => MapEntry(key, hotKeys[key] ?? value));
@@ -174,7 +180,7 @@ enum PlayerOptions {
       : kIsWeb
           ? {PlayerOptions.libMPV}
           : switch (defaultTargetPlatform) {
-              TargetPlatform.android => PlayerOptions.values,
+              TargetPlatform.android => {PlayerOptions.libMPV, PlayerOptions.nativePlayer},
               _ => {PlayerOptions.libMDK, PlayerOptions.libMPV},
             };
 

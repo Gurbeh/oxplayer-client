@@ -36,7 +36,7 @@ class _SimpleVideoPlayerState extends ConsumerState<SimpleVideoPlayer> with Wind
   late final BasePlayer player = switch (ref.read(videoPlayerSettingsProvider).wantedPlayer) {
     PlayerOptions.libMDK => LibMDK(),
     PlayerOptions.libMPV => LibMPV(),
-    _ => LibMDK(),
+    _ => LibMPV(),
   };
   late String videoUrl = "";
 
