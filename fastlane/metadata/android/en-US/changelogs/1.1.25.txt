@@ -1,1 +1,1 @@
-Media issue reporting from OXPlayer, admin Telegram alerts, and reporter notify when issues are resolved in Seerr.
+See the full changelog at: https://github.com/Gurbeh/oxplayer-client/releases/tag/v1.1.25
