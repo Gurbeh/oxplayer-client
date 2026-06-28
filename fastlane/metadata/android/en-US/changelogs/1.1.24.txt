@@ -1,0 +1,1 @@
+Fix Android TV back button: prevent double-trigger exit from player, restore double-back-to-exit on Home screen, and navigate to Home from any other screen on back press.

@@ -44,6 +44,13 @@ class VideoPlayerActivity : ComponentActivity() {
         super.onPause()
         VideoPlayerObject.implementation.pause()
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (VideoPlayerObject.currentActivity === this) {
+            VideoPlayerObject.currentActivity = null
+        }
+    }
 }
 
 @OptIn(UnstableApi::class)

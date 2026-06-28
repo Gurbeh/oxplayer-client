@@ -183,13 +183,18 @@ class _NavigationScaffoldState extends ConsumerState<NavigationScaffold> {
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         if (showAudioOverlay) {
+          // The AudioPlayerFullScreen has its own PopScope that handles this.
           return;
         }
         if (onRootTab && OxplayerDoubleBackExit.handleRootBack(context)) {
           return;
         }
         if (!onRootTab) {
-          widget.destinations.first.action!();
+          // Not on the Home root tab — navigate home and reset the double-back
+          // timer so the user must press Back *twice from Home* to exit, not
+          // twice carried over from a different screen.
+          OxplayerDoubleBackExit.resetLastPress();
+          widget.destinations.first.action?.call();
         }
       },
       child: Stack(

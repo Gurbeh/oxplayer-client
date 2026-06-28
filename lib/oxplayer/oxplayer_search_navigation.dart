@@ -5,10 +5,10 @@ import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/seerr/seerr_models.dart';
 
-/// OX default search: TMDB discover (movies) so filter chips (genre, year, …) are available.
+/// OX default search: generic search (everything) so the user can search across all content types.
 PageRouteInfo oxplayerDefaultSearchRoute({required bool seerrConfigured}) {
   if (OxplayerConfig.isEnabled && seerrConfigured) {
-    return SeerrSearchRoute(mode: SeerrSearchMode.discoverMovies);
+    return SeerrSearchRoute(mode: SeerrSearchMode.search);
   }
   return LibrarySearchRoute();
 }

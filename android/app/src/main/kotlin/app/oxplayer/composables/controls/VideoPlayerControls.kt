@@ -195,7 +195,12 @@ fun CustomVideoControls(
                         return@keyEvent true
                     }
 
-                    Key.Back, Key.Escape, Key.ButtonB, Key.Backspace -> {
+                    Key.Escape, Key.ButtonB, Key.Backspace -> {
+                        // Key.Back is intentionally excluded here: it is handled exclusively by
+                        // BackHandler above (via the system onBackPressed/KEY_UP path). Including
+                        // it here as well would cause a double-trigger — KEY_DOWN fires this
+                        // branch, then KEY_UP fires BackHandler — resulting in a single remote
+                        // press both hiding controls AND immediately finishing the activity.
                         if (showControls) {
                             hideControls()
                             return@keyEvent true

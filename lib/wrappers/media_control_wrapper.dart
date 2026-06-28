@@ -183,7 +183,19 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
     _previousPlayer = null;
   }
 
-  Future<void> openPlayer(BuildContext context) async => _player?.open(context);
+  Future<void> openPlayer(BuildContext context) async {
+    await _player?.open(context);
+    // For the native Android player the VideoPlayerActivity runs as a separate
+    // Activity and returns here when the user backs out (or the activity is
+    // otherwise finished).  The Kotlin side has already stopped / released
+    // ExoPlayer, but the Dart state is still marked as fullScreen and the
+    // server has never received a playbackStopped notification.  Call stop()
+    // now to (a) transition state → disposed, (b) disable wakelock, and
+    // (c) report the final position to the Jellyfin API so that resume works.
+    if (_player is NativePlayer) {
+      await stop();
+    }
+  }
 
   Future<void> _updatePositionWithRetry(PlaybackModel model, Duration position, bool isPlaying) async {
     try {

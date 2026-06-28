@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
 import 'package:fladder/util/localization_helper.dart';
 
@@ -14,14 +13,17 @@ abstract final class OxplayerDoubleBackExit {
 
   static DateTime? _lastPress;
 
-  static bool get isActive => OxplayerEnv.isEnabled && !kIsWeb && Platform.isAndroid;
-
   /// When true, root [PopScope] must not pop on the first back press.
-  static bool blocksRootPop() => isActive;
+  static bool blocksRootPop() => !kIsWeb && Platform.isAndroid;
+
+  /// Resets the back-press timestamp.
+  /// Call this whenever the app navigates away from the root Home tab so that
+  /// the user must press Back *twice from Home* to exit, not twice from anywhere.
+  static void resetLastPress() => _lastPress = null;
 
   /// Handles back on the home root tab. Returns true when the event was consumed.
   static bool handleRootBack(BuildContext context) {
-    if (!isActive) return false;
+    if (kIsWeb || !Platform.isAndroid) return false;
 
     final now = DateTime.now();
     final last = _lastPress;

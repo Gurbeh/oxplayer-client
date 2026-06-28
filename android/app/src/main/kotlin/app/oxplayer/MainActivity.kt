@@ -82,9 +82,13 @@ class MainActivity : AudioServiceFragmentActivity(), NativeVideoActivity {
                 StartResult(resultValue = "Cancelled")
             }
 
-            VideoPlayerObject.implementation.player?.stop()
-            VideoPlayerObject.implementation.player?.release()
-            callback?.invoke(Result.success(startResult))
+                VideoPlayerObject.implementation.player?.stop()
+                VideoPlayerObject.implementation.player?.release()
+                // Null-out the player before the Dart callback so that any subsequent
+                // Dart-side stop() call goes through VideoPlayerImplementation.stop()
+                // safely (player?.stop() becomes a null-safe no-op on a released player).
+                VideoPlayerObject.implementation.init(null)
+                callback?.invoke(Result.success(startResult))
         }
     }
 
