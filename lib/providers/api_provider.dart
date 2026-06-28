@@ -10,6 +10,7 @@ import 'package:punycoder/punycoder.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_force_repair_interceptor.dart';
 import 'package:fladder/oxplayer/oxplayer_http_performance_interceptor.dart';
@@ -33,6 +34,8 @@ final serverUrlProvider = StateProvider<String?>((ref) {
     newUrl = userCredentials?.url;
   } else if (tempUrl?.isNotEmpty == true) {
     newUrl = tempUrl;
+  } else if (OxplayerConfig.isEnabled) {
+    newUrl = OxplayerEnv.apiBaseUrl;
   } else {
     newUrl = null;
   }

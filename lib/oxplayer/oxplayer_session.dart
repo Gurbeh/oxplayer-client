@@ -51,12 +51,20 @@ Future<bool> oxplayerRestoreSession(WidgetRef ref, AccountModel account) async {
   return ok;
 }
 
-Future<bool> _restoreSession(OxplayerRead read, AccountModel account) async {
+Future<bool> _restoreSession(OxplayerRead read, AccountModel incoming) async {
+  var account = incoming;
   read(userProvider.notifier).updateUser(account);
   OxplayerImageAuth.syncFromAccount(account);
 
   if (account.credentials.url.trim().isEmpty) {
-    return false;
+    final fallback = OxplayerEnv.apiBaseUrl;
+    if (fallback == null || fallback.isEmpty) {
+      return false;
+    }
+    account = account.copyWith(
+      credentials: account.credentials.copyWith(url: fallback),
+    );
+    read(userProvider.notifier).updateUser(account);
   }
 
   try {

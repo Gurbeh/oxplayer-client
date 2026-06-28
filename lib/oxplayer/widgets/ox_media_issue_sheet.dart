@@ -116,9 +116,11 @@ class _OxMediaIssueSheetState extends ConsumerState<OxMediaIssueSheet> {
       ),
       data: (ctx) {
         final categories = OxMediaIssueCategory.values;
+        final useParentScroll = widget.scrollController != null;
         return ListView(
-          controller: widget.scrollController,
-          shrinkWrap: true,
+          controller: useParentScroll ? widget.scrollController : null,
+          shrinkWrap: useParentScroll,
+          physics: useParentScroll ? const NeverScrollableScrollPhysics() : const ClampingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
             if (AdaptiveLayout.viewSizeOf(context) == ViewSize.phone) ...[
