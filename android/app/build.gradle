@@ -45,9 +45,11 @@ android {
                     "lib/x86_64/libc++_shared.so",
                     "lib/arm64-v8a/libc++_shared.so",
                     "lib/armeabi-v7a/libc++_shared.so",
+                    // fvp (still a dep) and ass-media both ship libass; FvpPlugin is omitted on Android.
+                    "lib/arm64-v8a/libass.so",
+                    "lib/armeabi-v7a/libass.so",
+                    "lib/x86_64/libass.so",
             ]
-            // Do not pickFirst libass/libffmpeg here: media_kit and fvp/mdk ship different
-            // builds; release merges were keeping media_kit's copy and crashing fvp JNI_OnLoad.
         }
     }
     namespace = "app.oxplayer"
