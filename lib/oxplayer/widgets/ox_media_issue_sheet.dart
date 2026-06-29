@@ -60,11 +60,13 @@ class _OxMediaIssueSheetState extends ConsumerState<OxMediaIssueSheet> {
   OxMediaIssueCategory? _selected;
   final _otherController = TextEditingController();
   final _otherFocus = FocusNode();
+  final _cancelFocus = FocusNode();
 
   @override
   void dispose() {
     _otherController.dispose();
     _otherFocus.dispose();
+    _cancelFocus.dispose();
     super.dispose();
   }
 
@@ -166,6 +168,15 @@ class _OxMediaIssueSheetState extends ConsumerState<OxMediaIssueSheet> {
                       )
                     : const Icon(IconsaxPlusBold.flag),
                 label: Text(context.localized.oxplayerReportIssueSubmit),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 50,
+              child: ElevatedButton(
+                focusNode: _cancelFocus,
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(context.localized.cancel),
               ),
             ),
           ],
