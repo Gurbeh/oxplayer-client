@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -18,11 +18,14 @@
 
   <meta charset="UTF-8" />
   <meta content="IE=Edge" http-equiv="X-UA-Compatible" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="OXPlayer — Jellyfin media library." />
+  <meta name="theme-color" content="#210000" />
+  <meta name="color-scheme" content="dark" />
 
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="OXPlayer">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
@@ -31,8 +34,129 @@
 
   <title>OXPlayer</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #210000;
+      overflow: hidden;
+    }
+
+    #ox-loading {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.25rem;
+      background: radial-gradient(ellipse at 50% 0%, #3a0a0a 0%, #210000 55%, #120000 100%);
+      transition: opacity 0.45s ease, visibility 0.45s ease;
+    }
+
+    #ox-loading.ox-loading--hide {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .ox-loading__logo {
+      width: 96px;
+      height: 96px;
+      object-fit: contain;
+      animation: ox-float 3s ease-in-out infinite;
+    }
+
+    .ox-loading__title {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      font-size: clamp(1.75rem, 5vw, 2.25rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #f9b435;
+    }
+
+    .ox-loading__status {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      font-size: 0.875rem;
+      color: rgba(255, 255, 255, 0.55);
+    }
+
+    .ox-loading__bar {
+      width: min(200px, 60vw);
+      height: 3px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      overflow: hidden;
+      margin-top: 0.25rem;
+    }
+
+    .ox-loading__bar::after {
+      content: "";
+      display: block;
+      width: 40%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #f9b435, #e4332c);
+      animation: ox-progress 1.4s ease-in-out infinite;
+    }
+
+    @keyframes ox-float {
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+
+      50% {
+        transform: translateY(-10px);
+      }
+    }
+
+    @keyframes ox-progress {
+      0% {
+        transform: translateX(-100%);
+      }
+
+      100% {
+        transform: translateX(350%);
+      }
+    }
+  </style>
 </head>
 <body>
+  <div id="ox-loading" role="status" aria-live="polite" aria-label="Loading OXPlayer">
+    <img class="ox-loading__logo" src="icons/Icon-192.png" width="96" height="96" alt="" />
+    <p class="ox-loading__title">OXPlayer</p>
+    <p class="ox-loading__status">Loading application…</p>
+    <div class="ox-loading__bar" aria-hidden="true"></div>
+  </div>
+
+  <script>
+    (function () {
+      function hideOxLoading() {
+        var el = document.getElementById("ox-loading");
+        if (!el || el.classList.contains("ox-loading--hide")) return;
+        el.classList.add("ox-loading--hide");
+        el.addEventListener(
+          "transitionend",
+          function () {
+            el.remove();
+          },
+          { once: true }
+        );
+        setTimeout(function () {
+          el.remove();
+        }, 500);
+      }
+
+      window.addEventListener("flutter-first-frame", hideOxLoading);
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
