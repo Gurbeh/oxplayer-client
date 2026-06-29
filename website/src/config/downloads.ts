@@ -14,9 +14,10 @@ export const WEB_APP_URL = `${SITE_ORIGIN}/web/`;
 export type PlatformId = "Android" | "AndroidTV" | "iOS" | "macOS" | "Windows" | "Linux" | "Web";
 
 /** Match primary release asset per platform from GitHub Releases. */
-export const PLATFORM_ASSET_PATTERNS: Record<Exclude<PlatformId, "Web">, RegExp> = {
-  Android: /^OXPlayer-Android-.+-arm64-v8a\.apk$/,
-  AndroidTV: /^OXPlayer-Android-.+-armeabi-v7a\.apk$/,
+export const PLATFORM_ASSET_PATTERNS: Record<
+  Exclude<PlatformId, "Web" | "Android" | "AndroidTV">,
+  RegExp
+> = {
   iOS: /^OXPlayer-iOS-.+\.ipa$/,
   macOS: /^OXPlayer-macOS-.+\.dmg$/,
   Windows: /^OXPlayer-Windows-.+-Setup\.exe$/,
@@ -28,7 +29,7 @@ export function resolvePlatformUrl(platformId: PlatformId, assets: { name: strin
     return WEB_APP_URL;
   }
 
-  if (platformId === "Android") {
+  if (platformId === "Android" || platformId === "AndroidTV") {
     return PLAY_STORE_ANDROID_URL;
   }
 
