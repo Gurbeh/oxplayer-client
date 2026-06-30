@@ -28,8 +28,8 @@ abstract final class OxplayerBootstrap {
     CustomCacheManager.instance = CacheManager(
       Config(
         CustomCacheManager.key,
-        stalePeriod: const Duration(days: 3),
-        maxNrOfCacheObjects: 256,
+        stalePeriod: const Duration(days: 7),
+        maxNrOfCacheObjects: 512,
         fileService: OxplayerAuthFileService(),
       ),
     );

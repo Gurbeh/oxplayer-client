@@ -166,6 +166,11 @@ fun CustomVideoControls(
             }
             .keyEvent { keyEvent: KeyEvent ->
                 when (keyEvent.key) {
+                    // Back is handled only by BackHandler (KEY_UP). Returning false here
+                    // without side effects prevents KEY_DOWN from showing controls before
+                    // BackHandler runs — otherwise one press hides controls instead of exiting.
+                    Key.Back -> return@keyEvent false
+
                     Key.MediaStop, Key.X -> {
                         activity?.finish()
                         return@keyEvent true

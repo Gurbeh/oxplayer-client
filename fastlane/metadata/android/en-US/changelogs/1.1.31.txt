@@ -1,0 +1,1 @@
+Fix TV remote Back to exit the player on the first press. Improve native playback stuck detection so buffering cold streams are not treated as failures. Larger image cache for snappier browsing.

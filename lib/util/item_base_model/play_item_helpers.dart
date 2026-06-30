@@ -969,6 +969,7 @@ Future<void> _playVideo(
       itemId: current.item.id,
       streamUrl: current.media?.url,
       catalogDuration: current.item.overview.runTime,
+      startPosition: actualStartPosition,
     );
   }
 

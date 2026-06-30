@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -31,8 +32,23 @@ Future<bool> oxplayerOpenNativePlayerEarly(WidgetRef ref, BuildContext context) 
   return false;
 }
 
-const _stuckCheckDelay = Duration(seconds: 8);
+const _stuckCheckDelay = Duration(seconds: 12);
 const _maxStuckRetries = 3;
+
+/// True when ExoPlayer appears idle after load (not merely buffering a cold stream).
+@visibleForTesting
+bool oxplayerNativePlaybackLooksStuck({
+  required bool playing,
+  required bool buffering,
+  required Duration position,
+  required Duration buffer,
+  Duration startPosition = Duration.zero,
+}) {
+  if (buffering || playing) return false;
+  // Buffer head advancing means the stream is alive even if position is still near zero.
+  if (buffer > const Duration(seconds: 2)) return false;
+  return position <= startPosition + const Duration(seconds: 2);
+}
 
 /// After the player opens, detect 00:00 / no-progress on Android TV and auto-retry with force-repair.
 Timer? oxplayerScheduleNativeStuckPlaybackWatch({
@@ -40,6 +56,7 @@ Timer? oxplayerScheduleNativeStuckPlaybackWatch({
   required String itemId,
   required String? streamUrl,
   Duration? catalogDuration,
+  Duration startPosition = Duration.zero,
 }) {
   if (!oxplayerUsesNativePlayer(ref)) return null;
 
@@ -54,8 +71,13 @@ Timer? oxplayerScheduleNativeStuckPlaybackWatch({
     final model = sessionRef.read(playBackModel);
     if (model == null || model.item.id != itemId) return;
 
-    // Do not gate on duration: catalog runtime is pre-filled and hid stuck playback before.
-    final stuck = !playback.playing && playback.position <= const Duration(seconds: 1);
+    final stuck = oxplayerNativePlaybackLooksStuck(
+      playing: playback.playing,
+      buffering: playback.buffering,
+      position: playback.position,
+      buffer: playback.buffer,
+      startPosition: startPosition,
+    );
     if (!stuck) return;
 
     if (retriesUsed == 0) {
