@@ -40,7 +40,6 @@ abstract class BaseAppWrapperState<T extends BaseAppWrapper> extends ConsumerSta
   bool _hidden = false;
 
   StreamSubscription<String?>? _notificationSub;
-  ProviderSubscription<int>? _oxSessionRevokedSub;
   bool get enableNotifications => true;
 
   @override
@@ -48,7 +47,7 @@ abstract class BaseAppWrapperState<T extends BaseAppWrapper> extends ConsumerSta
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      _oxSessionRevokedSub = oxplayerAttachSessionRevokedListener(ref, autoRouter);
+      oxplayerAttachSessionRouter(ref, autoRouter);
       ref.read(sharedUtilityProvider).loadSettings();
       await platformInit();
       await _initializeNotifications();
@@ -138,7 +137,6 @@ abstract class BaseAppWrapperState<T extends BaseAppWrapper> extends ConsumerSta
   @override
   void dispose() {
     _notificationSub?.cancel();
-    _oxSessionRevokedSub?.close();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

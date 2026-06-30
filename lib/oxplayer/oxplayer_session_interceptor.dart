@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
 import 'package:fladder/oxplayer/oxplayer_session.dart';
+import 'package:fladder/oxplayer/oxplayer_session_auth_prompt.dart';
 import 'package:fladder/providers/user_provider.dart';
 
 /// On 401, tries refresh once; otherwise clears the local session and routes to login.
@@ -36,9 +37,9 @@ class OxplayerSessionInterceptor implements Interceptor {
       return chain.proceed(retry);
     }
 
-    // Refresh failed without clearing the session (transient 5xx) — surface the 401, keep local tokens.
-    if (ref.read(userProvider) == null) {
-      ref.read(oxplayerSessionRevokedProvider.notifier).state++;
+    // Refresh failed — keep local credentials; offer logout so the user can sign in again.
+    if (ref.read(userProvider) != null) {
+      oxplayerPromptReLogin(ref);
     }
     return response;
   }

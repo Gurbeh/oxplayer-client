@@ -2814,5 +2814,7 @@
   "oxplayerReportIssueFailed": "Could not submit the issue. Try again later.",
   "@oxplayerReportIssueFailed": {},
   "oxplayerReportIssueContextFailed": "This title is not available for issue reporting yet.",
-  "@oxplayerReportIssueContextFailed": {}
+  "@oxplayerReportIssueContextFailed": {},
+  "oxplayerSessionExpiredMessage": "Your session expired. Log out and sign in again.",
+  "@oxplayerSessionExpiredMessage": {}
 }

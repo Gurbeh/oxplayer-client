@@ -25,6 +25,7 @@ import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/tv_playback_model.dart';
 import 'package:fladder/models/video_stream_model.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_prepare.dart';
 import 'package:fladder/oxplayer/oxplayer_native_playback.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
@@ -616,14 +617,19 @@ extension ItemBaseModelExtensions on ItemBaseModel? {
   }) async {
     if (itemModel == null) return;
 
-    await ref.read(videoPlayerProvider.notifier).init();
-
-    final op = CancelableOperation.fromFuture(ref.read(playbackModelHelper).createPlaybackModel(
-          context,
-          itemModel,
-          showPlaybackOptions: showPlaybackOption,
-          startPosition: startPosition,
-        ));
+    final op = CancelableOperation.fromFuture((() async {
+      if (OxplayerEnv.isEnabled) {
+        await oxplayerInitVideoPlayerIfNeeded(ref);
+      } else {
+        await ref.read(videoPlayerProvider.notifier).init();
+      }
+      return await ref.read(playbackModelHelper).createPlaybackModel(
+            context,
+            itemModel,
+            showPlaybackOptions: showPlaybackOption,
+            startPosition: startPosition,
+          );
+    })());
 
     _showLoadingIndicator(context, itemModel, op);
 

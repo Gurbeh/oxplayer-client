@@ -42,6 +42,11 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
   MediaPlaybackModel get playbackState => ref.read(mediaPlaybackProvider);
 
   Future<void> init() async {
+    final settings = ref.read(videoPlayerSettingsProvider);
+    if (state.hasPlayer && state.matchesSettings(settings)) {
+      return;
+    }
+
     await state.dispose();
     await state.init();
 

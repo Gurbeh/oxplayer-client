@@ -14,7 +14,7 @@ import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/providers/shared_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
-import 'package:fladder/oxplayer/oxplayer_navigation.dart';
+import 'package:fladder/oxplayer/oxplayer_session_auth_prompt.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 const kOxJellyfinRefreshUsername = '__ox_refresh__';
@@ -22,7 +22,7 @@ const kOxJellyfinRefreshUsername = '__ox_refresh__';
 /// Cold-start session check must not block the splash screen indefinitely.
 const kOxSessionRestoreTimeout = Duration(seconds: 12);
 
-/// Bumped when the server rejects the session and local credentials are cleared.
+/// Legacy hook for session revocation; prefer [oxplayerPromptReLogin].
 final oxplayerSessionRevokedProvider = StateProvider<int>((ref) => 0);
 
 OxplayerSessionStore _sessionStore(OxplayerRead read) => OxplayerSessionStore(read(sharedPreferencesProvider));
@@ -111,14 +111,9 @@ Future<void> oxplayerInvalidateLocalSession(OxplayerRead read, AccountModel acco
   read(oxplayerSessionRevokedProvider.notifier).state++;
 }
 
-/// Listen for server-driven session invalidation. Call from [State.initState] only
-/// with [ref.listenManual] (not [ref.listen], which requires an active build).
-ProviderSubscription<int> oxplayerAttachSessionRevokedListener(WidgetRef ref, StackRouter router) {
-  return ref.listenManual<int>(oxplayerSessionRevokedProvider, (previous, next) {
-    if (next == 0 || next == previous) return;
-    router.replaceAll(oxplayerSignOutRouteList(ref));
-    ref.read(authProvider.notifier).initModel();
-  });
+/// Registers the app router for auth-error logout navigation.
+void oxplayerAttachSessionRouter(WidgetRef ref, StackRouter router) {
+  ref.read(oxplayerSessionRouterProvider.notifier).state = router;
 }
 
 final _RefreshGate _refreshGate = _RefreshGate();
@@ -141,13 +136,11 @@ Future<bool> _refreshSession(OxplayerRead read) async {
 
   final refreshToken = await _sessionStore(read).read(account);
   if (refreshToken == null) {
-    await oxplayerInvalidateLocalSession(read, account);
     return false;
   }
 
   final credentials = account.credentials;
   if (credentials.url.isEmpty) {
-    await oxplayerInvalidateLocalSession(read, account);
     return false;
   }
 
@@ -162,13 +155,9 @@ Future<bool> _refreshSession(OxplayerRead read) async {
       )
       .timeout(kOxSessionRestoreTimeout);
 
-  final statusCode = response.statusCode;
   final accessOk = response.isSuccessful && (response.body?.accessToken?.isNotEmpty ?? false);
 
   if (!accessOk) {
-    if (statusCode == 401 || statusCode == 403) {
-      await oxplayerInvalidateLocalSession(read, account);
-    }
     return false;
   }
 

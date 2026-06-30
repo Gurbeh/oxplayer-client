@@ -50,6 +50,11 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
 
   bool get hasPlayer => _player != null;
 
+  bool matchesSettings(VideoPlayerSettingsModel settings) {
+    if (!hasPlayer || _activePlayerSettings == null) return false;
+    return _activePlayerSettings!.playerSame(settings) && backend == settings.wantedPlayer;
+  }
+
   PlayerOptions? get backend => switch (_player) {
         LibMPV _ => PlayerOptions.libMPV,
         LibMDK _ => PlayerOptions.libMDK,
@@ -70,6 +75,7 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
   SMTCWindows? smtc;
 
   bool initializedWrapper = false;
+  VideoPlayerSettingsModel? _activePlayerSettings;
   bool _isNewPlayback = false;
   bool _isAudioQueueMode = false;
   bool _audioQueueTransitioning = false;
@@ -119,6 +125,7 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
     _subtitleSettingsSubscription?.close();
     await _playerStateSubscription?.cancel();
     _player?.dispose();
+    _activePlayerSettings = null;
   }
 
   Future<void> setup(BasePlayer newPlayer) async {
@@ -128,7 +135,9 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
     }
 
     _player = newPlayer;
-    await newPlayer.init(ref.read(videoPlayerSettingsProvider));
+    final settings = ref.read(videoPlayerSettingsProvider);
+    _activePlayerSettings = settings;
+    await newPlayer.init(settings);
     _initPlayer();
     _subscribePlayerState();
   }
