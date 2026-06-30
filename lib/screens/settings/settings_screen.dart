@@ -238,7 +238,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onTap: () async {
                   await ref.read(authProvider.notifier).switchUser();
                   if (context.mounted) {
-                    context.router.replaceAll(oxplayerSignOutRouteList(ref));
+                    context.router.replaceAll(oxplayerSignOutRouteList());
                     await ref.read(authProvider.notifier).initModel();
                   }
                 },
@@ -271,7 +271,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         onPressed: () async {
                           await ref.read(authProvider.notifier).logOutUser();
                           if (context.mounted) {
-                            context.router.replaceAll(oxplayerSignOutRouteList(ref));
+                            context.router.replaceAll(oxplayerSignOutRouteList());
                             await ref.read(authProvider.notifier).initModel();
                           }
                         },

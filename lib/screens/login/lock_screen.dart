@@ -117,7 +117,7 @@ class _LockScreenState extends ConsumerState<LockScreen> with WidgetsBindingObse
               if (OxplayerConfig.isEnabled) {
                 await ref.read(authProvider.notifier).switchUser();
                 if (context.mounted) {
-                  context.router.replaceAll(oxplayerSignOutRouteList(ref));
+                  context.router.replaceAll(oxplayerSignOutRouteList());
                   await ref.read(authProvider.notifier).initModel();
                 }
               } else {

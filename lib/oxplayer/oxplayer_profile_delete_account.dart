@@ -82,7 +82,7 @@ Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref) async {
 
   await ref.read(authProvider.notifier).logOutUser();
   if (!context.mounted) return;
-  await context.router.replaceAll(oxplayerSignOutRouteList(ref));
+  await context.router.replaceAll(oxplayerSignOutRouteList());
   await ref.read(authProvider.notifier).initModel();
 }
 

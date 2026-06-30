@@ -54,7 +54,7 @@ Future<void> oxplayerPerformSignOut(Ref ref) async {
   await ref.read(authProvider.notifier).logOutUser();
 
   if (router != null) {
-    await router.replaceAll(oxplayerSignOutRouteList(ref));
+    await router.replaceAll(oxplayerSignOutRouteList());
   }
   await ref.read(authProvider.notifier).initModel();
 }

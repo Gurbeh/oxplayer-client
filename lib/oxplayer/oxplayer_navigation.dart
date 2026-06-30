@@ -6,7 +6,7 @@ import 'package:fladder/providers/shared_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 
 /// Routes after sign-out or session revocation in OX builds.
-List<PageRouteInfo> oxplayerSignOutRouteList(Ref ref) {
+List<PageRouteInfo> oxplayerSignOutRouteList() {
   if (!OxplayerConfig.isEnabled) {
     return [LoginRoute()];
   }

@@ -167,7 +167,7 @@ class AuthGuard extends AutoRouteGuard {
       } else {
         if (OxplayerConfig.isEnabled) {
           oxplayerFlushBufferedPendingPath(ref);
-          router.replaceAll(oxplayerSignOutRouteList(ref));
+          router.replaceAll(oxplayerSignOutRouteList());
           ref.read(authProvider.notifier).initModel();
         } else {
           router.replace(LoginRoute());
