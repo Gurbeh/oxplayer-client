@@ -65,7 +65,9 @@ abstract final class OxplayerSentry {
     final previousPlatformError = PlatformDispatcher.instance.onError;
     PlatformDispatcher.instance.onError = (error, stack) {
       final handled = previousPlatformError?.call(error, stack) ?? false;
-      unawaited(Sentry.captureException(error, stackTrace: stack));
+      if (OxplayerSentryFilters.shouldReportPlatformError(error)) {
+        unawaited(Sentry.captureException(error, stackTrace: stack));
+      }
       return handled;
     };
   }

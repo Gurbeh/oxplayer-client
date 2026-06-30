@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// Drops known-benign client errors so Sentry reflects actionable issues only.
@@ -8,6 +9,7 @@ abstract final class OxplayerSentryFilters {
     if (_isBenignAnr(event)) return null;
     if (_isFlutterLiveTextLifecycleCrash(event)) return null;
     if (_isChannelCallbackNativeNoise(event)) return null;
+    if (_isPigeonChannelUnavailable(event)) return null;
 
     final tags = event.tags ?? {};
     if (tags['transient'] == 'true') return null;
@@ -18,6 +20,8 @@ abstract final class OxplayerSentryFilters {
       'LiveTextInputStatusNotifier',
       '_handleLifecycleMessage',
       '_ChannelCallbackRecord.invoke',
+      'PlayerSettingsPigeon.sendPlayerSettings',
+      'VideoPlayerApi.setSubtitleSettings',
     ])) {
       return null;
     }
@@ -32,7 +36,18 @@ abstract final class OxplayerSentryFilters {
   }
 
   static bool shouldReportFlutterError(Object exception) {
-    return shouldReportPersistedLog(exception.toString());
+    return shouldReportPlatformError(exception);
+  }
+
+  /// Whether a platform/async error should be forwarded to Sentry.
+  static bool shouldReportPlatformError(Object error) {
+    if (error is MissingPluginException) {
+      return !_isDetachedPlayerChannelMessage(error.toString());
+    }
+    if (error is PlatformException && error.code == 'channel-error') {
+      return !_isDetachedPlayerChannelMessage(error.message ?? error.toString());
+    }
+    return shouldReportPersistedLog(error.toString());
   }
 
   static bool shouldReportPersistedLog(String message) {
@@ -85,8 +100,50 @@ abstract final class OxplayerSentryFilters {
     if (lower.contains('video playback failed: hydrate_timeout')) {
       return true;
     }
+    if (_isPigeonChannelUnavailableMessage(lower)) {
+      return true;
+    }
+    if (lower.contains('missingpluginexception') && _isDetachedPlayerChannelMessage(lower)) {
+      return true;
+    }
 
     return false;
+  }
+
+  /// Pigeon channel-error when the native player handler is torn down (app detach/background).
+  static bool _isPigeonChannelUnavailable(SentryEvent event) {
+    final parts = <String>[
+      _eventText(event) ?? '',
+      event.message?.formatted ?? '',
+      for (final ex in event.exceptions ?? const []) ex.type ?? '',
+      for (final ex in event.exceptions ?? const []) ex.value ?? '',
+      for (final ex in event.exceptions ?? const []) ..._framesText(ex.stackTrace?.frames ?? const []),
+    ];
+    return _isDetachedPlayerChannelMessage(parts.join(' '));
+  }
+
+  static bool _isDetachedPlayerChannelMessage(String text) {
+    final lower = text.toLowerCase();
+    if (lower.contains('missingpluginexception')) {
+      return _isPigeonPlayerChannelName(lower);
+    }
+    if (!lower.contains('channel-error')) {
+      return false;
+    }
+    return _isPigeonPlayerChannelName(lower);
+  }
+
+  static bool _isPigeonChannelUnavailableMessage(String lower) {
+    return _isDetachedPlayerChannelMessage(lower);
+  }
+
+  static bool _isPigeonPlayerChannelName(String lower) {
+    return lower.contains('playersettingspigeon.sendplayersettings') ||
+        lower.contains('videoplayerapi.setsubtitlesettings') ||
+        lower.contains('nl_jknaapen_fladder.settings.playersettingspigeon') ||
+        lower.contains('nl_jknaapen_fladder.video.videoplayerapi') ||
+        lower.contains('player_settings_helper.g.dart') ||
+        lower.contains('video_player_helper.g.dart');
   }
 
   /// Drops ANRs from Google Play license verification on sideloaded/emulator builds,

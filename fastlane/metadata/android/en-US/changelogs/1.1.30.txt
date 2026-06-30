@@ -1,0 +1,1 @@
+Filter detached player channel noise from crash reports. See release notes on GitHub.

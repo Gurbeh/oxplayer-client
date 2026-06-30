@@ -1,4 +1,5 @@
 import 'package:fladder/oxplayer/oxplayer_sentry_filters.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
@@ -113,6 +114,36 @@ void main() {
       ],
     );
     expect(OxplayerSentryFilters.beforeSend(event, Hint()), isNull);
+  });
+
+  test('drops pigeon channel-error when native player is gone', () {
+    final event = SentryEvent(
+      exceptions: [
+        SentryException(
+          type: 'PlatformException',
+          value:
+              'PlatformException(channel-error, Unable to establish connection on channel: "dev.flutter.pigeon.nl_jknaapen_fladder.settings.PlayerSettingsPigeon.sendPlayerSettings"., null, null)',
+        ),
+      ],
+    );
+    expect(OxplayerSentryFilters.beforeSend(event, Hint()), isNull);
+  });
+
+  test('drops MissingPluginException on pigeon player channels', () {
+    expect(
+      OxplayerSentryFilters.shouldReportPlatformError(
+        MissingPluginException(
+          'No implementation found for method sendPlayerSettings on channel dev.flutter.pigeon.nl_jknaapen_fladder.settings.PlayerSettingsPigeon.sendPlayerSettings',
+        ),
+      ),
+      isFalse,
+    );
+    expect(
+      OxplayerSentryFilters.shouldReportPlatformError(
+        MissingPluginException('No implementation found for method foo on channel some.other.channel'),
+      ),
+      isTrue,
+    );
   });
 
   test('drops RenderFlex overflow layout noise', () {
