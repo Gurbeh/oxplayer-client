@@ -8,7 +8,7 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/providers/items/series_details_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
-import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
+import 'package:fladder/oxplayer/ox_library_detail_labels.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
 import 'package:fladder/oxplayer/widgets/ox_series_request_button.dart';
@@ -165,12 +165,13 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                     officialRating: details.overview.parentalRating,
                     genres: details.overview.genreItems,
                     communityRating: details.overview.communityRating,
-                    additionalLabels: OxplayerEnv.isEnabled
-                        ? oxSeerrRatingLabels(
-                            context,
-                            ref.watch(oxLibraryItemRatingsProvider(widget.item.id)),
-                          )
-                        : const [],
+                    contentTags: details.overview.tags,
+                    additionalLabels: oxLibraryDetailLabels(
+                      context,
+                      ref,
+                      widget.item.id,
+                      details.overview,
+                    ),
                     mediaStreamHelper: currentEpisode != null &&
                             oxplayerShowMediaStreamHelper(currentEpisode.mediaStreams)
                         ? MediaStreamHelper(

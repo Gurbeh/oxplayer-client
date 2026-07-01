@@ -89,6 +89,7 @@ class SeerrDetails extends _$SeerrDetails {
           people: _mapCredits(details.credits),
           seasonStatuses: updatedPoster.seasonStatuses ?? const {},
           externalIds: details.externalIds ?? state.externalIds,
+          tmdbKeywords: details.keywords?.map((k) => k.name ?? '').where((n) => n.isNotEmpty).toList() ?? const [],
           ratings: SeerrRatingsResponse(
             rt: ratings,
           ),
@@ -288,6 +289,7 @@ abstract class SeerrDetailsModel with _$SeerrDetailsModel {
     double? voteAverage,
     String? contentRating,
     String? releaseDate,
+    @Default([]) List<String> tmdbKeywords,
     @Default([]) List<SeerrDashboardPosterModel> recommended,
     @Default([]) List<SeerrDashboardPosterModel> similar,
     @Default([]) List<Person> people,

@@ -9,16 +9,19 @@ import 'package:fladder/models/items/images_models.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/watched_state.dart';
+import 'package:fladder/oxplayer/oxplayer_adult_content.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
+import 'package:fladder/screens/shared/media/components/chip_button.dart';
 import 'package:fladder/screens/shared/media/components/media_header.dart';
-import 'package:fladder/screens/shared/media/components/small_detail_widgets.dart';
 import 'package:fladder/theme.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/humanize_duration.dart';
 import 'package:fladder/util/list_padding.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/position_provider.dart';
+import 'package:fladder/util/string_extensions.dart';
 import 'package:fladder/widgets/shared/ensure_visible.dart';
 import 'package:fladder/widgets/shared/enum_selection.dart';
 import 'package:fladder/widgets/shared/focus_row.dart';
@@ -38,6 +41,8 @@ class OverviewHeader extends ConsumerWidget {
   final Alignment logoAlignment;
   final Function()? onTitleClicked;
   final List<SimpleLabel> additionalLabels;
+  final List<String> contentTags;
+  final Iterable<String>? tmdbKeywords;
   final String? productionYear;
   final Widget? summary;
   final Duration? runTime;
@@ -60,6 +65,8 @@ class OverviewHeader extends ConsumerWidget {
     this.logoAlignment = Alignment.bottomCenter,
     this.onTitleClicked,
     this.additionalLabels = const [],
+    this.contentTags = const [],
+    this.tmdbKeywords,
     this.productionYear,
     this.summary,
     this.runTime,
@@ -288,10 +295,12 @@ class OverviewHeader extends ConsumerWidget {
                   runTime: runTime,
                   communityRating: communityRating,
                 ),
-                if (genres.isNotEmpty)
-                  Genres(
-                    genres: genres.take(6).toList(),
-                  ),
+                _OxGenresWithAdultChip(
+                  genres: genres,
+                  contentTags: contentTags,
+                  officialRating: officialRating,
+                  tmdbKeywords: tmdbKeywords,
+                ),
                 if (additionalLabels.isNotEmpty)
                   Wrap(
                     spacing: 8,
@@ -368,6 +377,52 @@ class OverviewHeader extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _OxGenresWithAdultChip extends StatelessWidget {
+  final List<GenreItems> genres;
+  final List<String> contentTags;
+  final String? officialRating;
+  final Iterable<String>? tmdbKeywords;
+
+  const _OxGenresWithAdultChip({
+    required this.genres,
+    this.contentTags = const [],
+    this.officialRating,
+    this.tmdbKeywords,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final genreChips = genres.take(6).toList();
+    final adultLabels = OxplayerConfig.isEnabled
+        ? OxplayerAdultContent.labels(
+            tags: contentTags,
+            officialRating: officialRating,
+            keywords: tmdbKeywords,
+          )
+        : const <SimpleLabel>[];
+
+    if (genreChips.isEmpty && adultLabels.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.center,
+      runAlignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        for (final genre in genreChips)
+          ChipButton(
+            onPressed: null,
+            label: genre.name.capitalize(),
+          ),
+        ...adultLabels,
+      ],
     );
   }
 }

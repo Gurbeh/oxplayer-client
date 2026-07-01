@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/providers/items/episode_details_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
+import 'package:fladder/oxplayer/ox_library_detail_labels.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
@@ -161,8 +162,19 @@ class _ItemDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
                     runTime: details.episode?.overview.runTime,
                     studios: details.series?.overview.studios ?? [],
                     genres: details.series?.overview.genreItems ?? [],
-                    officialRating: details.episode?.overview.parentalRating,
+                    officialRating: details.episode?.overview.parentalRating ??
+                        details.series?.overview.parentalRating,
                     communityRating: details.episode?.overview.communityRating,
+                    contentTags: details.episode?.overview.tags ?? const [],
+                    additionalLabels: details.episode != null
+                        ? oxLibraryDetailLabels(
+                            context,
+                            ref,
+                            widget.item.id,
+                            details.episode!.overview,
+                            officialRatingFallback: details.series?.overview.parentalRating,
+                          )
+                        : const [],
                     mediaStreamHelper: details.episode != null &&
                             oxplayerShowMediaStreamHelper(details.episode!.mediaStreams)
                         ? MediaStreamHelper(

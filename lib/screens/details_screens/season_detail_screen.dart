@@ -7,6 +7,7 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/providers/items/season_details_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
+import 'package:fladder/oxplayer/ox_library_detail_labels.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
 import 'package:fladder/screens/shared/detail_scaffold.dart';
 import 'package:fladder/screens/shared/media/episode_details_list.dart';
@@ -71,6 +72,13 @@ class _SeasonDetailScreenState extends ConsumerState<SeasonDetailScreen> {
                     officialRating: details.overview.parentalRating,
                     genres: details.overview.genreItems,
                     communityRating: details.overview.communityRating,
+                    contentTags: details.overview.tags,
+                    additionalLabels: oxLibraryDetailLabels(
+                      context,
+                      ref,
+                      widget.item.id,
+                      details.overview,
+                    ),
                   ),
                   Row(
                     children: [

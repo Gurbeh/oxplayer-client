@@ -162,6 +162,7 @@ class SeerrDetailsScreen extends ConsumerWidget {
                     productionYear: currentPoster.releaseYear,
                     officialRating: state.contentRating,
                     communityRating: state.voteAverage,
+                    tmdbKeywords: state.tmdbKeywords,
                     additionalLabels: [
                       if (rottenTomatoes != null)
                         if (rottenTomatoes.criticsScore != null) ...[
