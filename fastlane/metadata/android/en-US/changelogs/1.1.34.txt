@@ -1,0 +1,1 @@
+Playback resumes correctly after backgrounding. Dev build icons no longer overwrite production assets.
