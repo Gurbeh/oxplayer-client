@@ -7,8 +7,10 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/bootstrap/app_bootstrap.dart';
+import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/oxplayer/oxplayer_bootstrap.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_queue.dart';
 import 'package:fladder/oxplayer/services/ox_github_update_service.dart';
 import 'package:fladder/oxplayer/services/ox_update_service.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
@@ -66,6 +68,8 @@ void main(List<String> args) async {
           crashLogProvider.overrideWith((ref) => bootstrap.crashProvider),
           argumentsStateProvider.overrideWith((ref) => bootstrap.argumentsModel),
           syncProvider.overrideWith((ref) => SyncNotifier(ref, bootstrap.applicationDirectory)),
+          if (OxplayerConfig.isEnabled)
+            playbackModelHelper.overrideWith((ref) => OxPlaybackModelHelper(ref: ref)),
         ],
         child: OxplayerBootstrap.wrapRoot(
           AdaptiveLayoutBuilder(
