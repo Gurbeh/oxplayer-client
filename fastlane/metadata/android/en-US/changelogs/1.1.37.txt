@@ -1,0 +1,1 @@
+Mature rating chips (R, TV-MA) now show 🔞 on the grade label instead of a separate chip.

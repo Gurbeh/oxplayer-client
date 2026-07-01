@@ -462,7 +462,15 @@ class MetadataLabels extends StatelessWidget {
         if (officialRating != null)
           SimpleLabel(
             icon: null,
-            label: Text(officialRating.toString()),
+            label: Row(
+              mainAxisSize: MainAxisSize.min,
+              spacing: 4,
+              children: [
+                Text(officialRating.toString()),
+                if (OxplayerConfig.isEnabled && OxplayerAdultContent.ratingConveysAdult(officialRating))
+                  OxplayerAdultContent.adultEmoji,
+              ],
+            ),
           ),
         if (productionYear != null)
           SimpleLabel(

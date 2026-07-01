@@ -19,17 +19,36 @@ abstract final class OxplayerAdultContent {
     return false;
   }
 
-  static SimpleLabel? chip({
+  /// Whether the official rating chip already conveys mature content (e.g. R, TV-MA).
+  static bool ratingConveysAdult(String? officialRating) => _isAdultOfficialRating(officialRating);
+
+  static const adultEmoji = Text('🔞', style: TextStyle(fontSize: 18));
+
+  /// Standalone chip when adult is flagged via tags/keywords but not via the rating chip.
+  static bool showStandaloneChip({
     List<String> tags = const [],
     String? officialRating,
     Iterable<String>? keywords,
   }) {
     if (!isAdult(tags: tags, officialRating: officialRating, keywords: keywords)) {
+      return false;
+    }
+    return !ratingConveysAdult(officialRating);
+  }
+
+  static SimpleLabel? chip({
+    List<String> tags = const [],
+    String? officialRating,
+    Iterable<String>? keywords,
+  }) {
+    if (!showStandaloneChip(
+      tags: tags,
+      officialRating: officialRating,
+      keywords: keywords,
+    )) {
       return null;
     }
-    return const SimpleLabel(
-      iconWidget: Text('🔞', style: TextStyle(fontSize: 18)),
-    );
+    return const SimpleLabel(iconWidget: adultEmoji);
   }
 
   static List<SimpleLabel> labels({
@@ -42,7 +61,7 @@ abstract final class OxplayerAdultContent {
   }
 
   static bool _isAdultOfficialRating(String? rating) {
-    final r = (rating ?? '').trim().toUpperCase().replaceAll(' ', '');
+    final r = (rating ?? '').trim().toUpperCase().replaceAll(' ', '').replaceAll('_', '-');
     if (r.isEmpty) return false;
 
     const nonAdult = ['PG-13', 'PG13', 'TV-14', 'TV-PG', 'TV-G', 'TV-Y', 'PG', 'G', 'U', 'MA15+'];
