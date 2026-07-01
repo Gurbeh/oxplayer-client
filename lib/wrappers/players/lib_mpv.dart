@@ -248,11 +248,13 @@ class LibMPV extends BasePlayer {
     _loadCompleter = Completer<void>();
     _firstLoadAttempt = DateTime.now();
 
-    final remuxStream = kIsWeb && _isOxStreamRemuxUrl(url);
-    final serverSeek = remuxStream && url.contains('start=');
+    final isOxStreamTs = _isOxStreamRemuxUrl(url);
+    // Progressive ox-stream TS: long-lived HTTP read — no 5s reopen on web or Android mpv.
+    final progressiveOxStream = isOxStreamTs;
+    final serverSeek = isOxStreamTs && url.contains('start=');
     _remuxTimelineBase = serverSeek ? startPosition : Duration.zero;
 
-    await setStartPosition(remuxStream && serverSeek ? Duration.zero : startPosition);
+    await setStartPosition(serverSeek ? Duration.zero : startPosition);
 
     await _player?.open(mpv.Media(url), play: play);
 
@@ -260,7 +262,7 @@ class LibMPV extends BasePlayer {
     _retryTimer = null;
 
     // Progressive remux is a long-lived HTTP read; reopening every 5s kills ffmpeg mid-pipe.
-    if (!remuxStream) {
+    if (!progressiveOxStream) {
       _retryTimer = RestartableTimer(
         _currentRetryDuration,
         () async {
@@ -337,7 +339,7 @@ class LibMPV extends BasePlayer {
         subPlaying?.cancel();
       }
 
-      if (remuxStream) {
+      if (progressiveOxStream) {
         subPlaying = _player?.stream.playing.listen((event) {
           if (event) {
             if (serverSeek && startPosition > Duration.zero) {

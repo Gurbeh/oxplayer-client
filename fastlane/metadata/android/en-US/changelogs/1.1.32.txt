@@ -1,0 +1,1 @@
+Fix Android playback for ox-stream videos. Stop libMPV from reopening stream.ts every 5 seconds, which prevented progressive streams from starting on phone and tablet.
