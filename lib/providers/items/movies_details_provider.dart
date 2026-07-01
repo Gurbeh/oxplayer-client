@@ -16,6 +16,7 @@ import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_share.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/related_provider.dart';
 import 'package:fladder/providers/seerr_api_provider.dart';
@@ -126,6 +127,9 @@ class MovieDetails extends _$MovieDetails {
             seerrUrl: seerrUrl,
           ),
           specialFeatures: specialFeatureModel);
+      if (OxplayerConfig.isEnabled) {
+        state = oxplayerApplyShareMediaSourceToMovie(state, ref);
+      }
       return null;
     } catch (e) {
       return null;

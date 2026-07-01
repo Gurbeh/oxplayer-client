@@ -12,6 +12,7 @@ import 'package:fladder/oxplayer/oxplayer_sentry_user_sync.dart';
 import 'package:fladder/oxplayer/services/ox_github_update_service.dart';
 import 'package:fladder/oxplayer/services/ox_update_service.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_details_refresh.dart';
+import 'package:fladder/oxplayer/oxplayer_share_deep_link.dart';
 import 'package:fladder/util/custom_cache_manager.dart';
 import 'package:fladder/util/deep_link_helper.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
@@ -70,7 +71,9 @@ abstract final class OxplayerBootstrap {
       wrapped = OxUpdatePromptHost(child: wrapped);
     }
     return OxplayerPlaybackDetailsRefresh(
-      child: OxplayerSentryUserSync(child: wrapped),
+      child: OxplayerShareDeepLinkHost(
+        child: OxplayerSentryUserSync(child: wrapped),
+      ),
     );
   }
 }

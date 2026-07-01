@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 const websiteRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const out404 = path.join(websiteRoot, "out", "404.html");
 
-const SHARE_REDIRECT_SCRIPT = `<script>(function(){var p=location.pathname;var m=p.match(/^\\/share\\/([^/]+)\\/?$/);if(!m)return;var id=m[1];var ua=navigator.userAgent||"";var landing="/share/item/?id="+encodeURIComponent(id);if(/android/i.test(ua)||/iPhone|iPad|iPod/i.test(ua)||/Windows/i.test(ua)){location.href="oxplayer:///share/"+id;setTimeout(function(){location.replace(landing);},1200);return;}location.replace(landing);})();</script>`;
+const SHARE_REDIRECT_SCRIPT = `<script>(function(){var p=location.pathname;var m=p.match(/^\\/share\\/([^/]+)\\/?$/);if(!m)return;var id=m[1];var qs=location.search||"";var ua=navigator.userAgent||"";var landing="/share/item/?id="+encodeURIComponent(id)+(qs?("&"+qs.substring(1)):"");var appUrl="oxplayer:///share/"+id+qs;if(/android/i.test(ua)||/iPhone|iPad|iPod/i.test(ua)||/Windows/i.test(ua)){location.href=appUrl;setTimeout(function(){location.replace(landing);},1200);return;}location.replace(landing);})();</script>`;
 
 if (!fs.existsSync(out404)) {
   console.warn("[patch-404-share] No out/404.html — skip");

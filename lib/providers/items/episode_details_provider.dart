@@ -8,6 +8,7 @@ import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
+import 'package:fladder/oxplayer/oxplayer_share.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/sync_provider.dart';
@@ -67,6 +68,9 @@ class EpisodeDetailsProvider extends StateNotifier<EpisodeDetailModel> {
         episodes: EpisodeModel.episodesFromDto(episodes.bodyOrThrow.items, ref),
         episode: episode,
       );
+      if (OxplayerConfig.isEnabled) {
+        state = state.copyWith(episode: oxplayerApplyShareMediaSourceToEpisode(state.episode, ref));
+      }
 
       return seriesResponse;
     } catch (e) {

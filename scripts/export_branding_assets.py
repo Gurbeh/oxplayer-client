@@ -2,7 +2,7 @@
 """Export TV banner, notification, monochrome, launcher PNGs, and dev icon copies."""
 from __future__ import annotations
 
-import shutil
+import colorsys
 import subprocess
 import sys
 import tempfile
@@ -17,6 +17,9 @@ PROD = ROOT / "icons" / "production"
 DEV = ROOT / "icons" / "development"
 ANDROID_RES = ROOT / "android" / "app" / "src" / "main" / "res"
 BRAND = "#210000"
+# Development flavor: hot-pink launcher so debug builds are obvious on the home screen.
+DEV_BRAND = "#FF2D95"
+DEV_HUE_SHIFT = 0.78
 BANNER_SIZE = (320, 180)
 ICON_CANVAS = 1024
 # Adaptive-icon safe zone: keep artwork inside the inner ~50% of the canvas.
@@ -120,21 +123,51 @@ def production_launcher_pngs() -> None:
         save_launcher_icon(ICON_SVG, PROD / name, width)
 
 
-def sync_dev_icons() -> None:
+def tint_development_logo(img: Image.Image) -> Image.Image:
+    """Shift production oranges toward magenta/pink for the development flavor."""
+    r, g, b, a = img.split()
+    rgb = Image.merge("RGB", (r, g, b))
+    pixels = list(rgb.getdata())
+    tinted: list[tuple[int, int, int]] = []
+    for red, green, blue in pixels:
+        if red == 0 and green == 0 and blue == 0:
+            tinted.append((0, 0, 0))
+            continue
+        hue, sat, val = colorsys.rgb_to_hsv(red / 255, green / 255, blue / 255)
+        hue = (hue + DEV_HUE_SHIFT) % 1.0
+        sat = min(1.0, sat * 1.15 + 0.05)
+        val = min(1.0, val * 1.05)
+        red, green, blue = colorsys.hsv_to_rgb(hue, sat, val)
+        tinted.append((int(red * 255), int(green * 255), int(blue * 255)))
+    tinted_rgb = Image.new("RGB", rgb.size)
+    tinted_rgb.putdata(tinted)
+    return Image.merge("RGBA", (*tinted_rgb.split(), a))
+
+
+def save_development_launcher_icon(svg: Path, out: Path, width: int) -> None:
+    icon = tint_development_logo(launcher_icon(svg))
+    if width != ICON_CANVAS:
+        icon = icon.resize((width, width), Image.Resampling.LANCZOS)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    icon.save(out, "PNG")
+    print(f"wrote {out.relative_to(ROOT)}")
+
+
+def development_launcher_pngs() -> None:
     DEV.mkdir(parents=True, exist_ok=True)
-    names = [
-        "oxplayer_icon.png",
-        "oxplayer_icon_512.png",
-        "oxplayer_icon_desktop.png",
-        "oxplayer_macos_icon.png",
-        "oxplayer_store_icon.png",
-        "oxplayer_adaptive_icon.png",
+    exports = [
+        ("oxplayer_icon.png", ICON_CANVAS),
+        ("oxplayer_macos_icon.png", ICON_CANVAS),
+        ("oxplayer_icon_512.png", 512),
+        ("oxplayer_icon_desktop.png", 512),
+        ("oxplayer_store_icon.png", 512),
     ]
-    for name in names:
-        src = PROD / name
-        if src.exists():
-            shutil.copy2(src, DEV / name)
-    print(f"synced {len(names)} files to icons/development/")
+    for name, width in exports:
+        save_development_launcher_icon(ICON_SVG, DEV / name, width)
+
+    mono = white_silhouette(repad_icon(render_rgba(OUTLINE_SVG)))
+    mono.save(DEV / "oxplayer_adaptive_icon.png", "PNG")
+    print(f"wrote {(DEV / 'oxplayer_adaptive_icon.png').relative_to(ROOT)}")
 
 
 def main() -> None:
@@ -144,7 +177,7 @@ def main() -> None:
     monochrome_adaptive()
     notification_master()
     tv_banner()
-    sync_dev_icons()
+    development_launcher_pngs()
     print("done")
 
 

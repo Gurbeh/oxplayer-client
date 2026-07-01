@@ -147,8 +147,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     }
 
     if (widget.loggedIn == null) {
-      context.router.replace(const DashboardRoute());
-      WidgetsBinding.instance.addPostFrameCallback((_) => pushLock());
+      if (OxplayerConfig.isEnabled) {
+        oxplayerFlushBufferedPendingPath(ref);
+        unawaited(oxplayerNavigateAfterLogin(context, ref));
+        WidgetsBinding.instance.addPostFrameCallback((_) => pushLock());
+      } else {
+        context.router.replace(const DashboardRoute());
+        WidgetsBinding.instance.addPostFrameCallback((_) => pushLock());
+      }
     } else {
       widget.loggedIn?.call(true);
       WidgetsBinding.instance.addPostFrameCallback((_) => pushLock());

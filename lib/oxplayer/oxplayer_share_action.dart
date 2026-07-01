@@ -23,7 +23,10 @@ List<ItemAction> oxplayerShareActions(BuildContext context, ItemBaseModel item) 
 
 Future<void> oxplayerShareItem(BuildContext context, ItemBaseModel item) async {
   if (!oxIsShareableItem(item)) return;
-  final url = oxplayerBuildShareUrl(item.id);
+  final url = oxplayerBuildShareUrl(
+    item.id,
+    mediaSourceId: oxplayerShareMediaSourceIdFromItem(item),
+  );
   await Clipboard.setData(ClipboardData(text: url));
   if (context.mounted) {
     FladderSnack.show(context.localized.shareLinkCopied, context: context);

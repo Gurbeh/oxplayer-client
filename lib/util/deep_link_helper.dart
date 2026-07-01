@@ -4,19 +4,20 @@ import 'dart:developer';
 
 import 'package:auto_route/auto_route.dart' show DeepLink, PageRouteInfo;
 
-import 'package:fladder/oxplayer/oxplayer_pending_route.dart';
 import 'package:fladder/oxplayer/oxplayer_share.dart';
+import 'package:fladder/oxplayer/oxplayer_share_deep_link.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 
 /// Custom URL scheme used by OXPlayer native deep links.
 const kOxplayerDeepLinkScheme = 'oxplayer';
 
 FutureOr<DeepLink> deepLinkBuilder(Uri? payload) {
+  if (payload != null) {
+    log('OXPlayer deep link received: $payload');
+  }
   final route = payloadToRoute(payload);
   if (route != null) {
-    final path = pageRouteInfoToPath(route);
-    oxplayerBufferPendingPath(path);
-    return DeepLink.path(path);
+    return oxplayerDeepLinkForRoute(route);
   }
   return DeepLink.defaultPath;
 }
@@ -88,10 +89,11 @@ PageRouteInfo? payloadToRoute(Uri? payload) {
   if (payload == null) return null;
 
   final shareId = oxplayerCatalogIdFromShareUri(payload);
-  if (shareId != null &&
-      (oxplayerIsShareWebHost(payload) ||
-          payload.scheme == kOxplayerDeepLinkScheme ||
-          payload.scheme == 'fladder')) {
+  if (shareId != null) {
+    oxplayerBufferShareMediaSource(
+      catalogId: shareId,
+      mediaSourceId: oxplayerMediaSourceIdFromShareUri(payload),
+    );
     return DetailsRoute(id: shareId);
   }
 
@@ -116,6 +118,10 @@ PageRouteInfo? payloadToRoute(Uri? payload) {
   if (payload.path.contains('/details')) {
     final id = payload.queryParameters['id'];
     if (id != null && id.isNotEmpty) {
+      oxplayerBufferShareMediaSource(
+        catalogId: id,
+        mediaSourceId: oxplayerMediaSourceIdFromShareUri(payload),
+      );
       return DetailsRoute(id: id);
     }
   }
@@ -125,7 +131,15 @@ PageRouteInfo? payloadToRoute(Uri? payload) {
 String pageRouteInfoToPath(PageRouteInfo route) {
   try {
     return switch (route) {
-      DetailsRoute() => '/details?id=${route.queryParams.get('id')}',
+      DetailsRoute() => () {
+          final id = route.queryParams.getString('id', '');
+          final params = <String, String>{'id': id};
+          final msId = oxplayerPeekBufferedShareMediaSourceId(id);
+          if (msId != null && msId.isNotEmpty) {
+            params['mediaSourceId'] = msId;
+          }
+          return Uri(path: '/details', queryParameters: params).toString();
+        }(),
       SeerrDetailsRoute() =>
         '/seerr?mediaType=${route.queryParams.get('mediaType')}&tmdbId=${route.queryParams.get('tmdbId')}',
       LoginRoute() => '/login?authLink=${route.queryParams.get('authLink')}',

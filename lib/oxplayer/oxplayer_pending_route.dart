@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_share.dart';
+import 'package:fladder/oxplayer/oxplayer_share_deep_link.dart';
 import 'package:fladder/oxplayer/oxplayer_seerr_auto_config.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/login/lock_screen.dart';
@@ -12,6 +14,9 @@ import 'package:fladder/screens/login/lock_screen.dart';
 final oxplayerPendingRouteProvider = StateProvider<String?>((ref) => null);
 
 String? _bufferedPendingPath;
+
+bool get oxplayerHasBufferedPendingPath =>
+    _bufferedPendingPath != null && _bufferedPendingPath!.isNotEmpty;
 
 /// Called from [deepLinkBuilder] before auth is available (no [WidgetRef]).
 void oxplayerBufferPendingPath(String path) {
@@ -27,6 +32,7 @@ void oxplayerFlushBufferedPendingPath(WidgetRef ref) {
   if (path == null) return;
   _bufferedPendingPath = null;
   ref.read(oxplayerPendingRouteProvider.notifier).state = path;
+  oxplayerFlushBufferedShareMediaSource(ref);
 }
 
 void oxplayerSetPendingRoute(WidgetRef ref, String path) {
@@ -46,12 +52,8 @@ Future<void> oxplayerNavigateAfterLogin(BuildContext context, WidgetRef ref) asy
   if (!context.mounted) return;
 
   final pending = OxplayerEnv.isEnabled ? ref.read(oxplayerPendingRouteProvider) : null;
-  if (pending != null && pending.isNotEmpty) {
-    ref.read(oxplayerPendingRouteProvider.notifier).state = null;
-    await context.router.replaceAll([const HomeRoute()]);
-    if (context.mounted) {
-      await context.router.navigatePath(pending);
-    }
+  if ((pending != null && pending.isNotEmpty) || oxplayerHasBufferedPendingPath) {
+    await oxplayerReconcilePendingShareNavigation(context, ref, force: true);
     return;
   }
 

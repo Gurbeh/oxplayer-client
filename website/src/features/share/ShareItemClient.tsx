@@ -7,5 +7,6 @@ import ShareLanding from "@/features/share/ShareLanding";
 export default function ShareItemClient() {
   const params = useSearchParams();
   const id = params.get("id") ?? "";
-  return <ShareLanding catalogId={id} />;
+  const mediaSourceId = params.get("mediaSourceId") ?? undefined;
+  return <ShareLanding catalogId={id} mediaSourceId={mediaSourceId} />;
 }

@@ -2,7 +2,9 @@ import 'dart:developer';
 
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_pending_route.dart';
+import 'package:fladder/oxplayer/oxplayer_share_deep_link.dart';
 import 'package:fladder/routes/auto_router.dart';
+import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/util/deep_link_helper.dart';
 import 'package:protocol_handler/protocol_handler.dart';
 
@@ -54,12 +56,18 @@ final class OxplayerWindowsDeepLinkListener with ProtocolListener {
     final route = payloadToRoute(uri);
     if (route == null) return;
 
+    oxplayerDeepLinkForRoute(route);
     final path = pageRouteInfoToPath(route);
-    oxplayerBufferPendingPath(path);
     log('OXPlayer Windows deep link → $path');
 
     try {
-      _router.navigatePath(path);
+      if (route is DetailsRoute) {
+        _router.replaceAll([
+          HomeRoute(children: [route]),
+        ]);
+      } else {
+        _router.navigatePath(path);
+      }
     } catch (e, st) {
       log('Windows deep link navigation failed: $e', stackTrace: st);
     }

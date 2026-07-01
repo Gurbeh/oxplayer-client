@@ -13,6 +13,7 @@ const UUID_RE =
 
 type ShareLandingProps = {
   catalogId: string;
+  mediaSourceId?: string;
 };
 
 function detectPlatform(): "android" | "ios" | "windows" | "desktop" {
@@ -36,13 +37,22 @@ const secondaryLinkClass = clsx(
   "transition-all duration-300 hover:border-primary",
 );
 
-export default function ShareLanding({ catalogId }: ShareLandingProps) {
+export default function ShareLanding({ catalogId, mediaSourceId }: ShareLandingProps) {
   const id = catalogId.trim();
   const valid = UUID_RE.test(id);
   const platform = useMemo(() => detectPlatform(), []);
 
-  const webAppUrl = `${SITE_ORIGIN}/web/#/details?id=${encodeURIComponent(id)}`;
-  const customSchemeUrl = `oxplayer:///share/${id}`;
+  const mediaSourceQuery =
+    mediaSourceId && mediaSourceId.trim().length > 0
+      ? `?mediaSourceId=${encodeURIComponent(mediaSourceId.trim())}`
+      : "";
+
+  const detailParams = new URLSearchParams({ id });
+  if (mediaSourceId?.trim()) {
+    detailParams.set("mediaSourceId", mediaSourceId.trim());
+  }
+  const webAppUrl = `${SITE_ORIGIN}/web/#/details?${detailParams.toString()}`;
+  const customSchemeUrl = `oxplayer:///share/${id}${mediaSourceQuery}`;
 
   // Custom scheme works for dev (app.oxplayer.dev) and prod (app.oxplayer) builds.
   const openInAppHref = customSchemeUrl;
