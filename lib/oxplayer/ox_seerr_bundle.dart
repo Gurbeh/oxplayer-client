@@ -5,12 +5,11 @@ import 'package:http/http.dart' as http;
 
 import 'package:fladder/models/items/images_models.dart';
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
+import 'package:fladder/oxplayer/ox_seerr_images.dart';
 import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/seerr/seerr_models.dart';
-
-const _tmdbImageBase = 'https://image.tmdb.org/t/p/w500';
 
 /// Fetches `GET /tmdb/seerr-bundle` from oxplayer-be (VIP+ TMDB fallback).
 Future<Map<String, dynamic>?> oxFetchSeerrBundle(
@@ -52,7 +51,7 @@ String? oxLogoUrlFromBundlePoster(Map<String, dynamic> poster) {
 
   final logoPath = poster['logoPath'] as String?;
   if (logoPath != null && logoPath.isNotEmpty) {
-    return logoPath.startsWith('http') ? logoPath : '$_tmdbImageBase$logoPath';
+    return oxSeerrLogoUrl(logoPath);
   }
   return null;
 }
@@ -113,7 +112,7 @@ SeerrDashboardPosterModel? _posterFromBundleCard(
   final mediaType = (card['mediaType'] as String?) ?? defaultMediaType;
   final type = mediaType == 'tv' ? SeerrMediaType.tvshow : SeerrMediaType.movie;
   final posterPath = card['posterPath'] as String?;
-  final posterUrl = posterPath != null && posterPath.isNotEmpty ? '$_tmdbImageBase$posterPath' : null;
+  final posterUrl = oxSeerrPosterUrl(posterPath);
 
   ImageData? primary;
   if (posterUrl != null) {

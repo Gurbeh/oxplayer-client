@@ -1,5 +1,7 @@
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
+import 'package:fladder/oxplayer/ox_seerr_images.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -1567,6 +1569,7 @@ class SeerrCompany {
 
   String? get logoUrl {
     if (_logoPath == null || _logoPath!.isEmpty) return null;
+    if (OxplayerConfig.isEnabled) return oxSeerrLogoUrl(_logoPath);
     return '$_tmdbImageBaseUrl$_logoPath';
   }
 
@@ -1630,11 +1633,13 @@ class SeerrSearchCompanyResponse {
 extension SeerrMovieDetailsExtension on SeerrMovieDetails {
   String? get posterUrl {
     if (internalPosterPath == null || internalPosterPath!.isEmpty) return null;
+    if (OxplayerConfig.isEnabled) return oxSeerrPosterUrl(internalPosterPath);
     return '$_tmdbPosterBaseUrl$internalPosterPath';
   }
 
   String? get backdropUrl {
     if (internalBackdropPath == null || internalBackdropPath!.isEmpty) return null;
+    if (OxplayerConfig.isEnabled) return oxSeerrBackdropUrl(internalBackdropPath);
     return '$_tmdbImageBaseUrl$internalBackdropPath';
   }
 }
@@ -1642,6 +1647,7 @@ extension SeerrMovieDetailsExtension on SeerrMovieDetails {
 extension SeerrCastExtension on SeerrCast {
   String? get profileUrl {
     if (internalProfilePath == null || internalProfilePath!.isEmpty) return null;
+    if (OxplayerConfig.isEnabled) return oxSeerrProfileUrl(internalProfilePath);
     return '$_tmdbProfileBaseUrl$internalProfilePath';
   }
 }
@@ -1649,6 +1655,7 @@ extension SeerrCastExtension on SeerrCast {
 extension SeerrCrewExtension on SeerrCrew {
   String? get profileUrl {
     if (internalProfilePath == null || internalProfilePath!.isEmpty) return null;
+    if (OxplayerConfig.isEnabled) return oxSeerrProfileUrl(internalProfilePath);
     return '$_tmdbProfileBaseUrl$internalProfilePath';
   }
 }
@@ -1656,11 +1663,13 @@ extension SeerrCrewExtension on SeerrCrew {
 extension SeerrTvDetailsExtension on SeerrTvDetails {
   String? get posterUrl {
     if (internalPosterPath == null || internalPosterPath!.isEmpty) return null;
+    if (OxplayerConfig.isEnabled) return oxSeerrPosterUrl(internalPosterPath);
     return '$_tmdbPosterBaseUrl$internalPosterPath';
   }
 
   String? get backdropUrl {
     if (internalBackdropPath == null || internalBackdropPath!.isEmpty) return null;
+    if (OxplayerConfig.isEnabled) return oxSeerrBackdropUrl(internalBackdropPath);
     return '$_tmdbImageBaseUrl$internalBackdropPath';
   }
 }
@@ -1668,6 +1677,7 @@ extension SeerrTvDetailsExtension on SeerrTvDetails {
 extension SeerrSeasonExtension on SeerrSeason {
   String? get posterUrl {
     if (internalPosterPath == null || internalPosterPath!.isEmpty) return null;
+    if (OxplayerConfig.isEnabled) return oxSeerrPosterUrl(internalPosterPath);
     return '$_tmdbPosterBaseUrl$internalPosterPath';
   }
 }
@@ -1675,6 +1685,7 @@ extension SeerrSeasonExtension on SeerrSeason {
 extension SeerrEpisodeExtension on SeerrEpisode {
   String? get stillUrl {
     if (internalStillPath == null || internalStillPath!.isEmpty) return null;
+    if (OxplayerConfig.isEnabled) return oxSeerrStillUrl(internalStillPath);
     return '$_tmdbImageBaseUrl$internalStillPath';
   }
 }
@@ -1682,11 +1693,13 @@ extension SeerrEpisodeExtension on SeerrEpisode {
 extension SeerrDiscoverItemExtension on SeerrDiscoverItem {
   String? get posterUrl {
     if (internalPosterPath == null || internalPosterPath!.isEmpty) return null;
+    if (OxplayerConfig.isEnabled) return oxSeerrPosterUrl(internalPosterPath);
     return '$_tmdbPosterBaseUrl$internalPosterPath';
   }
 
   String? get backdropUrl {
     if (internalBackdropPath == null || internalBackdropPath!.isEmpty) return null;
+    if (OxplayerConfig.isEnabled) return oxSeerrBackdropUrl(internalBackdropPath);
     return '$_tmdbImageBaseUrl$internalBackdropPath';
   }
 }
@@ -1694,6 +1707,7 @@ extension SeerrDiscoverItemExtension on SeerrDiscoverItem {
 extension SeerrWatchProviderExtension on SeerrWatchProvider {
   String? get logoUrl {
     if (internalLogoPath == null || internalLogoPath!.isEmpty) return null;
+    if (OxplayerConfig.isEnabled) return oxSeerrLogoUrl(internalLogoPath);
     return '$_tmdbImageBaseUrl$internalLogoPath';
   }
 }
