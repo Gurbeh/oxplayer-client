@@ -76,8 +76,23 @@
 			"args": [
 				"run",
 				"icons_launcher:create",
-				"--flavors",
-				"development,production"
+				"--flavor",
+				"development"
+			],
+			"label": "dart: generate icons_launcher (development)",
+			"detail": "",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
+			"type": "dart",
+			"command": "dart",
+			"args": [
+				"run",
+				"icons_launcher:create",
+				"--flavor",
+				"production"
 			],
 			"label": "dart: generate icons_launcher",
 			"detail": "",
