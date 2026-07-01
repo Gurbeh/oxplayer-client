@@ -1,5 +1,6 @@
 package app.oxplayer.messengers
 
+import PlaybackState
 import PlayableData
 import SubtitleSettings
 import TVGuideModel
@@ -38,12 +39,65 @@ class VideoPlayerImplementation(
 
     var subsInitialized = false
 
+    /** Last known position when the activity went to background (survives activity recreation). */
+    var savedPositionMs: Long = 0L
+
+    /** Whether playback was active when the activity went to background. */
+    var wasPlayingBeforeBackground: Boolean = false
+
     /** One-shot listener: Ox loopback + resume must load from t=0 first, then seek (see [open]). */
     private var loopbackResumeListener: Player.Listener? = null
 
     /** When [open] runs before ExoPlayer is bound, retry with this URL after [init]. */
     private var pendingOpenUrl: String? = null
     private var pendingOpenPlay: Boolean = true
+
+    fun saveBackgroundState() {
+        val exo = player ?: return
+        val pos = exo.currentPosition.coerceAtLeast(0L)
+        if (pos > 0L) {
+            savedPositionMs = pos
+            playbackData.value = playbackData.value?.copy(startPosition = pos)
+        }
+        wasPlayingBeforeBackground = exo.isPlaying || exo.playWhenReady
+    }
+
+    fun restoreAfterBackground() {
+        val exo = player ?: return
+        if (exo.mediaItemCount == 0) return
+
+        val resumeMs = savedPositionMs
+        if (resumeMs > 0L && kotlin.math.abs(exo.currentPosition - resumeMs) > 500L) {
+            exo.seekTo(resumeMs)
+        }
+        if (wasPlayingBeforeBackground && !exo.isPlaying) {
+            exo.play()
+        }
+        publishPlaybackState(exo)
+    }
+
+    fun clearSession() {
+        playbackData.value = null
+        savedPositionMs = 0L
+        wasPlayingBeforeBackground = false
+        pendingOpenUrl = null
+    }
+
+    private fun publishPlaybackState(exo: ExoPlayer) {
+        val hasMedia = exo.mediaItemCount > 0
+        val state = exo.playbackState
+        VideoPlayerObject.setPlaybackState(
+            PlaybackState(
+                position = exo.currentPosition,
+                buffered = exo.bufferedPosition,
+                duration = exo.duration,
+                playing = exo.isPlaying,
+                buffering = state == Player.STATE_BUFFERING,
+                completed = state == Player.STATE_ENDED,
+                failed = state == Player.STATE_IDLE && !hasMedia,
+            ),
+        )
+    }
 
     val isTVMode: Flow<Boolean> = playbackData.asStateFlow().map {
         it?.mediaInfo?.playbackType == PlaybackType.TV
@@ -267,6 +321,7 @@ class VideoPlayerImplementation(
         loopbackResumeListener = null
         player?.stop()
         player?.clearMediaItems()
+        clearSession()
     }
 
     fun init(exoPlayer: ExoPlayer?) {
@@ -285,9 +340,21 @@ class VideoPlayerImplementation(
             return
         }
         playbackData.value?.let { playData ->
-            VideoPlayerObject.setAudioTrackIndex(playData.defaultAudioTrack.toInt(), true)
-            VideoPlayerObject.setSubtitleTrackIndex(playData.defaultSubtrack.toInt(), true)
-            open(playData.url, true, callback = {})
+            if (exoPlayer.mediaItemCount > 0) {
+                restoreAfterBackground()
+                return
+            }
+            val resumeMs = savedPositionMs.takeIf { it > 0L } ?: playData.startPosition
+            val updated = playData.copy(startPosition = resumeMs)
+            playbackData.value = updated
+            VideoPlayerObject.setAudioTrackIndex(updated.defaultAudioTrack.toInt(), true)
+            VideoPlayerObject.setSubtitleTrackIndex(updated.defaultSubtrack.toInt(), true)
+            val shouldPlay = wasPlayingBeforeBackground
+            Log.d(
+                OX_NATIVE_PLY_TAG,
+                "init restoring after recreation resumeMs=$resumeMs play=$shouldPlay",
+            )
+            open(updated.url, shouldPlay, callback = {})
         }
     }
 

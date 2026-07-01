@@ -40,7 +40,13 @@ class VideoPlayerActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        VideoPlayerObject.implementation.restoreAfterBackground()
+    }
+
     override fun onPause() {
+        VideoPlayerObject.implementation.saveBackgroundState()
         super.onPause()
         VideoPlayerObject.implementation.pause()
     }

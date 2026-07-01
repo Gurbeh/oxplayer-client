@@ -88,6 +88,8 @@ class MainActivity : AudioServiceFragmentActivity(), NativeVideoActivity {
                 // Dart-side stop() call goes through VideoPlayerImplementation.stop()
                 // safely (player?.stop() becomes a null-safe no-op on a released player).
                 VideoPlayerObject.implementation.init(null)
+                VideoPlayerObject.implementation.clearSession()
+                VideoPlayerObject.tvGuide.value = null
                 callback?.invoke(Result.success(startResult))
         }
     }
@@ -110,8 +112,8 @@ class MainActivity : AudioServiceFragmentActivity(), NativeVideoActivity {
     }
 
     override fun disposeActivity() {
-        VideoPlayerObject.implementation.playbackData.value = null
         VideoPlayerObject.implementation.stop()
+        VideoPlayerObject.tvGuide.value = null
         VideoPlayerObject.currentActivity?.finish()
     }
 

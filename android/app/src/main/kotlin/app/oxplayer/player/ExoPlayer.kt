@@ -18,13 +18,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.getSystemService
 import androidx.core.os.postDelayed
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
@@ -129,15 +134,17 @@ internal fun ExoPlayer(
     }
 
     fun updatePlaybackState() {
+        val hasMedia = exoPlayer.mediaItemCount > 0
+        val state = exoPlayer.playbackState
         videoHost.setPlaybackState(
             PlaybackState(
                 position = exoPlayer.currentPosition,
                 buffered = exoPlayer.bufferedPosition,
                 duration = exoPlayer.duration,
                 playing = exoPlayer.isPlaying,
-                buffering = exoPlayer.playbackState == Player.STATE_BUFFERING,
-                completed = exoPlayer.playbackState == Player.STATE_ENDED,
-                failed = exoPlayer.playbackState == Player.STATE_IDLE
+                buffering = state == Player.STATE_BUFFERING,
+                completed = state == Player.STATE_ENDED,
+                failed = state == Player.STATE_IDLE && !hasMedia,
             )
         )
     }
@@ -175,6 +182,7 @@ internal fun ExoPlayer(
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
+                val hasMedia = exoPlayer.mediaItemCount > 0
                 videoHost.setPlaybackState(
                     PlaybackState(
                         position = exoPlayer.currentPosition,
@@ -183,7 +191,7 @@ internal fun ExoPlayer(
                         playing = exoPlayer.isPlaying,
                         buffering = playbackState == Player.STATE_BUFFERING,
                         completed = playbackState == Player.STATE_ENDED,
-                        failed = playbackState == Player.STATE_IDLE
+                        failed = playbackState == Player.STATE_IDLE && !hasMedia,
                     )
                 )
             }
@@ -238,10 +246,17 @@ internal fun ExoPlayer(
     DisposableEffect(Unit) {
         VideoPlayerObject.implementation.init(exoPlayer)
         onDispose {
-            videoHost.videoPlayerControls?.onStop(callback = {})
-            if (VideoPlayerObject.implementation.releasePlayer(exoPlayer)) {
-                VideoPlayerObject.implementation.playbackData.value = null
-                VideoPlayerObject.tvGuide.value = null
+            val finishing = activity?.isFinishing == true
+            if (finishing) {
+                videoHost.videoPlayerControls?.onStop(callback = {})
+                if (VideoPlayerObject.implementation.releasePlayer(exoPlayer)) {
+                    VideoPlayerObject.implementation.clearSession()
+                    VideoPlayerObject.tvGuide.value = null
+                }
+            } else {
+                // Activity recreated (e.g. TV home) — keep session data for restore in init().
+                VideoPlayerObject.implementation.saveBackgroundState()
+                VideoPlayerObject.implementation.releasePlayer(exoPlayer)
             }
             exoPlayer.release()
         }
@@ -256,6 +271,26 @@ internal fun ExoPlayer(
 
     @Composable
     fun createPlayer(showControls: Boolean) {
+        var playerView by remember { mutableStateOf<PlayerView?>(null) }
+        val lifecycleOwner = LocalLifecycleOwner.current
+
+        DisposableEffect(lifecycleOwner, playerView) {
+            val view = playerView
+            if (view == null) {
+                onDispose { }
+            } else {
+                val observer = LifecycleEventObserver { _, event ->
+                    when (event) {
+                        Lifecycle.Event.ON_RESUME -> view.onResume()
+                        Lifecycle.Event.ON_PAUSE -> view.onPause()
+                        else -> Unit
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+            }
+        }
+
         AndroidView(
             modifier = Modifier
                 .fillMaxSize()
@@ -273,6 +308,7 @@ internal fun ExoPlayer(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                     )
                     keepScreenOn = false
+                    playerView = this
                     subtitleView?.apply {
                         setStyle(
                             CaptionStyleCompat(
