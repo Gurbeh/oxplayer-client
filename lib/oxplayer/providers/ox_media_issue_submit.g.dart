@@ -7,7 +7,7 @@ part of 'ox_media_issue_submit.dart';
 // **************************************************************************
 
 String _$oxMediaIssueSubmitHash() =>
-    r'32acfe46d61dda06dbf7588c927f5c461f64f015';
+    r'f20d04ac763079174f6e67b59335ae860211fd47';
 
 /// See also [OxMediaIssueSubmit].
 @ProviderFor(OxMediaIssueSubmit)

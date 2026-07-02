@@ -15,6 +15,8 @@ import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
 import 'package:fladder/oxplayer/ox_item_recommendations.dart';
 import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
 import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
+import 'package:fladder/oxplayer/ox_season_user_data.dart';
+import 'package:fladder/oxplayer/ox_virtual_episode_images.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
@@ -97,15 +99,19 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
       final episodes = await api.showsSeriesIdEpisodesGet(
         seriesId: seriesModel.id,
         enableUserData: true,
-        fields: [
+        fields: oxEpisodeListFields([
           ItemFields.mediastreams,
           ItemFields.mediasources,
           ItemFields.overview,
           ItemFields.candownload,
-        ],
+        ]),
       );
 
-      final newEpisodes = EpisodeModel.episodesFromDto(
+      final newEpisodes = oxApplyVirtualEpisodeImages(
+        EpisodeModel.episodesFromDto(
+          episodes.body?.items,
+          ref,
+        ),
         episodes.body?.items,
         ref,
       );
@@ -124,19 +130,23 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
       newState = newState.copyWith(
           seasons: SeasonModel.seasonsFromDto(seasons.body?.items, ref).map(
             (element) {
-              final unPlayedCount = newEpisodes
-                  .where((episode) =>
-                      episode.season == element.season &&
-                      episode.status == EpisodeStatus.available &&
-                      episode.userData.played == false)
-                  .length;
+              final seasonEpisodes = newEpisodes.where((episode) => episode.season == element.season);
+              final userData = OxplayerEnv.isEnabled
+                  ? oxSeasonUserDataFromEpisodes(seasonEpisodes)
+                  : () {
+                      final unPlayedCount = seasonEpisodes
+                          .where((episode) =>
+                              episode.status == EpisodeStatus.available && episode.userData.played == false)
+                          .length;
+                      return UserData(
+                        unPlayedItemCount: unPlayedCount,
+                        played: unPlayedCount == 0,
+                      );
+                    }();
               return element.copyWith(
                 canDownload: true,
-                episodes: newEpisodes.where((episode) => episode.season == element.season).toList(),
-                userData: UserData(
-                  unPlayedItemCount: unPlayedCount,
-                  played: unPlayedCount == 0,
-                ),
+                episodes: seasonEpisodes.toList(),
+                userData: userData,
               );
             },
           ).toList(),

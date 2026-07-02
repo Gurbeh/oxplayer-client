@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:chopper/chopper.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
@@ -9,7 +10,7 @@ import 'package:fladder/oxplayer/oxplayer_env.dart';
 class OxplayerHttpPerformanceInterceptor implements Interceptor {
   @override
   FutureOr<Response<BodyType>> intercept<BodyType>(Chain<BodyType> chain) async {
-    if (!OxplayerEnv.isEnabled || !Sentry.isEnabled) {
+    if (!OxplayerEnv.isEnabled || !Sentry.isEnabled || !kReleaseMode) {
       return chain.proceed(chain.request);
     }
 

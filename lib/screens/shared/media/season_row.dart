@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/providers/sync/sync_provider_helpers.dart';
+import 'package:fladder/oxplayer/ox_season_availability.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/screens/syncing/sync_button.dart';
 import 'package:fladder/theme.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
@@ -147,7 +149,34 @@ class SeasonPoster extends ConsumerWidget {
                               },
                               loading: () => const SizedBox.shrink(),
                             ),
-                        if (season.userData.unPlayedItemCount != 0)
+                        if (OxplayerConfig.isEnabled)
+                          Builder(
+                            builder: (context) {
+                              if (oxSeasonShowWatchedTick(season)) {
+                                return StatusCard(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  child: const Icon(Icons.check_rounded),
+                                );
+                              }
+                              final countText = oxSeasonPosterCountText(season);
+                              if (countText == null) return const SizedBox.shrink();
+                              return StatusCard(
+                                color: Theme.of(context).colorScheme.primary,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(6),
+                                  child: Text(
+                                    countText,
+                                    textAlign: TextAlign.center,
+                                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                          color: Theme.of(context).colorScheme.onSurface,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                        else if (season.userData.unPlayedItemCount != 0)
                           StatusCard(
                             color: Theme.of(context).colorScheme.primary,
                             child: Padding(

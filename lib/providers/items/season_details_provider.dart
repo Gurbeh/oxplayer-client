@@ -7,6 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/season_model.dart';
+import 'package:fladder/oxplayer/ox_virtual_episode_images.dart';
+import 'package:fladder/oxplayer/ox_season_user_data.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:logging/logging.dart' as logging;
@@ -33,12 +36,13 @@ class SeasonDetailsNotifier extends StateNotifier<SeasonModel?> {
       seriesId: newState?.seriesId ?? "",
       seasonId: newState?.id,
       season: newState?.season,
-      fields: [
+      enableUserData: true,
+      fields: oxEpisodeListFields([
         ItemFields.overview,
         ItemFields.candelete,
         ItemFields.candownload,
         ItemFields.parentid,
-      ],
+      ]),
     );
 
     List<BaseItemDto> specialFeatures;
@@ -51,8 +55,17 @@ class SeasonDetailsNotifier extends StateNotifier<SeasonModel?> {
     }
 
     newState = newState?.copyWith(
-        episodes: EpisodeModel.episodesFromDto(episodes.body?.items, ref).toList(),
+        episodes: oxApplyVirtualEpisodeImages(
+          EpisodeModel.episodesFromDto(episodes.body?.items, ref).toList(),
+          episodes.body?.items,
+          ref,
+        ),
         specialFeatures: SpecialFeatureModel.specialFeaturesFromDto(specialFeatures, ref).toList());
+    if (OxplayerConfig.isEnabled && newState != null) {
+      newState = newState.copyWith(
+        userData: oxSeasonUserDataFromEpisodes(newState.episodes),
+      );
+    }
     state = newState;
     return season;
   }

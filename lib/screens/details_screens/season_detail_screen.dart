@@ -8,6 +8,9 @@ import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/providers/items/season_details_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/oxplayer/ox_library_detail_labels.dart';
+import 'package:fladder/oxplayer/ox_season_playable.dart';
+import 'package:fladder/oxplayer/ox_season_watch_actions.dart';
+import 'package:fladder/oxplayer/widgets/ox_season_request_button.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
 import 'package:fladder/screens/shared/detail_scaffold.dart';
 import 'package:fladder/screens/shared/media/episode_details_list.dart';
@@ -88,21 +91,29 @@ class _SeasonDetailScreenState extends ConsumerState<SeasonDetailScreen> {
                           runSpacing: 8,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            SelectableIconButton(
-                              onPressed: () async => await ref
-                                  .read(userProvider.notifier)
-                                  .setAsFavorite(!details.userData.isFavourite, details.id),
-                              selected: details.userData.isFavourite,
-                              selectedIcon: IconsaxPlusBold.heart,
-                              icon: IconsaxPlusLinear.heart,
-                            ),
-                            SelectableIconButton(
-                              onPressed: () async => await ref
-                                  .read(userProvider.notifier)
-                                  .markAsPlayed(!details.userData.played, details.id),
-                              selected: details.userData.played,
-                              selectedIcon: IconsaxPlusBold.tick_circle,
-                              icon: IconsaxPlusLinear.tick_circle,
+                            if (oxSeasonHasPlayableEpisodes(details))
+                              SelectableIconButton(
+                                onPressed: () async => await ref
+                                    .read(userProvider.notifier)
+                                    .setAsFavorite(!details.userData.isFavourite, details.id),
+                                selected: details.userData.isFavourite,
+                                selectedIcon: IconsaxPlusBold.heart,
+                                icon: IconsaxPlusLinear.heart,
+                              ),
+                            if (oxSeasonHasPlayableEpisodes(details))
+                              SelectableIconButton(
+                                onPressed: () async => await oxSeasonMarkPlayed(
+                                  ref,
+                                  details,
+                                  !details.userData.played,
+                                ),
+                                selected: details.userData.played,
+                                selectedIcon: IconsaxPlusBold.tick_circle,
+                                icon: IconsaxPlusLinear.tick_circle,
+                              ),
+                            OxSeasonRequestButton(
+                              seriesId: details.seriesId,
+                              seasonNumber: details.season,
                             ),
                           ],
                         ),

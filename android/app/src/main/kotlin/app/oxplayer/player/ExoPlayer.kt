@@ -219,8 +219,8 @@ internal fun ExoPlayer(
                 val impl = VideoPlayerObject.implementation
                 // Short deferral: track groups must be mapped before overrides stick; debounce
                 // so rapid onTracksChanged bursts (e.g. after TV Home resume) coalesce to one apply.
-                val scheduleApplyDefaults: () -> Unit = {
-                    val playbackData = impl.playbackData.value ?: return@Unit
+                val scheduleApplyDefaults: () -> Unit = scheduleApplyDefaults@{
+                    val playbackData = impl.playbackData.value ?: return@scheduleApplyDefaults
                     pendingTrackApply?.let { trackApplyHandler.removeCallbacks(it) }
                     val runnable = Runnable {
                         pendingTrackApply = null
