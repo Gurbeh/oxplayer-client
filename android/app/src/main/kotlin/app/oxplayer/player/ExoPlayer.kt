@@ -27,7 +27,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.getSystemService
-import androidx.core.os.postDelayed
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.AudioAttributes
@@ -62,8 +61,6 @@ import app.oxplayer.utility.AllowedOrientations
 import app.oxplayer.utility.conditional
 import app.oxplayer.utility.getAudioTracks
 import app.oxplayer.utility.getSubtitleTracks
-import app.oxplayer.utility.toNativeMuxedAudioRow
-import app.oxplayer.utility.toNativeMuxedSubtitleRow
 import kotlin.time.Duration.Companion.seconds
 
 private const val OX_NATIVE_PLY_TAG = "OX_NATIVE_PLY"
@@ -116,6 +113,9 @@ internal fun ExoPlayer(
             setAllowInvalidateSelectionsOnRendererCapabilitiesChange(true)
         })
     }
+
+    val trackApplyHandler = remember { Handler(Looper.getMainLooper()) }
+    var pendingTrackApply by remember { mutableStateOf<Runnable?>(null) }
 
     val exoPlayer = remember {
         ExoPlayer.Builder(context, renderersFactory)
@@ -217,13 +217,17 @@ internal fun ExoPlayer(
                 VideoPlayerObject.exoAudioTracks.value = audioTracks
 
                 val impl = VideoPlayerObject.implementation
-                // Short deferral: track groups must be mapped before overrides stick; a 1s
-                // wait was unnecessarily slow and kept subtitles off until user interaction.
+                // Short deferral: track groups must be mapped before overrides stick; debounce
+                // so rapid onTracksChanged bursts (e.g. after TV Home resume) coalesce to one apply.
                 val scheduleApplyDefaults: () -> Unit = {
-                    val playbackData = impl.playbackData.value
-                    Handler(Looper.getMainLooper()).postDelayed(delayInMillis = 150) {
-                        playbackData?.let { exoPlayer.properlySetSubAndAudioTracks(it) }
+                    val playbackData = impl.playbackData.value ?: return@Unit
+                    pendingTrackApply?.let { trackApplyHandler.removeCallbacks(it) }
+                    val runnable = Runnable {
+                        pendingTrackApply = null
+                        exoPlayer.properlySetSubAndAudioTracks(playbackData)
                     }
+                    pendingTrackApply = runnable
+                    trackApplyHandler.postDelayed(runnable, 150)
                 }
 
                 if (!impl.subsInitialized) {
@@ -233,12 +237,12 @@ internal fun ExoPlayer(
                     // Late-mapped text tracks after the initial audio-only snapshot.
                     scheduleApplyDefaults()
                 }
-
-                notifyFlutterMuxedTrackDiscovery(exoPlayer)
             }
         }
         exoPlayer.addListener(listener)
         onDispose {
+            pendingTrackApply?.let { trackApplyHandler.removeCallbacks(it) }
+            pendingTrackApply = null
             exoPlayer.removeListener(listener)
         }
     }
@@ -378,12 +382,3 @@ internal fun ExoPlayer(
     }
 }
 
-private fun notifyFlutterMuxedTrackDiscovery(exoPlayer: ExoPlayer) {
-    val listener = VideoPlayerObject.videoPlayerListener ?: return
-    val audioTracks = exoPlayer.getAudioTracks()
-    val subTracks = exoPlayer.getSubtitleTracks()
-    if (audioTracks.isEmpty() && subTracks.isEmpty()) return
-    val audioRows = audioTracks.map { it.toNativeMuxedAudioRow() }
-    val subRows = subTracks.map { it.toNativeMuxedSubtitleRow() }
-    listener.onMuxedTracksDiscovered(audioRows, subRows) { }
-}

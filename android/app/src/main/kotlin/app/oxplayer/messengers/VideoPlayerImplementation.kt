@@ -26,6 +26,8 @@ import app.oxplayer.utility.clearSubtitleTrack
 import app.oxplayer.utility.enableSubtitles
 import app.oxplayer.utility.getAudioTracks
 import app.oxplayer.utility.getSubtitleTracks
+import app.oxplayer.utility.isInternalSubtitleTrackSelected
+import app.oxplayer.utility.isSubtitleTrackDisabled
 import app.oxplayer.utility.setInternalAudioTrack
 import app.oxplayer.utility.setInternalSubtitleTrack
 import kotlin.time.Duration.Companion.seconds
@@ -396,22 +398,26 @@ fun ExoPlayer.properlySetSubAndAudioTracks(playableData: PlayableData) {
         }
 
         if (wantedSubIndex < 0) {
-            clearSubtitleTrack()
+            if (!exo.isSubtitleTrackDisabled()) {
+                clearSubtitleTrack()
+            }
         } else if (wantedSubIndex >= internalSubTracks.size) {
             // Exo text tracks not mapped yet; a later onTracksChanged will schedule again.
         } else {
             val subTrack = internalSubTracks[wantedSubIndex]
-            clearSubtitleTrack()
-            Handler(Looper.getMainLooper()).post {
-                try {
-                    exo.setInternalSubtitleTrack(subTrack)
-                    Handler(Looper.getMainLooper()).post {
-                        try {
-                            exo.setInternalSubtitleTrack(subTrack)
-                        } catch (_: Exception) {
+            if (!exo.isInternalSubtitleTrackSelected(subTrack)) {
+                clearSubtitleTrack()
+                Handler(Looper.getMainLooper()).post {
+                    try {
+                        exo.setInternalSubtitleTrack(subTrack)
+                        Handler(Looper.getMainLooper()).post {
+                            try {
+                                exo.setInternalSubtitleTrack(subTrack)
+                            } catch (_: Exception) {
+                            }
                         }
+                    } catch (_: Exception) {
                     }
-                } catch (_: Exception) {
                 }
             }
         }

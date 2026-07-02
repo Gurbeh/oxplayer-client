@@ -119,6 +119,25 @@ fun ExoPlayer.getSubtitleTracks(): List<InternalTrack> {
 }
 
 @OptIn(UnstableApi::class)
+fun ExoPlayer.isSubtitleTrackDisabled(): Boolean {
+    val selector = trackSelector as? DefaultTrackSelector ?: return true
+    return C.TRACK_TYPE_TEXT in selector.parameters.disabledTrackTypes
+}
+
+@OptIn(UnstableApi::class)
+fun ExoPlayer.isInternalSubtitleTrackSelected(subtitleTrack: InternalTrack): Boolean {
+    if (isSubtitleTrackDisabled()) return false
+    val selector = trackSelector as? DefaultTrackSelector ?: return false
+    val mapped = selector.currentMappedTrackInfo ?: return false
+    if (subtitleTrack.rendererIndex >= mapped.rendererCount) return false
+    val groups = mapped.getTrackGroups(subtitleTrack.rendererIndex)
+    if (subtitleTrack.groupIndex >= groups.length) return false
+    val group = groups[subtitleTrack.groupIndex]
+    val override = selector.parameters.overrides[group] ?: return false
+    return subtitleTrack.trackIndex in override.trackIndices
+}
+
+@OptIn(UnstableApi::class)
 fun ExoPlayer.clearSubtitleTrack() {
     val selector = trackSelector as? DefaultTrackSelector ?: return
     val newParams = selector.buildUponParameters()
