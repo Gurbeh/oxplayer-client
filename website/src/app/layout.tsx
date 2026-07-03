@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Nosifer, Space_Grotesk } from "next/font/google";
+import { Nosifer, Space_Grotesk, Vazirmatn } from "next/font/google";
 
 import { createPageMetadata } from "@/config/seo";
 import { assetPath } from "@/config/site";
@@ -17,6 +17,12 @@ const nosifer = Nosifer({
   variable: "--font-nosifer",
 });
 
+const vazirmatn = Vazirmatn({
+  subsets: ["arabic", "latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-vazirmatn",
+});
+
 export const metadata: Metadata = {
   ...createPageMetadata(),
   icons: {
@@ -32,7 +38,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" data-theme="light" className="scroll-smooth">
-      <body className={` ${nosifer.variable} ${spaceGrotesk.variable} antialiased`} suppressHydrationWarning={true}>
+      <body
+        className={`${nosifer.variable} ${spaceGrotesk.variable} ${vazirmatn.variable} antialiased`}
+        suppressHydrationWarning={true}
+      >
         {children}
       </body>
     </html>

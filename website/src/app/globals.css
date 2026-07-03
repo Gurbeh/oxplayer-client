@@ -153,6 +153,10 @@ body {
   .font-space {
     font-family: var(--font-space-grotesk), sans-serif;
   }
+
+  .font-vazirmatn {
+    font-family: var(--font-vazirmatn),Tahoma, sans-serif;
+  }
 }
 
 @utility container {

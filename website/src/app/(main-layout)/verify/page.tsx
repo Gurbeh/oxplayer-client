@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
-import Container from "@/components/ui/Container";
-import TelegramVerifyClient from "@/features/verify/TelegramVerifyClient";
+import VerifyPageClient, { VerifyPageFallback } from "@/features/verify/VerifyPageClient";
+import { verifyMessages } from "@/features/verify/messages";
 
 export const metadata: Metadata = {
-  title: "تأیید حساب",
-  description: "تأیید حساب برای استفاده از ربات تلگرام OXPlayer.",
+  title: verifyMessages.en.pageTitle,
+  description: verifyMessages.en.pageDescription,
   robots: { index: false, follow: false },
 };
 
 export default function VerifyPage() {
   return (
-    <Suspense fallback={<Container className="py-24 text-center">Loading…</Container>}>
-      <TelegramVerifyClient />
+    <Suspense fallback={<VerifyPageFallback />}>
+      <VerifyPageClient />
     </Suspense>
   );
 }

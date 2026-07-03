@@ -5,9 +5,9 @@ import Heading from "@/components/ui/Heading";
 import Paragraph from "@/components/ui/Paragraph";
 import { TELEGRAM_VERIFY_API } from "@/config/api";
 import { OXPLAYER_BOT } from "@/config/bots";
+import { verifyMessages, type VerifyLocale } from "@/features/verify/messages";
 import clsx from "clsx";
-import { useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 
 type VerifyState = "idle" | "loading" | "success" | "error";
 
@@ -27,19 +27,110 @@ type VerifyResponse = {
   error?: string;
 };
 
-export default function TelegramVerifyClient() {
-  const searchParams = useSearchParams();
-  const token = useMemo(() => searchParams.get("token")?.trim() ?? "", [searchParams]);
-  const [state, setState] = useState<VerifyState>(token ? "idle" : "error");
-  const [errorText, setErrorText] = useState(
-    token ? "" : "لینک تأیید نامعتبر است. از ربات دوباره لینک بگیرید.",
+type TelegramVerifyClientProps = {
+  locale: VerifyLocale;
+  token: string;
+};
+
+function VerifyPageShell({
+  locale,
+  children,
+}: {
+  locale: VerifyLocale;
+  children: ReactNode;
+}) {
+  const isRtl = locale === "fa";
+  return (
+    <div
+      dir={isRtl ? "rtl" : "ltr"}
+      lang={locale}
+      className={clsx(isRtl && "font-vazirmatn")}
+    >
+      {children}
+    </div>
   );
+}
+
+function VerifyTitle({ locale }: { locale: VerifyLocale }) {
+  const t = verifyMessages[locale];
+  const isRtl = locale === "fa";
+
+  if (isRtl && t.titlePrefix) {
+    return (
+      <Heading
+        level="h1"
+        align="center"
+        className="font-vazirmatn !text-center"
+      >
+        {t.titlePrefix}{" "}
+        <bdi dir="ltr" className="inline-block font-space tracking-tight">
+          {t.brandName}
+        </bdi>
+      </Heading>
+    );
+  }
+
+  return (
+    <Heading level="h1" align="center" className="font-space !text-center">
+      {t.title}
+    </Heading>
+  );
+}
+
+function VerifyHeading({
+  locale,
+  children,
+}: {
+  locale: VerifyLocale;
+  children: ReactNode;
+}) {
+  const isRtl = locale === "fa";
+  return (
+    <Heading
+      level="h1"
+      align="center"
+      className={clsx(isRtl ? "font-vazirmatn" : "font-space", "!text-center")}
+    >
+      {children}
+    </Heading>
+  );
+}
+
+function VerifyText({
+  locale,
+  className,
+  children,
+}: {
+  locale: VerifyLocale;
+  className?: string;
+  children: ReactNode;
+}) {
+  const isRtl = locale === "fa";
+  return (
+    <Paragraph
+      align="center"
+      className={clsx(isRtl && "font-vazirmatn", className)}
+    >
+      {children}
+    </Paragraph>
+  );
+}
+
+export default function TelegramVerifyClient({
+  locale,
+  token,
+}: TelegramVerifyClientProps) {
+  const t = verifyMessages[locale];
+  const isRtl = locale === "fa";
+
+  const [state, setState] = useState<VerifyState>(token ? "idle" : "error");
+  const [errorText, setErrorText] = useState(token ? "" : t.invalidLink);
   const [botLink, setBotLink] = useState(botReturnUrl);
 
   const verify = useCallback(async () => {
     if (!token) {
       setState("error");
-      setErrorText("لینک تأیید نامعتبر است. از ربات دوباره لینک بگیرید.");
+      setErrorText(t.invalidLink);
       return;
     }
     setState("loading");
@@ -53,78 +144,107 @@ export default function TelegramVerifyClient() {
       const data = (await res.json()) as VerifyResponse;
       if (!res.ok || !data.ok) {
         setState("error");
-        if (data.error === "expired_token") {
-          setErrorText("لینک منقضی شده — از ربات دوباره لینک بگیرید.");
-        } else {
-          setErrorText("تأیید انجام نشد. دوباره تلاش کنید.");
-        }
+        setErrorText(
+          data.error === "expired_token" ? t.expiredLink : t.verifyFailed,
+        );
         return;
       }
       setBotLink(data.botDeepLink?.trim() || botReturnUrl);
       setState("success");
     } catch {
       setState("error");
-      setErrorText("اتصال برقرار نشد. اینترنت یا VPN را بررسی کنید.");
+      setErrorText(t.networkError);
     }
-  }, [token]);
+  }, [token, t.expiredLink, t.invalidLink, t.networkError, t.verifyFailed]);
+
+  const shellClass = "mx-auto max-w-lg text-center";
 
   if (state === "success") {
     return (
-      <Container className="py-16 md:py-24">
-        <div className="mx-auto max-w-lg text-center">
-          <Heading level="h1">✅ با موفقیت تأیید شدید</Heading>
-          <Paragraph className="mt-4 text-gray-300">
-            حساب شما تأیید شد. برای ادامه به ربات تلگرام برگردید.
-          </Paragraph>
-          <a href={botLink} className={clsx(primaryButtonClass, "mt-8")}>
-            بازگشت به ربات تلگرام
-          </a>
-          <Paragraph className="mt-8 text-sm text-gray-500 text-center" align="center">
-            Verified successfully. Return to the Telegram bot to continue.
-          </Paragraph>
-        </div>
-      </Container>
+      <VerifyPageShell locale={locale}>
+        <Container className="py-16 md:py-24">
+          <div className={shellClass}>
+            <VerifyHeading locale={locale}>
+              {isRtl ? (
+                <>
+                  {t.successTitle} <span aria-hidden="true">✅</span>
+                </>
+              ) : (
+                <>
+                  <span aria-hidden="true">✅</span> {t.successTitle}
+                </>
+              )}
+            </VerifyHeading>
+            <VerifyText locale={locale} className="mt-4 text-gray-300">
+              {t.successBody}
+            </VerifyText>
+            <a
+              href={botLink}
+              className={clsx(
+                primaryButtonClass,
+                "mt-8",
+                isRtl && "font-vazirmatn",
+              )}
+            >
+              {t.returnToBot}
+            </a>
+          </div>
+        </Container>
+      </VerifyPageShell>
     );
   }
 
   if (state === "error") {
     return (
-      <Container className="py-16 md:py-24">
-        <div className="mx-auto max-w-lg text-center">
-          <Heading level="h1">خطا</Heading>
-          <Paragraph className="mt-4 text-red-300">{errorText}</Paragraph>
-          <button type="button" className={clsx(primaryButtonClass, "mt-8")} onClick={() => verify()}>
-            تلاش دوباره
-          </button>
-        </div>
-      </Container>
+      <VerifyPageShell locale={locale}>
+        <Container className="py-16 md:py-24">
+          <div className={shellClass}>
+            <VerifyHeading locale={locale}>{t.errorTitle}</VerifyHeading>
+            <VerifyText locale={locale} className="mt-4 text-red-300">
+              {errorText}
+            </VerifyText>
+            <button
+              type="button"
+              className={clsx(
+                primaryButtonClass,
+                "mt-8",
+                isRtl && "font-vazirmatn",
+              )}
+              onClick={() => verify()}
+            >
+              {t.retry}
+            </button>
+          </div>
+        </Container>
+      </VerifyPageShell>
     );
   }
 
   return (
-    <Container className="py-16 md:py-24">
-      <div className="mx-auto max-w-lg text-center">
-        <Heading level="h1">تأیید حساب OXPlayer</Heading>
-        <Paragraph className="mt-4 text-gray-300">
-          برای استفاده از <b>ربات تلگرام</b> باید حساب خود را تأیید کنید. اپ OXPlayer بدون تأیید هم
-          کار می‌کند.
-        </Paragraph>
-        <Paragraph className="mt-3 text-gray-300">
-          اگر در <b>ایران</b> هستید، قبل از تأیید <b>VPN را خاموش</b> کنید.
-        </Paragraph>
-        <button
-          type="button"
-          className={clsx(primaryButtonClass, "mt-8")}
-          disabled={state === "loading"}
-          onClick={() => verify()}
-        >
-          {state === "loading" ? "در حال تأیید…" : "تأیید حساب"}
-        </button>
-        <Paragraph className="mt-8 text-sm text-gray-500 text-center" align="center">
-          Account verification for the Telegram bot only. If you are in Iran, turn VPN off, then tap
-          Verify.
-        </Paragraph>
-      </div>
-    </Container>
+    <VerifyPageShell locale={locale}>
+      <Container className="py-16 md:py-24">
+        <div className={shellClass}>
+          <VerifyTitle locale={locale} />
+          <VerifyText locale={locale} className="mt-4 text-gray-300">
+            {t.intro}
+          </VerifyText>
+          <VerifyText locale={locale} className="mt-3 text-gray-300">
+            🚨⚠️ {t.vpnHint} ⚠️🚨
+          </VerifyText>
+          <button
+            type="button"
+            className={clsx(
+              primaryButtonClass,
+              "mt-8",
+              isRtl && "font-vazirmatn",
+            )}
+            disabled={state === "loading"}
+            onClick={() => verify()}
+          >
+            {state === "loading" ? t.verifying : t.verifyButton}
+          </button>
+        </div>
+      </Container>
+    </VerifyPageShell>
   );
 }
