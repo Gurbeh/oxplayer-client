@@ -43,6 +43,15 @@ class PersonDetailsNotifier extends StateNotifier<PersonModel?> {
     return response;
   }
 
+  Future<void> toggleFavorite() async {
+    final current = state;
+    if (current == null || _disposed) return;
+    final next = !current.userData.isFavourite;
+    final response = await ref.read(userProvider.notifier).setAsFavorite(next, current.id);
+    if (_disposed || response?.isSuccessful != true) return;
+    state = current.copyWith(userData: current.userData.copyWith(isFavourite: next));
+  }
+
   Future<Response?> fetchMovies() async {
     if (_disposed) return null;
 

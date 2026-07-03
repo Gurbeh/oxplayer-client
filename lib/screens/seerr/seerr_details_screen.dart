@@ -8,7 +8,8 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:fladder/models/items/images_models.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
-import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/widgets/ox_seerr_interest_buttons.dart';
 import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
 import 'package:fladder/providers/seerr/seerr_details_provider.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
@@ -242,7 +243,7 @@ class SeerrDetailsScreen extends ConsumerWidget {
                         );
                       },
                     ),
-                    centerButtons: (hasVisibleRequests || state.hasTrailerAction)
+                    centerButtons: (hasVisibleRequests || state.hasTrailerAction || (OxplayerConfig.isEnabled && currentPoster.jellyfinItemId == null))
                         ? Builder(
                             builder: (context) {
                               return Wrap(
@@ -251,6 +252,8 @@ class SeerrDetailsScreen extends ConsumerWidget {
                                 alignment: wrapAlignment,
                                 crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
+                                  if (OxplayerConfig.isEnabled && currentPoster.jellyfinItemId == null)
+                                    OxSeerrInterestButtons(poster: currentPoster),
                                   if (hasVisibleRequests)
                                     FocusButton(
                                       autoFocus: false,
@@ -392,7 +395,7 @@ class SeerrDetailsScreen extends ConsumerWidget {
                       seasonStatuses: state.seasonStatuses,
                     ).padding(padding),
                   if (state.people.isNotEmpty)
-                    OxplayerEnv.isEnabled
+                    OxplayerConfig.isEnabled
                         ? OxSeerrPeopleRow(
                             people: state.people,
                             contentPadding: padding,

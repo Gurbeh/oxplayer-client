@@ -10,7 +10,9 @@ import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/oxplayer/ox_library_detail_labels.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/widgets/ox_movie_request_button.dart';
+import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
 import 'package:fladder/screens/seerr/widgets/seerr_poster_row.dart';
@@ -208,10 +210,16 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                       },
                     ),
                   if (details.overview.people.isNotEmpty)
-                    PeopleRow(
-                      people: details.overview.people,
-                      contentPadding: padding,
-                    ),
+                    OxplayerConfig.isEnabled
+                        ? OxSeerrPeopleRow(
+                            people: details.overview.people,
+                            contentPadding: padding,
+                            useLibraryPersonScreen: true,
+                          )
+                        : PeopleRow(
+                            people: details.overview.people,
+                            contentPadding: padding,
+                          ),
                   if (details.specialFeatures.isNotEmpty)
                     SpecialFeaturesRow(
                         contentPadding: padding,

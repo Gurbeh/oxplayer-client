@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/providers/items/person_details_provider.dart';
-import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/screens/seerr/widgets/seerr_poster_row.dart';
 import 'package:fladder/screens/shared/detail_scaffold.dart';
 import 'package:fladder/screens/shared/media/external_urls.dart';
@@ -80,9 +79,7 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           Flexible(child: Text(details?.name ?? "", style: Theme.of(context).textTheme.displaySmall)),
                           const SizedBox(width: 15),
                           SelectableIconButton(
-                            onPressed: () async => await ref
-                                .read(userProvider.notifier)
-                                .setAsFavorite(!(details?.userData.isFavourite ?? false), details?.id ?? ""),
+                            onPressed: () => ref.read(providerID.notifier).toggleFavorite(),
                             selected: (details?.userData.isFavourite ?? false),
                             selectedIcon: Icons.favorite_rounded,
                             icon: Icons.favorite_border_rounded,

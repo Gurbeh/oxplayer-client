@@ -1244,6 +1244,8 @@ class SeerrDiscoverItem {
   final String? overview;
   @JsonKey(name: 'posterPath')
   final String? internalPosterPath;
+  @JsonKey(name: 'profilePath')
+  final String? internalProfilePath;
   @JsonKey(name: 'backdropPath')
   final String? internalBackdropPath;
   final String? releaseDate;
@@ -1261,6 +1263,7 @@ class SeerrDiscoverItem {
     this.originalName,
     this.overview,
     this.internalPosterPath,
+    this.internalProfilePath,
     this.internalBackdropPath,
     this.releaseDate,
     this.firstAirDate,

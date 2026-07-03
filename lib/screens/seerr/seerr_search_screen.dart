@@ -10,6 +10,7 @@ import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_seerr_library_search.dart';
 import 'package:fladder/oxplayer/oxplayer_seerr_catalog.dart';
 import 'package:fladder/oxplayer/oxplayer_seerr_search_catalog_ui.dart';
+import 'package:fladder/oxplayer/oxplayer_seerr_search_people.dart';
 import 'package:fladder/providers/seerr_search_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/screens/seerr/widgets/seerr_filter_chips.dart';
@@ -101,6 +102,16 @@ class _SeerrSearchScreenState extends ConsumerState<SeerrSearchScreen> {
         ),
       );
       return;
+    }
+
+    if (OxplayerConfig.isEnabled &&
+        state.query.trim().isNotEmpty &&
+        oxplayerSeerrSearchShowsPeople(state.searchMode)) {
+      ref.invalidate(
+        oxplayerSeerrSearchPeopleProvider(
+          OxplayerSeerrSearchPeopleQuery(term: state.query, searchMode: state.searchMode),
+        ),
+      );
     }
 
     if (_forceSubmitOnRefresh) {
@@ -200,8 +211,25 @@ class _SeerrSearchScreenState extends ConsumerState<SeerrSearchScreen> {
     }
 
     final catalogRowHasResults = partitionedSeerrResults?.inCatalog.isNotEmpty == true;
-    final showNoResults =
-        gridResults.isEmpty && !catalogRowHasResults && !gridLoading && !searchState.isLoading;
+    final peopleQuery = OxplayerSeerrSearchPeopleQuery(
+      term: query,
+      searchMode: searchState.searchMode,
+    );
+    final peopleAsync = OxplayerConfig.isEnabled &&
+            query.isNotEmpty &&
+            !catalogOnly &&
+            oxplayerSeerrSearchShowsPeople(searchState.searchMode)
+        ? ref.watch(oxplayerSeerrSearchPeopleProvider(peopleQuery))
+        : null;
+    final peopleHasResults =
+        peopleAsync?.maybeWhen(data: (value) => value.isNotEmpty, orElse: () => false) ?? false;
+    final peopleLoading = peopleAsync?.isLoading ?? false;
+    final showNoResults = gridResults.isEmpty &&
+        !catalogRowHasResults &&
+        !peopleHasResults &&
+        !gridLoading &&
+        !searchState.isLoading &&
+        !peopleLoading;
 
     if (backgroundImages.isEmpty) {
       backgroundImages = searchResults.map((e) => e.images).nonNulls.toList(growable: false);
@@ -406,6 +434,11 @@ class _SeerrSearchScreenState extends ConsumerState<SeerrSearchScreen> {
                       },
                     ),
                   ),
+                  if (OxplayerConfig.isEnabled)
+                    OxplayerSeerrSearchPeopleRow(
+                      query: searchState.query,
+                      searchMode: searchState.searchMode,
+                    ),
                 ],
                 const DefaultSliverBottomPadding(),
               ],

@@ -7,7 +7,7 @@ part of 'ox_season_seerr_request.dart';
 // **************************************************************************
 
 String _$oxSeasonSeerrRequestHash() =>
-    r'8cfa11e4042ca8b9c717335956bc9b50f17d78fb';
+    r'f594b03487724583d7eaeab5700014551ca5beee';
 
 /// Copied from Dart SDK
 class _SystemHash {

@@ -9,6 +9,8 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/providers/items/episode_details_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/oxplayer/ox_library_detail_labels.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
@@ -203,15 +205,27 @@ class _ItemDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
                       },
                     ),
                   if (actors.mainCast.isNotEmpty == true)
-                    PeopleRow(
-                      people: actors.mainCast,
-                      contentPadding: padding,
-                    ),
+                    OxplayerConfig.isEnabled
+                        ? OxSeerrPeopleRow(
+                            people: actors.mainCast,
+                            contentPadding: padding,
+                            useLibraryPersonScreen: true,
+                          )
+                        : PeopleRow(
+                            people: actors.mainCast,
+                            contentPadding: padding,
+                          ),
                   if (actors.guestActors.isNotEmpty == true)
-                    PeopleRow(
-                      people: actors.guestActors,
-                      contentPadding: padding,
-                    ),
+                    OxplayerConfig.isEnabled
+                        ? OxSeerrPeopleRow(
+                            people: actors.guestActors,
+                            contentPadding: padding,
+                            useLibraryPersonScreen: true,
+                          )
+                        : PeopleRow(
+                            people: actors.guestActors,
+                            contentPadding: padding,
+                          ),
                   if (details.episodes.length > 1)
                     EpisodePosters(
                       contentPadding: padding,

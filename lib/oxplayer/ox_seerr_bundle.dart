@@ -3,8 +3,11 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
+import 'package:fladder/jellyfin/jellyfin_open_api.enums.swagger.dart';
 import 'package:fladder/models/items/images_models.dart';
+import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
+import 'package:fladder/oxplayer/ox_person_tmdb_id.dart';
 import 'package:fladder/oxplayer/ox_seerr_images.dart';
 import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
@@ -136,4 +139,83 @@ SeerrDashboardPosterModel? _posterFromBundleCard(
     mediaInfo: mediaInfo,
     releaseYear: card['year'] as String?,
   );
+}
+
+PersonKind? _personKindFromBundle(String? kind) {
+  switch (kind?.toLowerCase().trim()) {
+    case 'actor':
+      return PersonKind.actor;
+    case 'director':
+      return PersonKind.director;
+    case 'writer':
+      return PersonKind.writer;
+    case 'producer':
+      return PersonKind.producer;
+    case 'composer':
+      return PersonKind.composer;
+    default:
+      return null;
+  }
+}
+
+/// Parses cast/crew from `GET /tmdb/seerr-bundle` (always has TMDB person ids).
+List<Person> oxPeopleFromBundle(Map<String, dynamic> bundle) {
+  final raw = bundle['people'];
+  if (raw is! List) return const [];
+
+  final people = <Person>[];
+  for (final entry in raw) {
+    if (entry is! Map<String, dynamic>) continue;
+
+    final tmdbId = oxTmdbPersonIdFromRawId('${entry['id'] ?? ''}');
+    final name = (entry['name'] as String?)?.trim() ?? '';
+    if (tmdbId == null || tmdbId <= 0 || name.isEmpty) continue;
+
+    final role = (entry['role'] as String?)?.trim() ?? '';
+    ImageData? image;
+    final profilePath = entry['profilePath'];
+    if (profilePath is String && profilePath.isNotEmpty) {
+      final profileUrl = profilePath.startsWith('http') ? profilePath : oxSeerrProfileUrl(profilePath);
+      if (profileUrl != null) {
+        image = ImageData(path: profileUrl, key: 'ox_bundle_person_$tmdbId');
+      }
+    }
+
+    people.add(
+      Person(
+        id: '$tmdbId',
+        name: name,
+        role: role,
+        image: image,
+        type: _personKindFromBundle(entry['kind'] as String?),
+      ),
+    );
+  }
+  return people;
+}
+
+/// Fills missing TMDB ids on Seerr credits using the OX TMDB bundle fallback.
+List<Person> oxMergeSeerrPeople(List<Person> fromSeerr, Map<String, dynamic>? bundle) {
+  final bundlePeople = bundle != null ? oxPeopleFromBundle(bundle) : const <Person>[];
+  if (fromSeerr.isEmpty) return bundlePeople;
+  if (bundlePeople.isEmpty) return fromSeerr;
+
+  final bundleByName = {
+    for (final person in bundlePeople) person.name.toLowerCase(): person,
+  };
+
+  return fromSeerr.map((person) {
+    if (oxPersonHasNavigableTmdbId(person.id)) return person;
+
+    final match = bundleByName[person.name.toLowerCase()];
+    if (match == null) return person;
+
+    return Person(
+      id: match.id,
+      name: person.name,
+      image: person.image ?? match.image,
+      role: person.role.isNotEmpty ? person.role : match.role,
+      type: person.type ?? match.type,
+    );
+  }).toList();
 }

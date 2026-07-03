@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/jellyfin/jellyfin_open_api.enums.swagger.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/ox_person_tmdb_id.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/oxplayer/screens/ox_seerr_person_screen.dart';
+import 'package:fladder/screens/details_screens/person_detail_screen.dart';
 import 'package:fladder/theme.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/fladder_image.dart';
@@ -14,24 +17,41 @@ import 'package:fladder/util/string_extensions.dart';
 import 'package:fladder/widgets/shared/clickable_text.dart';
 import 'package:fladder/widgets/shared/horizontal_list.dart';
 
-/// Seerr cast row with TMDB person navigation (upstream Fladder disables taps via `onTap: () {}`).
+/// OX cast row with TMDB person navigation.
+///
+/// [useLibraryPersonScreen] opens Jellyfin-shaped [PersonDetailScreen] (favorite + filmography).
+/// When OX is enabled this is the default for all cast rows (search, Seerr details, library).
 class OxSeerrPeopleRow extends ConsumerWidget {
   final List<Person> people;
   final EdgeInsets contentPadding;
+  final bool useLibraryPersonScreen;
 
   const OxSeerrPeopleRow({
     required this.people,
     required this.contentPadding,
+    this.useLibraryPersonScreen = false,
     super.key,
   });
 
   void _openPerson(BuildContext context, Person person) {
-    final tmdbPersonId = int.tryParse(person.id);
+    final tmdbPersonId = oxTmdbPersonIdFromRawId(person.id);
     if (tmdbPersonId == null || tmdbPersonId <= 0) return;
+
+    if (useLibraryPersonScreen || OxplayerConfig.isEnabled) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => PersonDetailScreen(
+            person: oxPersonWithCanonicalId(person),
+          ),
+        ),
+      );
+      return;
+    }
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => OxSeerrPersonScreen(
-          person: person,
+          person: oxPersonWithCanonicalId(person),
           tmdbPersonId: tmdbPersonId,
         ),
       ),
@@ -70,7 +90,7 @@ class OxSeerrPeopleRow extends ConsumerWidget {
       items: people,
       itemBuilder: (context, index) {
         final person = people[index];
-        final canOpen = int.tryParse(person.id) != null;
+        final canOpen = oxPersonHasNavigableTmdbId(person.id);
         void open() => _openPerson(context, person);
 
         return AspectRatio(

@@ -8,6 +8,8 @@ import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/providers/items/season_details_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/oxplayer/ox_library_detail_labels.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
 import 'package:fladder/oxplayer/ox_season_playable.dart';
 import 'package:fladder/oxplayer/ox_season_watch_actions.dart';
 import 'package:fladder/oxplayer/widgets/ox_season_request_button.dart';
@@ -178,15 +180,27 @@ class _SeasonDetailScreenState extends ConsumerState<SeasonDetailScreen> {
                       padding: padding,
                     ),
                   if (details.overview.people.mainCast.isNotEmpty)
-                    PeopleRow(
-                      people: details.overview.people.mainCast,
-                      contentPadding: padding,
-                    ),
+                    OxplayerConfig.isEnabled
+                        ? OxSeerrPeopleRow(
+                            people: details.overview.people.mainCast,
+                            contentPadding: padding,
+                            useLibraryPersonScreen: true,
+                          )
+                        : PeopleRow(
+                            people: details.overview.people.mainCast,
+                            contentPadding: padding,
+                          ),
                   if (details.overview.people.guestActors.isNotEmpty)
-                    PeopleRow(
-                      people: details.overview.people.guestActors,
-                      contentPadding: padding,
-                    ),
+                    OxplayerConfig.isEnabled
+                        ? OxSeerrPeopleRow(
+                            people: details.overview.people.guestActors,
+                            contentPadding: padding,
+                            useLibraryPersonScreen: true,
+                          )
+                        : PeopleRow(
+                            people: details.overview.people.guestActors,
+                            contentPadding: padding,
+                          ),
                   if (details.specialFeatures.isNotEmpty)
                     SpecialFeaturesRow(
                         contentPadding: padding,

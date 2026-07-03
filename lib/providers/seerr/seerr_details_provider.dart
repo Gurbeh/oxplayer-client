@@ -147,6 +147,7 @@ class SeerrDetails extends _$SeerrDetails {
           ratings: mergedRatings,
           recommended: oxPosterCardsFromBundle(bundle['recommended'], bundleMedia),
           similar: oxPosterCardsFromBundle(bundle['similar'], bundleMedia),
+          people: oxMergeSeerrPeople(state.people, bundle),
         );
       }
     } else if (currentMediaType == SeerrMediaType.movie) {
