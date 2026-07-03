@@ -8,10 +8,8 @@ import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/providers/ox_catalog_follow.dart';
 import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
+import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/widgets/shared/item_actions.dart';
-
-const _followLabel = 'دنبال کردن';
-const _unfollowLabel = 'لغو دنبال کردن';
 
 bool oxIsFollowableItem(ItemBaseModel item) {
   return item is SeriesModel || item is MovieModel;
@@ -26,7 +24,7 @@ List<ItemAction> oxplayerFollowActions(BuildContext context, WidgetRef ref, Item
   return [
     ItemActionButton(
       icon: Icon(following ? IconsaxPlusLinear.notification_bing : IconsaxPlusLinear.notification),
-      label: Text(following ? _unfollowLabel : _followLabel),
+      label: Text(following ? context.localized.oxplayerUnfollow : context.localized.oxplayerFollow),
       action: () => _toggleFollow(context, ref, item.id),
     ),
   ];
@@ -40,7 +38,7 @@ Future<void> _toggleFollow(BuildContext context, WidgetRef ref, String catalogId
   final nowFollowing = ref.read(oxCatalogFollowStatusProvider(catalogId)).value ?? false;
   if (nowFollowing == wasFollowing) return;
   FladderSnack.show(
-    nowFollowing ? 'سریال/فیلم به دنبال‌شده‌ها اضافه شد' : 'از دنبال‌شده‌ها حذف شد',
+    nowFollowing ? context.localized.oxplayerFollowAdded : context.localized.oxplayerFollowRemoved,
     context: context,
   );
 }

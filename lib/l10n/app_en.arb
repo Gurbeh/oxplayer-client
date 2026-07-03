@@ -2816,5 +2816,13 @@
   "oxplayerReportIssueContextFailed": "This title is not available for issue reporting yet.",
   "@oxplayerReportIssueContextFailed": {},
   "oxplayerSessionExpiredMessage": "Your session expired. Log out and sign in again.",
-  "@oxplayerSessionExpiredMessage": {}
+  "@oxplayerSessionExpiredMessage": {},
+  "oxplayerFollow": "Follow",
+  "@oxplayerFollow": {},
+  "oxplayerUnfollow": "Unfollow",
+  "@oxplayerUnfollow": {},
+  "oxplayerFollowAdded": "Added to your follows",
+  "@oxplayerFollowAdded": {},
+  "oxplayerFollowRemoved": "Removed from your follows",
+  "@oxplayerFollowRemoved": {}
 }

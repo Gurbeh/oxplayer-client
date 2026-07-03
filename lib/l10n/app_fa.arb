@@ -2084,5 +2084,9 @@
     "oxplayerReportIssueSubmit": "ارسال گزارش",
     "oxplayerReportIssueSuccess": "گزارش ثبت شد. تیم بررسی می‌کند.",
     "oxplayerReportIssueFailed": "ارسال گزارش ناموفق بود. بعداً دوباره تلاش کنید.",
-    "oxplayerReportIssueContextFailed": "این عنوان هنوز برای گزارش مشکل در دسترس نیست."
+    "oxplayerReportIssueContextFailed": "این عنوان هنوز برای گزارش مشکل در دسترس نیست.",
+    "oxplayerFollow": "دنبال کردن",
+    "oxplayerUnfollow": "لغو دنبال کردن",
+    "oxplayerFollowAdded": "سریال/فیلم به دنبال‌شده‌ها اضافه شد",
+    "oxplayerFollowRemoved": "از دنبال‌شده‌ها حذف شد"
 }
