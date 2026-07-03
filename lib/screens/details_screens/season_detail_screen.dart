@@ -53,7 +53,8 @@ class _SeasonDetailScreenState extends ConsumerState<SeasonDetailScreen> {
         ItemActions.details,
       }),
       onRefresh: () async {
-        await ref.read(providerId.notifier).fetchDetails(widget.item.id);
+        final hint = widget.item is SeasonModel ? widget.item as SeasonModel : null;
+        await ref.read(providerId.notifier).fetchDetails(widget.item.id, hint: hint);
       },
       backDrops: details?.parentImages,
       content: (context, padding) => Padding(

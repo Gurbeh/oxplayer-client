@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer';
 
 import 'package:chopper/chopper.dart';
@@ -15,6 +16,7 @@ import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
 import 'package:fladder/oxplayer/ox_item_recommendations.dart';
 import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
 import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
+import 'package:fladder/oxplayer/ox_series_details_loader.dart';
 import 'package:fladder/oxplayer/ox_season_user_data.dart';
 import 'package:fladder/oxplayer/ox_virtual_episode_images.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
@@ -80,39 +82,39 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
       state = newState;
 
       if (OxplayerEnv.isEnabled && oxSeerrRatingsMissingRt(ref.read(oxLibraryItemRatingsProvider(seriesModel.id)))) {
-        final tmdbId = newState.tmdbId;
-        if (tmdbId != null) {
-          final rt = await ref.read(seerrApiProvider).tvRatings(tmdbId);
-          final merged = oxMergeSeerrRatings(
-            rt != null ? SeerrRatingsResponse(rt: rt) : null,
-            ref.read(oxLibraryItemRatingsProvider(seriesModel.id)),
-          );
-          oxApplyLibraryItemRatings(ref, seriesModel.id, merged);
-        }
+        oxPrefetchSeerrTvRatings(ref, seriesModel.id, newState.tmdbId);
       }
 
-      final seasons = await api.showsSeriesIdSeasonsGet(
-        seriesId: seriesModel.id,
-        enableUserData: false,
-      );
-
-      final episodes = await api.showsSeriesIdEpisodesGet(
-        seriesId: seriesModel.id,
-        enableUserData: true,
-        fields: oxEpisodeListFields([
-          ItemFields.mediastreams,
-          ItemFields.mediasources,
-          ItemFields.overview,
-          ItemFields.candownload,
-        ]),
-      );
+      final Response<BaseItemDtoQueryResult?> seasons;
+      List<BaseItemDto> episodeItems;
+      if (OxplayerEnv.isEnabled) {
+        final catalog = await oxFetchSeriesCatalogBySeason(api, seriesModel.id);
+        seasons = catalog.seasons;
+        episodeItems = catalog.episodeItems;
+      } else {
+        seasons = await api.showsSeriesIdSeasonsGet(
+          seriesId: seriesModel.id,
+          enableUserData: false,
+        );
+        final episodes = await api.showsSeriesIdEpisodesGet(
+          seriesId: seriesModel.id,
+          enableUserData: true,
+          fields: oxEpisodeListFields([
+            ItemFields.mediastreams,
+            ItemFields.mediasources,
+            ItemFields.overview,
+            ItemFields.candownload,
+          ]),
+        );
+        episodeItems = episodes.body?.items ?? const [];
+      }
 
       final newEpisodes = oxApplyVirtualEpisodeImages(
         EpisodeModel.episodesFromDto(
-          episodes.body?.items,
+          episodeItems,
           ref,
         ),
-        episodes.body?.items,
+        episodeItems,
         ref,
       );
 

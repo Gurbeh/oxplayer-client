@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/providers/api_provider.dart';
+import 'package:fladder/providers/seerr_api_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
 import 'package:fladder/seerr/seerr_models.dart';
@@ -25,6 +27,21 @@ SeerrRatingsResponse? oxRatingsFromItemJson(Map<String, dynamic> raw) {
 void oxApplyLibraryItemRatings(Ref ref, String itemId, SeerrRatingsResponse? ratings) {
   if (!OxplayerEnv.isEnabled) return;
   ref.read(oxLibraryItemRatingsProvider(itemId).notifier).state = ratings;
+}
+
+/// Loads Seerr TV RT scores in the background (does not block series detail load).
+void oxPrefetchSeerrTvRatings(Ref ref, String itemId, int? tmdbId) {
+  if (!OxplayerEnv.isEnabled || tmdbId == null || tmdbId <= 0) return;
+  unawaited(() async {
+    try {
+      final rt = await ref.read(seerrApiProvider).tvRatings(tmdbId);
+      final merged = oxMergeSeerrRatings(
+        rt != null ? SeerrRatingsResponse(rt: rt) : null,
+        ref.read(oxLibraryItemRatingsProvider(itemId)),
+      );
+      oxApplyLibraryItemRatings(ref, itemId, merged);
+    } catch (_) {}
+  }());
 }
 
 /// Fetches `GET /Items/{id}` and returns the raw JSON (includes `OxRatings` when present).

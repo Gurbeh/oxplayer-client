@@ -26,15 +26,21 @@ class SeasonDetailsNotifier extends StateNotifier<SeasonModel?> {
 
   late final JellyService api = ref.read(jellyApiProvider);
 
-  Future<Response?> fetchDetails(String seasonId) async {
-    SeasonModel? newState;
+  Future<Response?> fetchDetails(String seasonId, {SeasonModel? hint}) async {
+    SeasonModel? newState = hint;
 
     final season = await api.usersUserIdItemsItemIdGet(itemId: seasonId);
     if (season.body != null) newState = season.bodyOrThrow as SeasonModel;
 
+    final seriesId = newState?.seriesId ?? "";
+    if (seriesId.isEmpty) {
+      state = newState;
+      return season;
+    }
+
     final episodes = await api.showsSeriesIdEpisodesGet(
-      seriesId: newState?.seriesId ?? "",
-      seasonId: newState?.id,
+      seriesId: seriesId,
+      seasonId: newState?.id ?? seasonId,
       season: newState?.season,
       enableUserData: true,
       fields: oxEpisodeListFields([
@@ -42,6 +48,7 @@ class SeasonDetailsNotifier extends StateNotifier<SeasonModel?> {
         ItemFields.candelete,
         ItemFields.candownload,
         ItemFields.parentid,
+        ItemFields.externalurls,
       ]),
     );
 
