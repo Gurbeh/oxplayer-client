@@ -1,0 +1,1 @@
+Follow and unfollow labels now respect your app language instead of showing hardcoded Persian text.
