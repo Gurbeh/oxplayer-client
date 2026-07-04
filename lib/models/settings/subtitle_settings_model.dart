@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/playback/ox_subtitle_font.dart';
 import 'package:fladder/providers/settings/subtitle_settings_provider.dart';
 import 'package:fladder/providers/settings/video_player_settings_provider.dart';
 import 'package:fladder/util/color_extensions.dart';
@@ -155,11 +157,13 @@ class SubtitleText extends ConsumerWidget {
   final EdgeInsets padding;
   final String text;
   final double offset;
+  final String? subtitleLanguage;
   const SubtitleText({
     required this.subModel,
     required this.padding,
     required this.offset,
     required this.text,
+    this.subtitleLanguage,
     super.key,
   });
 
@@ -170,6 +174,13 @@ class SubtitleText extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final fillScreen = ref.watch(videoPlayerSettingsProvider.select((value) => value.fillScreen));
     final fontSize = ref.read(subtitleSettingsProvider.select((value) => value.fontSize));
+    final usePersianFont = OxplayerConfig.isEnabled &&
+        OxSubtitleFont.shouldUsePersianFont(language: subtitleLanguage, text: text);
+    final textDirection = usePersianFont ? OxSubtitleFont.textDirectionFor(text) : TextDirection.ltr;
+    final fillStyle = usePersianFont
+        ? OxSubtitleFont.backgroundStyleFor(subModel, usePersianFont: true)
+        : subModel.backGroundStyle;
+    final textStyle = usePersianFont ? OxSubtitleFont.styleFor(subModel, usePersianFont: true) : subModel.style;
 
     return Padding(
       padding: (fillScreen ? EdgeInsets.zero : EdgeInsets.only(left: padding.left, right: padding.right))
@@ -186,7 +197,7 @@ class SubtitleText extends ConsumerWidget {
           double getTextHeight(BuildContext context, String text, TextStyle style) {
             final TextPainter textPainter = TextPainter(
               text: TextSpan(text: text, style: style),
-              textDirection: TextDirection.ltr,
+              textDirection: textDirection,
               textScaler: MediaQuery.textScalerOf(context),
             )..layout(minWidth: 0, maxWidth: double.infinity);
 
@@ -200,7 +211,7 @@ class SubtitleText extends ConsumerWidget {
 
           final double desiredPosition = (safeAvailableHeight * offset).clamp(0.0, double.infinity);
 
-          double textHeight = getTextHeight(context, text, subModel.style);
+          double textHeight = getTextHeight(context, text, textStyle);
           final double safeTextHeight = textHeight.isFinite ? textHeight : 0.0;
 
           final double maxPosition = math.max(0.0, safeAvailableHeight - safeTextHeight);
@@ -213,42 +224,45 @@ class SubtitleText extends ConsumerWidget {
           return Visibility(
             visible: text.isEmpty ? false : true,
             child: IgnorePointer(
-              child: Stack(
-                alignment: Alignment.bottomCenter,
-                children: [
-                  Positioned(
-                    bottom: position,
-                    child: Container(
-                      constraints: BoxConstraints(maxWidth: constraints.maxWidth, maxHeight: constraints.maxHeight),
-                      decoration: BoxDecoration(
-                        color: subModel.backGroundColor,
-                        borderRadius: BorderRadius.circular(clampDouble(textScale / 10, 2, 12)),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          text,
-                          style: subModel.backGroundStyle.copyWith(fontSize: textScale),
-                          textAlign: TextAlign.center,
+              child: Directionality(
+                textDirection: textDirection,
+                child: Stack(
+                  alignment: Alignment.bottomCenter,
+                  children: [
+                    Positioned(
+                      bottom: position,
+                      child: Container(
+                        constraints: BoxConstraints(maxWidth: constraints.maxWidth, maxHeight: constraints.maxHeight),
+                        decoration: BoxDecoration(
+                          color: subModel.backGroundColor,
+                          borderRadius: BorderRadius.circular(clampDouble(textScale / 10, 2, 12)),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            text,
+                            style: fillStyle.copyWith(fontSize: textScale),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  Positioned(
-                    bottom: position,
-                    child: Container(
-                      constraints: BoxConstraints(maxWidth: constraints.maxWidth, maxHeight: constraints.maxHeight),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          text,
-                          style: subModel.style.copyWith(fontSize: textScale),
-                          textAlign: TextAlign.center,
+                    Positioned(
+                      bottom: position,
+                      child: Container(
+                        constraints: BoxConstraints(maxWidth: constraints.maxWidth, maxHeight: constraints.maxHeight),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            text,
+                            style: textStyle.copyWith(fontSize: textScale),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
-                    ),
-                  )
-                ],
+                    )
+                  ],
+                ),
               ),
             ),
           );

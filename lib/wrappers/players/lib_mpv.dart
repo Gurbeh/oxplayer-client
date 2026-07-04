@@ -22,7 +22,10 @@ import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/playback/ox_subtitle_font.dart';
 import 'package:fladder/providers/settings/subtitle_settings_provider.dart';
+import 'package:fladder/providers/video_player_provider.dart';
 import 'package:fladder/screens/video_player/video_player.dart' as video_screen;
 import 'package:fladder/util/subtitle_position_calculator.dart';
 import 'package:fladder/wrappers/players/base_player.dart';
@@ -32,6 +35,7 @@ class LibMPV extends BasePlayer {
   mpv.Player? _player;
   VideoController? _controller;
   String _currentSubtitleCodec = '';
+  String _currentSubtitleLanguage = '';
 
   final StreamController<PlayerState> _stateController = StreamController.broadcast();
   @override
@@ -558,10 +562,14 @@ class LibMPV extends BasePlayer {
     if (_player == null) return -1;
     final wantedSubtitle = model ?? playbackModel.defaultSubStream;
     if (wantedSubtitle == null || wantedSubtitle.index == SubStreamModel.no().index) {
+      _currentSubtitleCodec = '';
+      _currentSubtitleLanguage = '';
       await _player?.setSubtitleTrack(mpv.SubtitleTrack.no());
+      await _applyOxLibassSubtitleFont(null);
       return -1;
     }
     _currentSubtitleCodec = wantedSubtitle.codec;
+    _currentSubtitleLanguage = wantedSubtitle.language;
     final internalTrack = subTracks.getRange(2, subTracks.length).toList();
     final index = playbackModel.subStreams?.sublist(1).indexWhere((element) => element.id == wantedSubtitle.id);
     final subTrack = internalTrack.elementAtOrNull(index ?? -1);
@@ -570,7 +578,23 @@ class LibMPV extends BasePlayer {
     } else if (subTrack != null) {
       await _player?.setSubtitleTrack(subTrack);
     }
+    await _applyOxLibassSubtitleFont(wantedSubtitle.language);
     return wantedSubtitle.index;
+  }
+
+  Future<void> _applyOxLibassSubtitleFont(String? language) async {
+    if (!OxplayerConfig.isEnabled || _player?.platform is! mpv.NativePlayer) return;
+    final usePersianFont = OxSubtitleFont.shouldUsePersianFont(language: language, text: '');
+    final native = _player!.platform as dynamic;
+    try {
+      if (usePersianFont) {
+        await native.setProperty('sub-ass-override', 'force');
+        await native.setProperty('sub-ass-force-style', 'FontName=${OxSubtitleFont.family}');
+      } else {
+        await native.setProperty('sub-ass-override', 'no');
+        await native.setProperty('sub-ass-force-style', '');
+      }
+    } catch (_) {}
   }
 
   @override
@@ -624,6 +648,7 @@ class LibMPV extends BasePlayer {
               showOverlay: showOverlay,
               controlsKey: controlsKey,
               currentSubtitleCodec: _currentSubtitleCodec,
+              currentSubtitleLanguage: _currentSubtitleLanguage,
             )
           : null;
 
@@ -654,12 +679,14 @@ class _VideoSubtitles extends ConsumerStatefulWidget {
   final bool showOverlay;
   final GlobalKey? controlsKey;
   final String currentSubtitleCodec;
+  final String currentSubtitleLanguage;
 
   const _VideoSubtitles({
     required this.controller,
     this.showOverlay = false,
     this.controlsKey,
     this.currentSubtitleCodec = '',
+    this.currentSubtitleLanguage = '',
   });
 
   @override
@@ -708,6 +735,13 @@ class _VideoSubtitlesState extends ConsumerState<_VideoSubtitles> {
 
     final text = _cachedSubtitleText;
 
+    final playbackSubLanguage = ref.watch(
+      playBackModel.select((model) => model?.mediaStreams?.currentSubStream?.language),
+    );
+    final subtitleLanguage = widget.currentSubtitleLanguage.isNotEmpty
+        ? widget.currentSubtitleLanguage
+        : playbackSubLanguage;
+
     final bool isLibassEnabled = widget.controller.player.platform?.configuration.libass ?? false;
 
     if (isLibassEnabled) {
@@ -740,6 +774,7 @@ class _VideoSubtitlesState extends ConsumerState<_VideoSubtitles> {
       padding: padding,
       offset: offset,
       text: text,
+      subtitleLanguage: subtitleLanguage,
     );
   }
 

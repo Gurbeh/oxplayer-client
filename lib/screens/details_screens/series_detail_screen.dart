@@ -11,6 +11,7 @@ import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/oxplayer/ox_library_detail_labels.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
+import 'package:fladder/oxplayer/ox_series_next_up.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/widgets/ox_series_request_button.dart';
 import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
@@ -55,7 +56,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
     final wrapAlignment =
         AdaptiveLayout.viewSizeOf(context) != ViewSize.phone ? WrapAlignment.start : WrapAlignment.center;
 
-    final currentEpisode = details?.nextUp;
+    final currentEpisode = oxSeriesPlayableNextUp(details);
 
     return DetailScaffold(
       label: details?.name ?? "",
@@ -86,7 +87,8 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                   OverviewHeader(
                     name: details.name,
                     image: details.images,
-                    mainButton: currentEpisode != null
+                    mainButton: currentEpisode != null &&
+                            (!OxplayerConfig.isEnabled || currentEpisode.playAble)
                         ? MediaPlayButton(
                             item: currentEpisode,
                             onPressed: (restart) async {

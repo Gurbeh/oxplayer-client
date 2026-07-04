@@ -1,0 +1,1 @@
+Persian subtitle font (Vazirmatn) and smarter series play button for unavailable episodes.
