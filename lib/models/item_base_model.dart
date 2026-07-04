@@ -26,6 +26,7 @@ import 'package:fladder/models/items/photos_model.dart';
 import 'package:fladder/models/items/playlist_model.dart';
 import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/models/items/series_model.dart';
+import 'package:fladder/oxplayer/oxplayer_home_navigation.dart';
 import 'package:fladder/models/items/watched_state.dart';
 import 'package:fladder/models/library_search/library_search_options.dart';
 import 'package:fladder/providers/api_provider.dart';
@@ -214,6 +215,7 @@ class ItemBaseModel with ItemBaseModelMappable {
         );
         break;
       case EpisodeModel model:
+        if (await oxplayerMaybeNavigateEpisodeToSeries(context, model, tag: tag)) break;
         context.router.push(DetailsRoute(id: model.parentId ?? id, item: this, tag: tag));
         break;
       case BookModel _:
