@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// Reports video playback failures and related server/stream HTTP to Sentry.
@@ -138,6 +139,55 @@ abstract final class OxplayerPlaybackTelemetry {
       transient: attempt < 4,
       extra: {'attempt': attempt},
     );
+  }
+
+  static DateTime? _lastVolumeAnomalyAt;
+  static String? _lastVolumeAnomalyReason;
+
+  /// Detects MPV play/pause fade leaving audio muted (intermittent on Android).
+  /// Not marked transient so events reach Sentry for trend monitoring.
+  static Future<void> reportVolumeAnomaly({
+    required String reason,
+    required double playerVolume,
+    required double preferredVolume,
+    bool enablePlayPauseFade = false,
+    bool fadeAborted = false,
+  }) async {
+    if (!Sentry.isEnabled) return;
+
+    final now = DateTime.now();
+    if (_lastVolumeAnomalyReason == reason &&
+        _lastVolumeAnomalyAt != null &&
+        now.difference(_lastVolumeAnomalyAt!) < const Duration(minutes: 5)) {
+      return;
+    }
+    _lastVolumeAnomalyAt = now;
+    _lastVolumeAnomalyReason = reason;
+
+    await Sentry.captureMessage(
+      'playback volume anomaly: $reason',
+      level: SentryLevel.warning,
+      withScope: (scope) {
+        scope
+          ..setTag('playback_anomaly', 'true')
+          ..setTag('playback_stage', 'player_volume')
+          ..setTag('playback_reason', reason);
+        scope.setContexts('playback_volume', {
+          'reason': reason,
+          'player_volume': playerVolume,
+          'preferred_volume': preferredVolume,
+          'enable_play_pause_fade': enablePlayPauseFade,
+          if (fadeAborted) 'fade_aborted': fadeAborted,
+        });
+      },
+    );
+  }
+
+  /// Test-only reset for dedupe window.
+  @visibleForTesting
+  static void resetVolumeAnomalyDedupeForTest() {
+    _lastVolumeAnomalyAt = null;
+    _lastVolumeAnomalyReason = null;
   }
 
   static String? _sanitizeStreamUrl(String? raw) {

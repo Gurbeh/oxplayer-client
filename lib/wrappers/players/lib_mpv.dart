@@ -56,6 +56,22 @@ class LibMPV extends BasePlayer {
   int _fadeGeneration = 0;
   bool _isFading = false;
 
+  void _reportVolumeAnomaly(
+    String reason, {
+    required double playerVolume,
+    required double preferredVolume,
+    bool fadeAborted = false,
+  }) {
+    if (!OxplayerEnv.isEnabled) return;
+    unawaited(OxplayerPlaybackTelemetry.reportVolumeAnomaly(
+      reason: reason,
+      playerVolume: playerVolume,
+      preferredVolume: preferredVolume,
+      enablePlayPauseFade: _settings.enablePlayPauseFade,
+      fadeAborted: fadeAborted,
+    ));
+  }
+
   /// Absolute timeline offset for ox-stream remux (stream starts at ?start= but UI uses catalog clock).
   Duration _remuxTimelineBase = Duration.zero;
   Duration get playPauseFadeDuration => const Duration(milliseconds: 175);
@@ -136,6 +152,11 @@ class LibMPV extends BasePlayer {
     _playerStreamSubs.addAll([
       player.stream.playing.listen((value) {
         if (value && _player?.state.volume == 0 && _preferredVolume > 0) {
+          _reportVolumeAnomaly(
+            'volume_restored_on_play_event',
+            playerVolume: 0,
+            preferredVolume: _preferredVolume,
+          );
           _player?.setVolume(_preferredVolume);
         }
         setState(lastState.update(playing: value));
@@ -148,8 +169,19 @@ class LibMPV extends BasePlayer {
       }),
       player.stream.volume.listen((value) {
         if (!_isFading) {
-          _preferredVolume = value.clamp(0.0, 100.0);
-          setState(lastState.update(volume: value));
+          final clamped = value.clamp(0.0, 100.0);
+          final paused = !player.state.playing;
+          if (clamped == 0 && paused && _preferredVolume > 0) {
+            _reportVolumeAnomaly(
+              'preferred_volume_zeroed_while_paused',
+              playerVolume: clamped,
+              preferredVolume: _preferredVolume,
+            );
+            setState(lastState.update(volume: clamped));
+            return;
+          }
+          _preferredVolume = clamped;
+          setState(lastState.update(volume: clamped));
         }
       }),
       player.stream.rate.listen((value) => setState(lastState.update(rate: value))),
@@ -505,6 +537,14 @@ class LibMPV extends BasePlayer {
     for (var i = 1; i <= steps; i++) {
       if (generation != _fadeGeneration || _player == null) {
         _isFading = false;
+        if (fadingIn && player.state.playing && player.state.volume <= 0.5 && _preferredVolume > 0) {
+          _reportVolumeAnomaly(
+            'play_fade_aborted_while_muted',
+            playerVolume: player.state.volume,
+            preferredVolume: _preferredVolume,
+            fadeAborted: true,
+          );
+        }
         return;
       }
       await player.setVolume(from + (to - from) * i / steps);
@@ -516,6 +556,14 @@ class LibMPV extends BasePlayer {
       await player.pause();
     }
     _isFading = false;
+    if (fadingIn && generation == _fadeGeneration && player.state.volume <= 0.5 && _preferredVolume > 0) {
+      _reportVolumeAnomaly(
+        'stuck_muted_after_play_fade',
+        playerVolume: player.state.volume,
+        preferredVolume: _preferredVolume,
+      );
+      await player.setVolume(_preferredVolume);
+    }
     setState(lastState.update(volume: _preferredVolume));
   }
 
