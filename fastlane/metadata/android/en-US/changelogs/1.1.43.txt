@@ -1,0 +1,1 @@
+Open an episode to jump to its parent series.
