@@ -55,6 +55,7 @@ abstract final class OxplayerPlaybackTelemetry {
     Object? exception,
     StackTrace? stackTrace,
     int? elapsedMs,
+    bool transient = false,
   }) async {
     if (!Sentry.isEnabled) return;
 
@@ -66,15 +67,15 @@ abstract final class OxplayerPlaybackTelemetry {
       await Sentry.captureException(
         exception,
         stackTrace: stackTrace,
-        withScope: (scope) => _applyHttpScope(scope, method, path, statusCode, reason, elapsedMs),
+        withScope: (scope) => _applyHttpScope(scope, method, path, statusCode, reason, elapsedMs, transient),
       );
       return;
     }
 
     await Sentry.captureMessage(
       'playback http: $summary',
-      level: SentryLevel.warning,
-      withScope: (scope) => _applyHttpScope(scope, method, path, statusCode, reason, elapsedMs),
+      level: transient ? SentryLevel.warning : SentryLevel.warning,
+      withScope: (scope) => _applyHttpScope(scope, method, path, statusCode, reason, elapsedMs, transient),
     );
   }
 
@@ -85,6 +86,7 @@ abstract final class OxplayerPlaybackTelemetry {
     int? statusCode,
     String? reason,
     int? elapsedMs,
+    bool transient,
   ) {
     scope
       ..setTag('playback_failure', 'true')
@@ -96,12 +98,16 @@ abstract final class OxplayerPlaybackTelemetry {
     if (reason != null && reason.isNotEmpty) {
       scope.setTag('playback_reason', _truncate(reason, 120));
     }
+    if (transient) {
+      scope.setTag('transient', 'true');
+    }
     scope.setContexts('playback_http', {
       'method': method,
       'path': path,
       if (statusCode != null) 'status': statusCode,
       if (reason != null) 'reason': reason,
       if (elapsedMs != null) 'elapsed_ms': elapsedMs,
+      'transient': transient,
     });
   }
 

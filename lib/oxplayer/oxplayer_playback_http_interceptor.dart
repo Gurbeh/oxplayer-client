@@ -40,12 +40,14 @@ class OxplayerPlaybackHttpInterceptor implements Interceptor {
       );
 
       if (!response.isSuccessful) {
+        final reason = response.error?.toString() ?? response.base.reasonPhrase ?? 'http_error';
         unawaited(OxplayerPlaybackTelemetry.reportHttpFailure(
           method: method,
           path: path,
           statusCode: response.statusCode,
-          reason: response.error?.toString() ?? response.base.reasonPhrase ?? 'http_error',
+          reason: reason,
           elapsedMs: elapsedMs,
+          transient: _isTransientPlaybackHttpFailure(response.statusCode, reason),
         ));
       }
 
@@ -71,6 +73,12 @@ class OxplayerPlaybackHttpInterceptor implements Interceptor {
     if (path.contains('/sessions/playing')) return true;
     if (path.contains('/stream-nodes')) return true;
     if (path.contains('/me/stream')) return true;
+    return false;
+  }
+
+  static bool _isTransientPlaybackHttpFailure(int statusCode, String reason) {
+    if (statusCode == 502 || statusCode == 503 || statusCode == 504) return true;
+    if (statusCode == 404 && reason.toLowerCase().contains('no playable media')) return true;
     return false;
   }
 

@@ -953,9 +953,11 @@ Future<void> _playVideo(
   if (cancelOperation?.isCanceled ?? false) return;
 
   final actualStartPosition = startPosition ?? await current.startDuration() ?? Duration.zero;
+  if (!context.mounted) return;
 
   final nativeOpenedEarly =
       OxplayerEnv.isEnabled && context.mounted && await oxplayerOpenNativePlayerEarly(ref, context);
+  if (!context.mounted) return;
 
   var loadedCorrectly = await ref.read(videoPlayerProvider.notifier).loadPlaybackItem(
         current,

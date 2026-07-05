@@ -180,8 +180,23 @@ void main() {
       isFalse,
     );
     expect(
+      OxplayerSentryFilters.shouldReportPersistedLog(
+        'Flutter error: ClientException: Write failed, uri=https://image.tmdb.org/t/p/w780/foo.jpg',
+      ),
+      isFalse,
+    );
+    expect(
       OxplayerSentryFilters.beforeSend(
         SentryEvent(message: SentryMessage('playback volume anomaly: volume_restored_on_play_event')),
+        Hint(),
+      ),
+      isNull,
+    );
+    expect(
+      OxplayerSentryFilters.beforeSend(
+        SentryEvent(
+          message: SentryMessage('Bad state: Cannot use "ref" after the widget was disposed.'),
+        ),
         Hint(),
       ),
       isNull,

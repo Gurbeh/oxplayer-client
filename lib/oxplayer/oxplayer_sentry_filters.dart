@@ -117,6 +117,12 @@ abstract final class OxplayerSentryFilters {
     if (lower.contains('handshakeexception') || lower.contains('handshake error')) {
       return true;
     }
+    if (lower.contains('write failed') && lower.contains('image.tmdb.org')) {
+      return true;
+    }
+    if (lower.contains('cannot use "ref" after the widget was disposed')) {
+      return true;
+    }
 
     return false;
   }
@@ -196,11 +202,13 @@ abstract final class OxplayerSentryFilters {
       return true;
     }
 
+    // Sideloaded / AOSP emulator builds (test-keys) — license check ANR is not app code.
     if (event.tags?['isSideLoaded'] == 'true') {
       final osBuild = (event.contexts.operatingSystem?.build ?? '').toLowerCase();
       if (osBuild.contains('test-keys') ||
           osBuild.contains('sdk_phone') ||
-          osBuild.contains('-eng ')) {
+          osBuild.contains('-eng ') ||
+          osBuild.contains('eng.ubuntu')) {
         return true;
       }
     }

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import 'package:async/async.dart';
 import 'package:collection/collection.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart' as mpv;
 import 'package:media_kit_video/media_kit_video.dart';
@@ -332,6 +333,7 @@ class LibMPV extends BasePlayer {
               stage: 'player_load',
               reason: 'max_retry_duration_reached',
               streamUrl: url,
+              transient: await _deviceAppearsOffline(),
             ));
             _retryTimer?.cancel();
             _retryTimer = null;
@@ -839,5 +841,14 @@ class _VideoSubtitlesState extends ConsumerState<_VideoSubtitles> {
         });
       }
     });
+  }
+}
+
+Future<bool> _deviceAppearsOffline() async {
+  try {
+    final results = await Connectivity().checkConnectivity();
+    return results.isEmpty || results.every((r) => r == ConnectivityResult.none);
+  } catch (_) {
+    return false;
   }
 }
