@@ -18,8 +18,11 @@ Map<String, String> oxplayerMediaBrowserHeaders(OxplayerRead read, CredentialsMo
         : (leanbackMode ? "${application.platform.name.capitalize()} TV" : application.platform.name.capitalize()),
     _ => !kIsWeb ? application.platform.name.capitalize() : "${application.platform.name.capitalize()} Web",
   };
+  final versionLabel = application.buildNumber.isNotEmpty
+      ? '${application.version}+${application.buildNumber}'
+      : application.version;
   return {
     'authorization':
-        'MediaBrowser Token="${credentials.token}", Client="${application.name}", Device="$os", DeviceId="${credentials.deviceId}", Version="${application.version}"',
+        'MediaBrowser Token="${credentials.token}", Client="${application.name}", Device="$os", DeviceId="${credentials.deviceId}", Version="$versionLabel"',
   };
 }

@@ -111,17 +111,20 @@ abstract final class OxplayerPlaybackTelemetry {
     Duration position = Duration.zero,
     Duration? catalogDuration,
     bool nativePlayer = false,
+    String stuckKind = 'start',
+    bool transient = true,
   }) async {
     await reportFailure(
       stage: 'player_stuck',
-      reason: 'zero_progress_after_open',
+      reason: stuckKind == 'mid_stream' ? 'mid_stream_frozen' : 'zero_progress_after_open',
       itemId: itemId,
       streamUrl: streamUrl,
-      transient: true,
+      transient: transient,
       extra: {
         'position_ms': position.inMilliseconds,
         if (catalogDuration != null) 'catalog_duration_ms': catalogDuration.inMilliseconds,
         'native_player': nativePlayer,
+        'stuck_kind': stuckKind,
       },
     );
   }

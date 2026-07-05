@@ -964,7 +964,7 @@ Future<void> _playVideo(
 
   Timer? stuckWatch;
   if (loadedCorrectly && OxplayerEnv.isEnabled) {
-    stuckWatch = oxplayerScheduleNativeStuckPlaybackWatch(
+    stuckWatch = oxplayerScheduleStuckPlaybackWatch(
       ref: ref,
       itemId: current.item.id,
       streamUrl: current.media?.url,
