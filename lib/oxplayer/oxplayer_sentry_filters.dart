@@ -14,6 +14,7 @@ abstract final class OxplayerSentryFilters {
     final tags = event.tags ?? {};
     if (tags['transient'] == 'true') return null;
     if (tags['perf'] == 'slow_screen' || tags['perf'] == 'slow_splash') return null;
+    if (message != null && message.contains('playback volume anomaly:')) return null;
 
     if (_stackContainsAny(event, const [
       'LiveText.isLiveTextInputAvailable',
@@ -42,7 +43,7 @@ abstract final class OxplayerSentryFilters {
   /// Whether a platform/async error should be forwarded to Sentry.
   static bool shouldReportPlatformError(Object error) {
     if (error is MissingPluginException) {
-      return !_isDetachedPlayerChannelMessage(error.toString());
+      return !_isBenignMissingPlugin(error.toString());
     }
     if (error is PlatformException && error.code == 'channel-error') {
       return !_isDetachedPlayerChannelMessage(error.message ?? error.toString());
@@ -106,6 +107,16 @@ abstract final class OxplayerSentryFilters {
     if (lower.contains('missingpluginexception') && _isDetachedPlayerChannelMessage(lower)) {
       return true;
     }
+    if (lower.contains('missingpluginexception') && lower.contains('window_manager')) {
+      return true;
+    }
+    if (lower.contains('pathnotfoundexception') &&
+        lower.contains('nativereferenceholder')) {
+      return true;
+    }
+    if (lower.contains('handshakeexception') || lower.contains('handshake error')) {
+      return true;
+    }
 
     return false;
   }
@@ -120,6 +131,12 @@ abstract final class OxplayerSentryFilters {
       for (final ex in event.exceptions ?? const []) ..._framesText(ex.stackTrace?.frames ?? const []),
     ];
     return _isDetachedPlayerChannelMessage(parts.join(' '));
+  }
+
+  static bool _isBenignMissingPlugin(String text) {
+    final lower = text.toLowerCase();
+    if (lower.contains('window_manager')) return true;
+    return _isDetachedPlayerChannelMessage(lower);
   }
 
   static bool _isDetachedPlayerChannelMessage(String text) {

@@ -152,4 +152,39 @@ void main() {
     );
     expect(OxplayerSentryFilters.beforeSend(event, Hint()), isNull);
   });
+
+  test('drops window_manager MissingPluginException on Android', () {
+    expect(
+      OxplayerSentryFilters.shouldReportPlatformError(
+        MissingPluginException('No implementation found for method isFullScreen on channel window_manager'),
+      ),
+      isFalse,
+    );
+  });
+
+  test('drops media_kit NativeReferenceHolder cleanup PathNotFoundException', () {
+    expect(
+      OxplayerSentryFilters.shouldReportPersistedLog(
+        'Flutter error: PathNotFoundException: Cannot retrieve length of file, path = '
+        "'/data/user/0/app.oxplayer.dev/files/.com.alexmercerind.media_kit.NativeReferenceHolder.16947.src'",
+      ),
+      isFalse,
+    );
+  });
+
+  test('drops handshake and volume anomaly telemetry', () {
+    expect(
+      OxplayerSentryFilters.shouldReportPersistedLog(
+        'Flutter error: HandshakeException: Handshake error in client',
+      ),
+      isFalse,
+    );
+    expect(
+      OxplayerSentryFilters.beforeSend(
+        SentryEvent(message: SentryMessage('playback volume anomaly: volume_restored_on_play_event')),
+        Hint(),
+      ),
+      isNull,
+    );
+  });
 }
