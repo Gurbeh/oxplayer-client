@@ -1,0 +1,1 @@
+Playback stability improvements and fewer false error reports during offline or interrupted playback.
