@@ -12,16 +12,6 @@ import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/providers/settings/video_player_settings_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
 
-export 'package:fladder/oxplayer/oxplayer_stuck_playback.dart' show
-    oxplayerNativePlaybackLooksStuck,
-    oxplayerPlaybackLooksFrozenMidStream,
-    oxplayerOpenNativePlayerEarly,
-    oxplayerScheduleStuckPlaybackWatch,
-    oxplayerUsesNativePlayer,
-    oxplayerUsesNativePlayerRead,
-    oxplayerUsesMpvPlayerOnAndroid,
-    oxplayerUsesMpvPlayerOnAndroidRead;
-
 /// True when the Android native (ExoPlayer) backend is selected.
 bool oxplayerUsesNativePlayer(WidgetRef ref) {
   if (kIsWeb || !Platform.isAndroid || !OxplayerConfig.isEnabled) return false;
@@ -57,7 +47,68 @@ Future<bool> oxplayerOpenNativePlayerEarly(WidgetRef ref, BuildContext context) 
 }
 
 const stuckPlaybackCheckDelay = Duration(seconds: 12);
+const midStreamResumeGrace = Duration(seconds: 45);
 const _maxStuckRetries = 3;
+
+/// Consecutive mid-stream frozen samples required before auto-repair (avoids pause/resume false positives).
+@visibleForTesting
+const midStreamFrozenSamplesRequired = 2;
+
+/// Tracks pause/resume transitions so mid-stream freeze is not inferred right after play resumes.
+@visibleForTesting
+class OxplayerStuckPlaybackTracker {
+  OxplayerStuckPlaybackTracker({Duration startPosition = Duration.zero})
+      : previousPosition = startPosition;
+
+  Duration previousPosition;
+  Duration previousBuffer = Duration.zero;
+  bool? lastPlaying;
+  DateTime? resumeGraceUntil;
+  int consecutiveMidStreamFrozen = 0;
+
+  bool inResumeGrace([DateTime? now]) {
+    final until = resumeGraceUntil;
+    if (until == null) return false;
+    return (now ?? DateTime.now()).isBefore(until);
+  }
+
+  void onPlaybackSample({
+    required bool playing,
+    required Duration position,
+    required Duration buffer,
+    required DateTime now,
+  }) {
+    if (lastPlaying == false && playing) {
+      resumeGraceUntil = now.add(midStreamResumeGrace);
+      consecutiveMidStreamFrozen = 0;
+      previousPosition = position;
+      previousBuffer = buffer;
+    } else if (lastPlaying == true && !playing) {
+      resumeGraceUntil = null;
+      consecutiveMidStreamFrozen = 0;
+    }
+    lastPlaying = playing;
+  }
+
+  bool noteMidStreamFrozenSample(bool frozen) {
+    if (!frozen) {
+      consecutiveMidStreamFrozen = 0;
+      return false;
+    }
+    consecutiveMidStreamFrozen++;
+    return consecutiveMidStreamFrozen >= midStreamFrozenSamplesRequired;
+  }
+
+  void advanceSample({required Duration position, required Duration buffer}) {
+    previousPosition = position;
+    previousBuffer = buffer;
+  }
+
+  void resetIncident() {
+    consecutiveMidStreamFrozen = 0;
+    resumeGraceUntil = null;
+  }
+}
 
 /// True when the player appears idle right after open (not merely buffering a cold stream).
 @visibleForTesting
@@ -69,7 +120,6 @@ bool oxplayerNativePlaybackLooksStuck({
   Duration startPosition = Duration.zero,
 }) {
   if (buffering || playing) return false;
-  // Buffer head advancing means the stream is alive even if position is still near zero.
   if (buffer > const Duration(seconds: 2)) return false;
   return position <= startPosition + const Duration(seconds: 2);
 }
@@ -115,8 +165,7 @@ Timer? oxplayerScheduleStuckPlaybackWatch({
   var telemetrySentForIncident = false;
   var exhaustedReported = false;
   Timer? timer;
-  var previousPosition = startPosition;
-  var previousBuffer = Duration.zero;
+  final tracker = OxplayerStuckPlaybackTracker(startPosition: startPosition);
 
   Future<void> runStuckCheck() async {
     final sessionRef = OxplayerStreamRepairBridge.ref;
@@ -132,6 +181,14 @@ Timer? oxplayerScheduleStuckPlaybackWatch({
       return;
     }
 
+    final now = DateTime.now();
+    tracker.onPlaybackSample(
+      playing: playback.playing,
+      position: playback.position,
+      buffer: playback.buffer,
+      now: now,
+    );
+
     final startStuck = oxplayerNativePlaybackLooksStuck(
       playing: playback.playing,
       buffering: playback.buffering,
@@ -139,19 +196,21 @@ Timer? oxplayerScheduleStuckPlaybackWatch({
       buffer: playback.buffer,
       startPosition: startPosition,
     );
-    final midStreamFrozen = oxplayerPlaybackLooksFrozenMidStream(
-      playing: playback.playing,
-      buffering: playback.buffering,
-      position: playback.position,
-      previousPosition: previousPosition,
-      buffer: playback.buffer,
-      previousBuffer: previousBuffer,
-      duration: playback.duration.inSeconds > 0 ? playback.duration : catalogDuration,
-      startPosition: startPosition,
-    );
 
-    previousPosition = playback.position;
-    previousBuffer = playback.buffer;
+    final frozenSample = !tracker.inResumeGrace(now) &&
+        oxplayerPlaybackLooksFrozenMidStream(
+          playing: playback.playing,
+          buffering: playback.buffering,
+          position: playback.position,
+          previousPosition: tracker.previousPosition,
+          buffer: playback.buffer,
+          previousBuffer: tracker.previousBuffer,
+          duration: playback.duration.inSeconds > 0 ? playback.duration : catalogDuration,
+          startPosition: startPosition,
+        );
+    final midStreamFrozen = tracker.noteMidStreamFrozenSample(frozenSample);
+
+    tracker.advanceSample(position: playback.position, buffer: playback.buffer);
 
     final stuck = startStuck || midStreamFrozen;
     if (!stuck) {
@@ -186,7 +245,7 @@ Timer? oxplayerScheduleStuckPlaybackWatch({
         catalogDuration: catalogDuration,
         nativePlayer: oxplayerUsesNativePlayerRead(sessionRef),
         stuckKind: midStreamFrozen ? 'mid_stream' : 'start',
-        transient: midStreamFrozen ? false : true,
+        transient: true,
       ));
     }
 
@@ -200,6 +259,7 @@ Timer? oxplayerScheduleStuckPlaybackWatch({
     final retryModel = refreshed ?? model;
     await sessionRef.read(videoPlayerProvider.notifier).loadPlaybackItem(retryModel, resumeAt);
 
+    tracker.resetIncident();
     timer = Timer(stuckPlaybackCheckDelay, () => unawaited(runStuckCheck()));
   }
 

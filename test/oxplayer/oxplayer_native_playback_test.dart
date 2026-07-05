@@ -158,4 +158,61 @@ void main() {
       );
     });
   });
+
+  group('OxplayerStuckPlaybackTracker', () {
+    test('resume grace blocks immediate mid-stream false positive after pause', () {
+      final tracker = OxplayerStuckPlaybackTracker();
+      final now = DateTime(2026, 7, 6);
+      const mid = Duration(hours: 2);
+
+      tracker.onPlaybackSample(
+        playing: false,
+        position: mid,
+        buffer: mid,
+        now: now,
+      );
+      tracker.advanceSample(position: mid, buffer: mid);
+
+      tracker.onPlaybackSample(
+        playing: true,
+        position: mid,
+        buffer: mid,
+        now: now.add(const Duration(seconds: 1)),
+      );
+
+      expect(tracker.inResumeGrace(now.add(const Duration(seconds: 1))), isTrue);
+      expect(
+        tracker.noteMidStreamFrozenSample(
+          oxplayerPlaybackLooksFrozenMidStream(
+            playing: true,
+            buffering: false,
+            position: mid,
+            previousPosition: mid,
+            buffer: mid,
+            previousBuffer: mid,
+            duration: const Duration(hours: 3),
+          ),
+        ),
+        isFalse,
+      );
+    });
+
+    test('requires consecutive frozen samples after grace expires', () {
+      final tracker = OxplayerStuckPlaybackTracker();
+      const mid = Duration(hours: 2);
+
+      expect(
+        tracker.noteMidStreamFrozenSample(true),
+        isFalse,
+      );
+      expect(
+        tracker.noteMidStreamFrozenSample(true),
+        isTrue,
+      );
+      expect(
+        tracker.noteMidStreamFrozenSample(false),
+        isFalse,
+      );
+    });
+  });
 }

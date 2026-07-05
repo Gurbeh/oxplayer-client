@@ -1029,4 +1029,5 @@ Future<void> _playVideo(
   }
 
   onPlayerExit?.call();
+  stuckWatch?.cancel();
 }

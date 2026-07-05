@@ -1,0 +1,1 @@
+Fix false playback restart after a long pause on Android TV.
