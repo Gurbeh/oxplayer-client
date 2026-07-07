@@ -14,10 +14,10 @@ inputs:
   infisical-client-secret:
     description: Universal Auth client secret
     required: true
-  infisical-project-id:
-    description: Infisical project UUID
+  infisical-project-slug:
+    description: Infisical project slug
     required: false
-    default: e86a75b7-2164-4c38-8562-678a4bcad062
+    default: secret-management
   infisical-env-slug:
     description: Infisical environment slug
     required: false
@@ -50,7 +50,8 @@ runs:
         domain: ${{ inputs.infisical-domain }}
         client-id: ${{ inputs.infisical-client-id }}
         client-secret: ${{ inputs.infisical-client-secret }}
-        project-id: ${{ inputs.infisical-project-id }}
+        project-slug: ${{ inputs.infisical-project-slug }}
         env-slug: ${{ inputs.infisical-env-slug }}
         secret-path: ${{ inputs.infisical-secret-path }}
         export-type: env
+        recursive: true
