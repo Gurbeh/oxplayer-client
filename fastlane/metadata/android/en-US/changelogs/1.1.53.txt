@@ -1,0 +1,1 @@
+Infisical CI fixes; Sentry DSN required for release builds and crash reporting.
