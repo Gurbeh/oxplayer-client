@@ -50,6 +50,7 @@ class OxplayerStreamNodesApi {
   static const _cacheTtl = Duration(seconds: 30);
 
   Future<List<OxplayerStreamNode>> fetchHealthyNodes({
+    required String baseUrl,
     required String accessToken,
     bool forceRefresh = false,
   }) async {
@@ -63,8 +64,8 @@ class OxplayerStreamNodesApi {
       return List<OxplayerStreamNode>.from(_cache!);
     }
 
-    final base = OxplayerRoute.connectBaseUrl ?? OxplayerRoute.apiBaseUrl;
-    if (base == null || base.isEmpty || accessToken.trim().isEmpty) {
+    final base = baseUrl.trim();
+    if (base.isEmpty || accessToken.trim().isEmpty) {
       return const [];
     }
 

@@ -32,12 +32,16 @@ final serverUrlProvider = StateProvider<String?>((ref) {
 
   if (localUrlAvailable && userCredentials?.localUrl?.isNotEmpty == true) {
     newUrl = userCredentials?.localUrl;
+  } else if (OxplayerConfig.isEnabled) {
+    newUrl = OxplayerRoute.connectBaseUrl ??
+        OxplayerRoute.apiBaseUrl ??
+        userCredentials?.url ??
+        tempUrl ??
+        OxplayerEnv.apiBaseUrl;
   } else if (userCredentials?.url.isNotEmpty == true) {
     newUrl = userCredentials?.url;
   } else if (tempUrl?.isNotEmpty == true) {
     newUrl = tempUrl;
-  } else if (OxplayerConfig.isEnabled) {
-    newUrl = OxplayerRoute.connectBaseUrl ?? OxplayerRoute.apiBaseUrl ?? OxplayerEnv.apiBaseUrl;
   } else {
     newUrl = null;
   }

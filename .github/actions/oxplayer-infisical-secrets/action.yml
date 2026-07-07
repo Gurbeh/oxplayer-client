@@ -1,0 +1,56 @@
+# Load oxplayer-client CI secrets from self-hosted Infisical (/core/client-ci).
+# Bootstrap GitHub secrets: INFISICAL_MACHINE_CLIENT_ID, INFISICAL_MACHINE_CLIENT_SECRET,
+# INFISICAL_API_URL, TS_CI_AUTHKEY (Tailscale — Infisical API is Tailscale-only).
+name: OXPlayer Infisical secrets
+description: Connect Tailscale and export /core/client-ci into job environment
+inputs:
+  infisical-domain:
+    description: Infisical API base URL
+    required: false
+    default: http://100.67.35.80:8080
+  infisical-client-id:
+    description: Universal Auth client id (oxplayer-client-ci-identity)
+    required: true
+  infisical-client-secret:
+    description: Universal Auth client secret
+    required: true
+  infisical-project-id:
+    description: Infisical project UUID
+    required: false
+    default: e86a75b7-2164-4c38-8562-678a4bcad062
+  infisical-env-slug:
+    description: Infisical environment slug
+    required: false
+    default: core-api
+  infisical-secret-path:
+    description: Secret folder path
+    required: false
+    default: /core/client-ci
+  tailscale-authkey:
+    description: Tailscale auth key (reusable, ephemeral, tag:github-ci)
+    required: true
+  connect-tailscale:
+    description: Join Tailscale before Infisical fetch
+    required: false
+    default: "true"
+runs:
+  using: composite
+  steps:
+    - name: Connect Tailscale
+      if: inputs.connect-tailscale == 'true'
+      uses: tailscale/github-action@v3
+      with:
+        authkey: ${{ inputs.tailscale-authkey }}
+        version: latest
+
+    - name: Fetch secrets from Infisical
+      uses: Infisical/secrets-action@v1.0.12
+      with:
+        method: universal
+        domain: ${{ inputs.infisical-domain }}
+        client-id: ${{ inputs.infisical-client-id }}
+        client-secret: ${{ inputs.infisical-client-secret }}
+        project-id: ${{ inputs.infisical-project-id }}
+        env-slug: ${{ inputs.infisical-env-slug }}
+        secret-path: ${{ inputs.infisical-secret-path }}
+        export-type: env

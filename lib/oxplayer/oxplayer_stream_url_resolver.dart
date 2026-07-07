@@ -7,6 +7,7 @@ import 'package:fladder/oxplayer/oxplayer_route.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_nodes_api.dart';
+import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 
 /// Session-scoped stream node selection state for a single playback.
@@ -46,8 +47,12 @@ Future<String?> oxplayerResolveStreamPlaybackUrl(
   final token = ref.read(userProvider)?.credentials.token.trim() ?? '';
   if (token.isEmpty) return apiMintedUrl;
 
+  final base = ref.read(serverUrlProvider)?.trim() ?? '';
+  if (base.isEmpty) return apiMintedUrl;
+
   final api = ref.read(_streamNodesApiProvider);
   final nodes = await api.fetchHealthyNodes(
+    baseUrl: base,
     accessToken: token,
     forceRefresh: forceRefreshNodes,
   );
@@ -95,9 +100,13 @@ Future<String?> oxplayerFailoverStreamUrl(
   final token = ref.read(userProvider)?.credentials.token.trim() ?? '';
   if (token.isEmpty) return null;
 
+  final base = ref.read(serverUrlProvider)?.trim() ?? '';
+  if (base.isEmpty) return null;
+
   final api = ref.read(_streamNodesApiProvider);
   while (DateTime.now().isBefore(deadline)) {
     final nodes = await api.fetchHealthyNodes(
+      baseUrl: base,
       accessToken: token,
       forceRefresh: OxplayerStreamNodeSession.nodes.isEmpty,
     );

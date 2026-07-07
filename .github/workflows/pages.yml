@@ -35,14 +35,16 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     env:
-      BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
-      OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
-      OXPLAYER_API_BASE_ARVAN: ${{ secrets.OXPLAYER_API_BASE_ARVAN || vars.OXPLAYER_API_BASE_ARVAN }}
-      OXPLAYER_STREAM_BASE_ARVAN: ${{ secrets.OXPLAYER_STREAM_BASE_ARVAN || vars.OXPLAYER_STREAM_BASE_ARVAN }}
-      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       SENTRY_ENVIRONMENT: production
     steps:
       - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
 
       - uses: actions/setup-node@v4
         with:

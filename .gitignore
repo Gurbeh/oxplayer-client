@@ -84,6 +84,7 @@ android/build/reports/problems/
 assets/env/default.env
 dart_defines.ngrok.json
 dart_defines.dev.json
+dart_defines.prod.json
 
 # Cursor — local-only agent rules
 .cursor/rules/*.local.mdc

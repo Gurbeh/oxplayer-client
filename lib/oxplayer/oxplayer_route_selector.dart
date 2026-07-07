@@ -9,7 +9,7 @@ import 'package:fladder/oxplayer/oxplayer_route.dart';
 import 'package:fladder/oxplayer/oxplayer_route_env.dart';
 import 'package:fladder/oxplayer/oxplayer_route_store.dart';
 
-/// Startup edge resolution: env override → stored preference → parallel /health probe.
+/// Startup edge resolution: global (Cloudflare → Hetzner) unless Iran enforce blocks it.
 abstract final class OxplayerRouteSelector {
   static const _probeTimeout = Duration(seconds: 2);
 
@@ -48,12 +48,18 @@ abstract final class OxplayerRouteSelector {
       for (final p in probes) p.edge: p.ok,
     };
 
-    OxplayerEdge chosen;
-    if (stored != null && healthy[stored] == true) {
-      chosen = stored;
-    } else if (healthy[OxplayerEdge.arvan] == true && healthy[OxplayerEdge.global] != true) {
+    final globalOk = healthy[OxplayerEdge.global] == true;
+    final arvanOk = healthy[OxplayerEdge.arvan] == true;
+    final globalBlocked = global != null && globalOk && await _globalPathBlocked(global);
+
+    final OxplayerEdge chosen;
+    if (globalOk && !globalBlocked) {
+      // Outside Iran: always global CDN → Hetzner (ignore stored arvan from a past Iran session).
+      chosen = OxplayerEdge.global;
+    } else if (arvanOk) {
       chosen = OxplayerEdge.arvan;
-    } else if (healthy[OxplayerEdge.global] == true) {
+    } else if (globalOk) {
+      // Iran with Arvan down — start on global; 451 interceptor flips when enforce responds.
       chosen = OxplayerEdge.global;
     } else {
       chosen = stored ?? OxplayerEdge.global;
@@ -87,5 +93,20 @@ abstract final class OxplayerRouteSelector {
     OxplayerRoute.setActive(edge);
     final prefs = await SharedPreferences.getInstance();
     await OxplayerRouteStore(prefs).saveEdge(edge);
+  }
+
+  /// True when Iran enforce returns 451 on global CDN (/health is exempt).
+  static Future<bool> _globalPathBlocked(String globalBase) async {
+    try {
+      final response = await http
+          .get(Uri.parse('${globalBase.replaceAll(RegExp(r'/+$'), '')}/ox/client/android-update'))
+          .timeout(_probeTimeout);
+      if (response.statusCode != 451) return false;
+      final header = response.headers['x-ox-route-required'];
+      if (header != null && header.trim().toLowerCase() == 'arvan') return true;
+      return response.body.contains('ox_route_required');
+    } catch (_) {
+      return false;
+    }
   }
 }

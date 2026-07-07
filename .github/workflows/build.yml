@@ -1,7 +1,8 @@
 # CI aligned with upstream Fladder (DonutWare/fladder).
 # Tag v* → release. Schedule / push main / workflow_dispatch → nightly. PR → development (Android debug only).
 # Build workflow on PRs only when pubspec.yaml, build.yml, or .fvmrc change (same as Fladder).
-# OX additions: oxplayer-flutter-env, Sentry symbols, Play package app.oxplayer, admin Telegram notify.
+# OX additions: oxplayer-flutter-env, Infisical /core/client-ci, Sentry symbols, Play app.oxplayer, admin Telegram notify.
+# Bootstrap GitHub secrets: INFISICAL_API_URL, INFISICAL_MACHINE_CLIENT_ID, INFISICAL_MACHINE_CLIENT_SECRET, TS_CI_AUTHKEY
 name: Build OXPlayer
 
 on:
@@ -126,16 +127,18 @@ jobs:
       id-token: write
       attestations: write
     env:
-      BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
-      OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
-      OXPLAYER_API_BASE_ARVAN: ${{ secrets.OXPLAYER_API_BASE_ARVAN || vars.OXPLAYER_API_BASE_ARVAN }}
-      OXPLAYER_STREAM_BASE_ARVAN: ${{ secrets.OXPLAYER_STREAM_BASE_ARVAN || vars.OXPLAYER_STREAM_BASE_ARVAN }}
-      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       SENTRY_ENVIRONMENT: ${{ needs.fetch-info.outputs.build_type == 'development' && 'development' || 'production' }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
 
       - id: meta
         shell: bash
@@ -145,20 +148,20 @@ jobs:
         if: needs.fetch-info.outputs.build_type != 'development'
         shell: bash
         run: |
-          if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ] || \
-             [ -z "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ] || \
-             [ -z "${{ secrets.ANDROID_KEY_ALIAS }}" ] || \
-             [ -z "${{ secrets.ANDROID_KEY_PASSWORD }}" ]; then
+          if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ] || \
+             [ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ] || \
+             [ -z "${ANDROID_KEY_ALIAS:-}" ] || \
+             [ -z "${ANDROID_KEY_PASSWORD:-}" ]; then
             echo "Signing secrets incomplete — cannot produce signed release APK/AAB."
             exit 1
           fi
 
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/keystore.jks
+          echo "${ANDROID_KEYSTORE_BASE64}" | base64 --decode > android/app/keystore.jks
 
           cat > android/app/key.properties <<EOF
-          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storePassword=${ANDROID_KEYSTORE_PASSWORD}
+          keyPassword=${ANDROID_KEY_PASSWORD}
+          keyAlias=${ANDROID_KEY_ALIAS}
           EOF
 
       - uses: actions/setup-java@v5
@@ -223,9 +226,6 @@ jobs:
         if: needs.fetch-info.outputs.build_type != 'development'
         continue-on-error: true
         env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
           SENTRY_RELEASE: oxplayer-client@${{ needs.fetch-info.outputs.version_name }}+${{ needs.fetch-info.outputs.android_version_code }}
           SENTRY_DIST: ${{ needs.fetch-info.outputs.android_version_code }}
         run: dart run sentry_dart_plugin
@@ -281,16 +281,18 @@ jobs:
     needs: [fetch-info]
     runs-on: windows-2022
     env:
-      BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
-      OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
-      OXPLAYER_API_BASE_ARVAN: ${{ secrets.OXPLAYER_API_BASE_ARVAN || vars.OXPLAYER_API_BASE_ARVAN }}
-      OXPLAYER_STREAM_BASE_ARVAN: ${{ secrets.OXPLAYER_STREAM_BASE_ARVAN || vars.OXPLAYER_STREAM_BASE_ARVAN }}
-      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       SENTRY_ENVIRONMENT: production
       OX_MEDIAKIT_MPV_SCRIPT: ${{ github.workspace }}/tool/ci/extract_mpv_windows.ps1
       OX_MEDIAKIT_ANGLE_SCRIPT: ${{ github.workspace }}/tool/ci/extract_angle_windows.ps1
     steps:
       - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
 
       - uses: subosito/flutter-action@v2
         with:
@@ -418,14 +420,16 @@ jobs:
     needs: [fetch-info]
     runs-on: macos-latest
     env:
-      BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
-      OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
-      OXPLAYER_API_BASE_ARVAN: ${{ secrets.OXPLAYER_API_BASE_ARVAN || vars.OXPLAYER_API_BASE_ARVAN }}
-      OXPLAYER_STREAM_BASE_ARVAN: ${{ secrets.OXPLAYER_STREAM_BASE_ARVAN || vars.OXPLAYER_STREAM_BASE_ARVAN }}
-      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       SENTRY_ENVIRONMENT: production
     steps:
       - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
 
       - uses: subosito/flutter-action@v2
         with:
@@ -483,14 +487,16 @@ jobs:
     needs: [fetch-info]
     runs-on: macos-latest
     env:
-      BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
-      OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
-      OXPLAYER_API_BASE_ARVAN: ${{ secrets.OXPLAYER_API_BASE_ARVAN || vars.OXPLAYER_API_BASE_ARVAN }}
-      OXPLAYER_STREAM_BASE_ARVAN: ${{ secrets.OXPLAYER_STREAM_BASE_ARVAN || vars.OXPLAYER_STREAM_BASE_ARVAN }}
-      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       SENTRY_ENVIRONMENT: production
     steps:
       - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
 
       - uses: subosito/flutter-action@v2
         with:
@@ -547,14 +553,16 @@ jobs:
     needs: [fetch-info]
     runs-on: ubuntu-latest
     env:
-      BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
-      OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
-      OXPLAYER_API_BASE_ARVAN: ${{ secrets.OXPLAYER_API_BASE_ARVAN || vars.OXPLAYER_API_BASE_ARVAN }}
-      OXPLAYER_STREAM_BASE_ARVAN: ${{ secrets.OXPLAYER_STREAM_BASE_ARVAN || vars.OXPLAYER_STREAM_BASE_ARVAN }}
-      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       SENTRY_ENVIRONMENT: production
     steps:
       - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
 
       - uses: subosito/flutter-action@v2
         with:
@@ -686,14 +694,16 @@ jobs:
     needs: [fetch-info]
     runs-on: ubuntu-latest
     env:
-      BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
-      OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
-      OXPLAYER_API_BASE_ARVAN: ${{ secrets.OXPLAYER_API_BASE_ARVAN || vars.OXPLAYER_API_BASE_ARVAN }}
-      OXPLAYER_STREAM_BASE_ARVAN: ${{ secrets.OXPLAYER_STREAM_BASE_ARVAN || vars.OXPLAYER_STREAM_BASE_ARVAN }}
-      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       SENTRY_ENVIRONMENT: production
     steps:
       - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
 
       - uses: subosito/flutter-action@v2
         with:
@@ -736,6 +746,13 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
+
       - uses: actions/checkout@v5
         if: needs.fetch-info.outputs.build_type == 'nightly'
         with:
@@ -935,15 +952,13 @@ jobs:
       - name: Notify admins (Telegram via oxplayer API)
         if: success()
         env:
-          API_BASE: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
-          NOTIFY_TOKEN_PRIMARY: ${{ secrets.OXPLAYER_CLIENT_RELEASE_NOTIFY_TOKEN }}
-          NOTIFY_TOKEN_FALLBACK: ${{ secrets.PROVIDER_INTERNAL_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           BUILD_TYPE: ${{ needs.fetch-info.outputs.build_type }}
         shell: bash
         run: |
-          NOTIFY_TOKEN="${NOTIFY_TOKEN_PRIMARY:-${NOTIFY_TOKEN_FALLBACK}}"
+          API_BASE="${OXPLAYER_API_BASE_URL:-}"
+          NOTIFY_TOKEN="${OXPLAYER_CLIENT_RELEASE_NOTIFY_TOKEN:-${PROVIDER_INTERNAL_TOKEN:-}}"
           if [ -z "${API_BASE}" ] || [ -z "${NOTIFY_TOKEN}" ]; then
             echo "Skipping admin release notify."
             exit 0
@@ -995,6 +1010,13 @@ jobs:
       group: google-play-upload-${{ github.repository }}
       cancel-in-progress: false
     steps:
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
+
       - name: Download Artifacts Android
         uses: actions/download-artifact@v5
         with:
@@ -1005,7 +1027,7 @@ jobs:
         uses: r0adkll/upload-google-play@v1.1.4
         continue-on-error: true
         with:
-          serviceAccountJsonPlainText: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+          serviceAccountJsonPlainText: ${{ env.SERVICE_ACCOUNT_JSON }}
           packageName: "app.oxplayer"
           releaseFiles: "oxplayer-android/${{ needs.build-android.outputs.artifact_suffix }}.aab"
           # OX: internal track until production is promoted in Play Console (Fladder uses production/draft for release).

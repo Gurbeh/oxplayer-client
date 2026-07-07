@@ -1,0 +1,1 @@
+CI secrets from Infisical; global CDN when outside Iran; route re-probe on app resume.
