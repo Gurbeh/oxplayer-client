@@ -40,12 +40,16 @@ runs:
         arvan_stream = env_first("OXPLAYER_STREAM_BASE_ARVAN")
         if arvan_stream:
             keys["OXPLAYER_STREAM_BASE_ARVAN"] = arvan_stream
+        sentry_env = env_first("SENTRY_ENVIRONMENT") or "production"
+        keys["SENTRY_ENVIRONMENT"] = sentry_env
+
         sentry_dsn = env_first("SENTRY_DSN")
+        require_sentry = env_first("REQUIRE_SENTRY_DSN").lower() in ("1", "true", "yes")
         if sentry_dsn:
             keys["SENTRY_DSN"] = sentry_dsn
-        sentry_env = env_first("SENTRY_ENVIRONMENT")
-        if sentry_env:
-            keys["SENTRY_ENVIRONMENT"] = sentry_env
+        elif require_sentry:
+            print("Missing SENTRY_DSN — required for production client builds (Infisical /core/client-ci).")
+            raise SystemExit(1)
 
         out = Path(os.environ["RUNNER_TEMP"]) / "flutter-build-env.json"
         out.write_text(json.dumps(keys), encoding="utf-8")

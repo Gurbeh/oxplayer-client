@@ -34,10 +34,10 @@ Point the app at your `oxplayer` API base URL (set in `assets/env/default.env` o
 
 Set `SENTRY_DSN` in `assets/env/default.env`, `dart_defines.*.json`, or `--dart-define` (same variable names as the `oxplayer` API). When the DSN is empty, the SDK is not loaded. Implementation: `lib/oxplayer/oxplayer_sentry.dart`.
 
-Release CI uploads Dart debug symbols and ProGuard mappings via `sentry_dart_plugin` using GitHub secrets `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` (build-only; never ship in the app). `SENTRY_ORG` is your organization **slug** from Sentry → Settings → Organization → General Settings (not the display name). Local release upload after a build with `--split-debug-info=build/debug-info`:
+Release CI uploads Dart debug symbols and ProGuard mappings via `sentry_dart_plugin` using `SENTRY_AUTH_TOKEN` from Infisical `/core/client-ci` (org/project/url are in `pubspec.yaml`). Local release upload after a build with `--split-debug-info=build/debug-info`:
 
 ```bash
-export SENTRY_AUTH_TOKEN=... SENTRY_ORG=<org-slug> SENTRY_PROJECT=oxplayer-client
+export SENTRY_AUTH_TOKEN=... SENTRY_URL=https://de.sentry.io
 export SENTRY_RELEASE=oxplayer-client@$(grep '^version:' pubspec.yaml | cut -d' ' -f2 | tr -d ' ')
 export SENTRY_DIST=<same build number as flutter --build-number>
 dart run sentry_dart_plugin

@@ -128,6 +128,7 @@ jobs:
       attestations: write
     env:
       SENTRY_ENVIRONMENT: ${{ needs.fetch-info.outputs.build_type == 'development' && 'development' || 'production' }}
+      REQUIRE_SENTRY_DSN: ${{ needs.fetch-info.outputs.build_type != 'development' && 'true' || '' }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -224,11 +225,19 @@ jobs:
 
       - name: Upload debug symbols to Sentry
         if: needs.fetch-info.outputs.build_type != 'development'
-        continue-on-error: true
         env:
+          SENTRY_URL: https://de.sentry.io
           SENTRY_RELEASE: oxplayer-client@${{ needs.fetch-info.outputs.version_name }}+${{ needs.fetch-info.outputs.android_version_code }}
           SENTRY_DIST: ${{ needs.fetch-info.outputs.android_version_code }}
-        run: dart run sentry_dart_plugin
+        run: |
+          set -euo pipefail
+          for var in SENTRY_AUTH_TOKEN SENTRY_DSN; do
+            if [ -z "${!var:-}" ]; then
+              echo "Missing ${var} — bootstrap Infisical /core/client-ci (scripts/infisical-bootstrap-client-ci.py)."
+              exit 1
+            fi
+          done
+          dart run sentry_dart_plugin
 
       - name: Verify native ABI parity (Play 64-bit / no x86)
         if: needs.fetch-info.outputs.build_type != 'development'
@@ -282,6 +291,7 @@ jobs:
     runs-on: windows-2022
     env:
       SENTRY_ENVIRONMENT: production
+      REQUIRE_SENTRY_DSN: "true"
       OX_MEDIAKIT_MPV_SCRIPT: ${{ github.workspace }}/tool/ci/extract_mpv_windows.ps1
       OX_MEDIAKIT_ANGLE_SCRIPT: ${{ github.workspace }}/tool/ci/extract_angle_windows.ps1
     steps:
@@ -421,6 +431,7 @@ jobs:
     runs-on: macos-latest
     env:
       SENTRY_ENVIRONMENT: production
+      REQUIRE_SENTRY_DSN: "true"
     steps:
       - uses: actions/checkout@v5
 
@@ -488,6 +499,7 @@ jobs:
     runs-on: macos-latest
     env:
       SENTRY_ENVIRONMENT: production
+      REQUIRE_SENTRY_DSN: "true"
     steps:
       - uses: actions/checkout@v5
 
@@ -554,6 +566,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SENTRY_ENVIRONMENT: production
+      REQUIRE_SENTRY_DSN: "true"
     steps:
       - uses: actions/checkout@v5
 
@@ -695,6 +708,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SENTRY_ENVIRONMENT: production
+      REQUIRE_SENTRY_DSN: "true"
     steps:
       - uses: actions/checkout@v5
 
