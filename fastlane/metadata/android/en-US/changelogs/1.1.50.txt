@@ -1,0 +1,1 @@
+Iran users: automatic Arvan CDN routing for API and playback when domestic edge is available.

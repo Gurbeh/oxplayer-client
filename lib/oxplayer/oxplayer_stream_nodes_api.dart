@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:http/http.dart' as http;
 
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_route.dart';
 
 class OxplayerStreamNode {
   const OxplayerStreamNode({required this.id, required this.url});
@@ -62,7 +63,7 @@ class OxplayerStreamNodesApi {
       return List<OxplayerStreamNode>.from(_cache!);
     }
 
-    final base = OxplayerEnv.apiBaseUrl;
+    final base = OxplayerRoute.connectBaseUrl ?? OxplayerRoute.apiBaseUrl;
     if (base == null || base.isEmpty || accessToken.trim().isEmpty) {
       return const [];
     }
@@ -73,6 +74,7 @@ class OxplayerStreamNodesApi {
       headers: {
         'Authorization': 'MediaBrowser Token="${accessToken.trim()}"',
         'Accept': 'application/json',
+        ...OxplayerRoute.connectHeaders,
       },
     );
 

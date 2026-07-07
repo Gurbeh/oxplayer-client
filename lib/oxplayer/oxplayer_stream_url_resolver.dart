@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_route.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_nodes_api.dart';
@@ -68,7 +69,10 @@ Future<String?> oxplayerResolveStreamPlaybackUrl(
 
   OxplayerStreamNodeSession.activeNodeId = pick.id;
   final nodeBase = Uri.parse(pick.url);
-  return uri.replace(scheme: nodeBase.scheme, host: nodeBase.host, port: nodeBase.port).toString();
+  final rewritten = uri
+      .replace(scheme: nodeBase.scheme, host: nodeBase.host, port: nodeBase.port)
+      .toString();
+  return OxplayerRoute.rewriteStreamUri(rewritten);
 }
 
 /// Failover to the next healthy node within [budget], rewriting [currentUrl]'s host.
@@ -105,7 +109,10 @@ Future<String?> oxplayerFailoverStreamUrl(
 
     OxplayerStreamNodeSession.activeNodeId = next.id;
     final nodeBase = Uri.parse(next.url);
-    return uri.replace(scheme: nodeBase.scheme, host: nodeBase.host, port: nodeBase.port).toString();
+    final rewritten = uri
+        .replace(scheme: nodeBase.scheme, host: nodeBase.host, port: nodeBase.port)
+        .toString();
+    return OxplayerRoute.rewriteStreamUri(rewritten);
   }
   return null;
 }
