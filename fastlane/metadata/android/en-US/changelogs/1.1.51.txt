@@ -1,0 +1,1 @@
+Iran users: fix Arvan routing — release builds now include api.kabazhe.ir and stream.kabazhe.ir.

@@ -128,6 +128,8 @@ jobs:
     env:
       BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
       OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
+      OXPLAYER_API_BASE_ARVAN: ${{ secrets.OXPLAYER_API_BASE_ARVAN || vars.OXPLAYER_API_BASE_ARVAN }}
+      OXPLAYER_STREAM_BASE_ARVAN: ${{ secrets.OXPLAYER_STREAM_BASE_ARVAN || vars.OXPLAYER_STREAM_BASE_ARVAN }}
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       SENTRY_ENVIRONMENT: ${{ needs.fetch-info.outputs.build_type == 'development' && 'development' || 'production' }}
     steps:
@@ -281,6 +283,8 @@ jobs:
     env:
       BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
       OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
+      OXPLAYER_API_BASE_ARVAN: ${{ secrets.OXPLAYER_API_BASE_ARVAN || vars.OXPLAYER_API_BASE_ARVAN }}
+      OXPLAYER_STREAM_BASE_ARVAN: ${{ secrets.OXPLAYER_STREAM_BASE_ARVAN || vars.OXPLAYER_STREAM_BASE_ARVAN }}
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       SENTRY_ENVIRONMENT: production
       OX_MEDIAKIT_MPV_SCRIPT: ${{ github.workspace }}/tool/ci/extract_mpv_windows.ps1
@@ -416,6 +420,8 @@ jobs:
     env:
       BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
       OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
+      OXPLAYER_API_BASE_ARVAN: ${{ secrets.OXPLAYER_API_BASE_ARVAN || vars.OXPLAYER_API_BASE_ARVAN }}
+      OXPLAYER_STREAM_BASE_ARVAN: ${{ secrets.OXPLAYER_STREAM_BASE_ARVAN || vars.OXPLAYER_STREAM_BASE_ARVAN }}
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       SENTRY_ENVIRONMENT: production
     steps:
@@ -479,6 +485,8 @@ jobs:
     env:
       BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
       OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
+      OXPLAYER_API_BASE_ARVAN: ${{ secrets.OXPLAYER_API_BASE_ARVAN || vars.OXPLAYER_API_BASE_ARVAN }}
+      OXPLAYER_STREAM_BASE_ARVAN: ${{ secrets.OXPLAYER_STREAM_BASE_ARVAN || vars.OXPLAYER_STREAM_BASE_ARVAN }}
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       SENTRY_ENVIRONMENT: production
     steps:
@@ -541,6 +549,8 @@ jobs:
     env:
       BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
       OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
+      OXPLAYER_API_BASE_ARVAN: ${{ secrets.OXPLAYER_API_BASE_ARVAN || vars.OXPLAYER_API_BASE_ARVAN }}
+      OXPLAYER_STREAM_BASE_ARVAN: ${{ secrets.OXPLAYER_STREAM_BASE_ARVAN || vars.OXPLAYER_STREAM_BASE_ARVAN }}
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       SENTRY_ENVIRONMENT: production
     steps:
@@ -678,6 +688,8 @@ jobs:
     env:
       BOT_USERNAME: ${{ secrets.BOT_USERNAME || vars.BOT_USERNAME }}
       OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL || vars.OXPLAYER_API_BASE_URL }}
+      OXPLAYER_API_BASE_ARVAN: ${{ secrets.OXPLAYER_API_BASE_ARVAN || vars.OXPLAYER_API_BASE_ARVAN }}
+      OXPLAYER_STREAM_BASE_ARVAN: ${{ secrets.OXPLAYER_STREAM_BASE_ARVAN || vars.OXPLAYER_STREAM_BASE_ARVAN }}
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       SENTRY_ENVIRONMENT: production
     steps:
