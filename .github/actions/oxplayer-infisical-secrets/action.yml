@@ -17,7 +17,7 @@ inputs:
   infisical-project-slug:
     description: Infisical project slug
     required: false
-    default: secret-management
+    default: ox-player-f-asb
   infisical-env-slug:
     description: Infisical environment slug
     required: false
