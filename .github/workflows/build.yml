@@ -746,17 +746,16 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
       - uses: ./.github/actions/oxplayer-infisical-secrets
         with:
           infisical-domain: ${{ secrets.INFISICAL_API_URL }}
           infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
           infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
           tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
-
-      - uses: actions/checkout@v5
-        if: needs.fetch-info.outputs.build_type == 'nightly'
-        with:
-          fetch-depth: 0
 
       - id: version
         shell: bash
@@ -1010,6 +1009,8 @@ jobs:
       group: google-play-upload-${{ github.repository }}
       cancel-in-progress: false
     steps:
+      - uses: actions/checkout@v5
+
       - uses: ./.github/actions/oxplayer-infisical-secrets
         with:
           infisical-domain: ${{ secrets.INFISICAL_API_URL }}
