@@ -19,3 +19,6 @@
 # Jellyfin / Media3 / ExoPlayer (native player stack)
 -keep class androidx.media3.** { *; }
 -dontwarn androidx.media3.**
+
+# Flutter deferred components reference Play Core; we ship a single AAB (no split APKs).
+-dontwarn com.google.android.play.core.**
