@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -24,6 +25,14 @@ abstract final class OxplayerRouteSelector {
         OxplayerRoute.setActive(edge);
         return;
       }
+    }
+
+    // Iran web entrypoint: always Arvan oxplayer.ir (ignore global probe / stale kabazhe builds).
+    if (kIsWeb && _isOxplayerIranWebHost()) {
+      OxplayerRoute.setActive(OxplayerEdge.arvan);
+      final prefs = await SharedPreferences.getInstance();
+      await OxplayerRouteStore(prefs).saveEdge(OxplayerEdge.arvan);
+      return;
     }
 
     if (!OxplayerRouteEnv.hasArvanRoute) {
@@ -111,5 +120,10 @@ abstract final class OxplayerRouteSelector {
     } catch (_) {
       return false;
     }
+  }
+
+  static bool _isOxplayerIranWebHost() {
+    final host = Uri.base.host.toLowerCase();
+    return host == 'oxplayer.ir' || host == 'www.oxplayer.ir';
   }
 }

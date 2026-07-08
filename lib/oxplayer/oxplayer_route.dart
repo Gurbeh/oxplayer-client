@@ -77,6 +77,7 @@ abstract final class OxplayerRoute {
 
   /// Rewrites stream playback URLs for Arvan edge pin or vanity stream host.
   static String rewriteStreamUri(String url) {
+    url = OxplayerRouteEnv.rewriteLegacyIranUrl(url);
     if (_active != OxplayerEdge.arvan) return url;
 
     final uri = Uri.tryParse(url);

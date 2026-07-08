@@ -19,9 +19,20 @@ abstract final class OxplayerRouteEnv {
   }
 
   static String? _normalizeBase(String raw) {
-    final t = raw.trim();
+    final t = _rewriteLegacyIranHost(raw.trim());
     if (t.isEmpty) return null;
     return t.endsWith('/') ? t.substring(0, t.length - 1) : t;
+  }
+
+  /// CI builds before oxplayer.ir migration may still embed kabazhe.ir in dart-defines.
+  static String rewriteLegacyIranUrl(String raw) => _rewriteLegacyIranHost(raw);
+
+  static String _rewriteLegacyIranHost(String raw) {
+    return raw
+        .replaceAll('api.kabazhe.ir', 'api.oxplayer.ir')
+        .replaceAll('stream.kabazhe.ir', 'stream.oxplayer.ir')
+        .replaceAll('www.kabazhe.ir', 'www.oxplayer.ir')
+        .replaceAll('kabazhe.ir', 'oxplayer.ir');
   }
 
   static String? get globalApiBaseUrl => _normalizeBase(_pick(['OXPLAYER_API_BASE_URL', 'OXPLAYER_API_BASE'], _cGlobalApi));

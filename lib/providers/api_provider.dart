@@ -16,6 +16,7 @@ import 'package:fladder/oxplayer/oxplayer_force_repair_interceptor.dart';
 import 'package:fladder/oxplayer/oxplayer_http_performance_interceptor.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_http_interceptor.dart';
 import 'package:fladder/oxplayer/oxplayer_route.dart';
+import 'package:fladder/oxplayer/oxplayer_route_env.dart';
 import 'package:fladder/oxplayer/oxplayer_route_interceptor.dart';
 import 'package:fladder/oxplayer/oxplayer_session_interceptor.dart';
 import 'package:fladder/providers/auth_provider.dart';
@@ -46,7 +47,7 @@ final serverUrlProvider = StateProvider<String?>((ref) {
     newUrl = null;
   }
 
-  return normalizeUrl(newUrl ?? "");
+  return OxplayerRouteEnv.rewriteLegacyIranUrl(normalizeUrl(newUrl ?? ""));
 });
 
 @riverpod

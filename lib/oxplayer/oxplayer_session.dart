@@ -6,6 +6,7 @@ import 'package:chopper/chopper.dart';
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/account_model.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_route_env.dart';
 import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
 import 'package:fladder/oxplayer/oxplayer_image_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_seerr_auto_config.dart';
@@ -65,6 +66,15 @@ Future<bool> _restoreSession(OxplayerRead read, AccountModel incoming) async {
       credentials: account.credentials.copyWith(url: fallback),
     );
     read(userProvider.notifier).updateUser(account);
+  } else {
+    final migrated = OxplayerRouteEnv.rewriteLegacyIranUrl(account.credentials.url);
+    if (migrated != account.credentials.url) {
+      account = account.copyWith(
+        credentials: account.credentials.copyWith(url: migrated),
+      );
+      read(userProvider.notifier).updateUser(account);
+      await read(sharedUtilityProvider).updateAccountInfo(account);
+    }
   }
 
   try {
