@@ -9,6 +9,7 @@ import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/providers/items/series_details_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/oxplayer/ox_library_detail_labels.dart';
+import 'package:fladder/oxplayer/oxplayer_detail_loading.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
 import 'package:fladder/oxplayer/ox_series_next_up.dart';
@@ -279,7 +280,9 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                 ].addPadding(const EdgeInsets.symmetric(vertical: 16)),
               ),
             )
-          : Container(),
+          : OxplayerConfig.isEnabled
+              ? OxDetailLoadingContent(item: widget.item, padding: padding)
+              : Container(),
     );
   }
 }

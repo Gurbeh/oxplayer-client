@@ -40,6 +40,7 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
   Future<ViewsModel?> fetchViews() async {
     Future<ViewsModel?> load() async {
       if (state.loading) return null;
+      state = state.copyWith(loading: true);
       final showAllCollections = ref.read(clientSettingsProvider.select((value) => value.showAllCollectionTypes));
       final response = await api.usersUserIdViewsGet();
     final createdViews = response.body?.items?.map((e) => ViewModel.fromBodyDto(e, ref)).where((element) {

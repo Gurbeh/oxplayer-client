@@ -8,6 +8,7 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/providers/items/movies_details_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/oxplayer/ox_library_detail_labels.dart';
+import 'package:fladder/oxplayer/oxplayer_detail_loading.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
@@ -256,7 +257,9 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                 ].addPadding(const EdgeInsets.symmetric(vertical: 16)),
               ),
             )
-          : Container(),
+          : OxplayerConfig.isEnabled
+              ? OxDetailLoadingContent(item: widget.item, padding: padding)
+              : Container(),
     );
   }
 }

@@ -5,7 +5,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:fladder/jellyfin/jellyfin_open_api.enums.swagger.dart';
+import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/collection_types.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
@@ -20,6 +20,13 @@ import 'package:fladder/util/localization_helper.dart';
 
 part 'library_screen_provider.freezed.dart';
 part 'library_screen_provider.g.dart';
+
+Set<LibraryViewType> libraryLoadTypes(LibraryScreenModel state) {
+  if (OxplayerConfig.isEnabled && state.viewType.isEmpty) {
+    return {LibraryViewType.recommended};
+  }
+  return state.viewType;
+}
 
 enum LibraryViewType {
   recommended,
@@ -64,18 +71,33 @@ class LibraryScreen extends _$LibraryScreen {
   late final JellyService api = ref.read(jellyApiProvider);
 
   @override
-  LibraryScreenModel build() => LibraryScreenModel();
+  LibraryScreenModel build() => LibraryScreenModel(
+        viewType: OxplayerConfig.isEnabled
+            ? {}
+            : {LibraryViewType.recommended, LibraryViewType.favourites},
+      );
 
   Future<void> fetchAllLibraries() async {
     Future<void> load() async {
-      final views = await ref.read(viewsProvider.notifier).fetchViews();
+      final cachedViews = ref.read(viewsProvider);
+      final List<ViewModel> viewsList;
+      if (cachedViews.views.isNotEmpty && !cachedViews.loading) {
+        viewsList = cachedViews.views;
+      } else {
+        final views = await ref.read(viewsProvider.notifier).fetchViews();
+        viewsList = views?.views.toList() ?? [];
+      }
       state = state.copyWith(
-        views: views?.views.toList() ?? [],
+        views: viewsList,
       );
       if (state.views.isEmpty) return;
       final viewModel = state.selectedViewModel ?? state.views.firstOrNull;
       if (viewModel == null) return;
-      selectLibrary(viewModel);
+      if (state.selectedViewModel?.id != viewModel.id) {
+        await selectLibrary(viewModel);
+      } else {
+        state = state.copyWith(selectedViewModel: viewModel);
+      }
       await loadLibrary(viewModel);
     }
 
@@ -87,113 +109,185 @@ class LibraryScreen extends _$LibraryScreen {
   }
 
   Future<void> selectLibrary(ViewModel viewModel) async {
-    state = state.copyWith(selectedViewModel: viewModel);
+    state = state.copyWith(
+      selectedViewModel: viewModel,
+      recommendations: const [],
+      favourites: const [],
+      genres: const [],
+    );
   }
 
   Future<void> setViewType(Set<LibraryViewType> type) async {
     state = state.copyWith(viewType: type);
+    final view = state.selectedViewModel;
+    if (view != null) {
+      await loadLibrary(view);
+    }
   }
 
   Future<Response?> loadLibrary(ViewModel viewModel) async {
-    if (state.viewType.contains(LibraryViewType.recommended)) {
-      await loadRecommendations(viewModel);
-    }
-    if (state.viewType.contains(LibraryViewType.favourites)) {
-      await loadFavourites(viewModel);
-    }
-    if (state.viewType.contains(LibraryViewType.genres)) {
-      await loadGenres(viewModel);
-    }
+    final loadTypes = libraryLoadTypes(state);
+    final loadRecommended = loadTypes.contains(LibraryViewType.recommended);
+    final loadFavouritesSection = loadTypes.contains(LibraryViewType.favourites);
+    final loadGenresSection = loadTypes.contains(LibraryViewType.genres);
+
+    final results = await Future.wait<dynamic>([
+      loadRecommended ? _fetchRecommendations(viewModel) : Future<dynamic>.value(null),
+      loadFavouritesSection ? _fetchFavourites(viewModel) : Future<dynamic>.value(null),
+      loadGenresSection ? _fetchGenres(viewModel) : Future<dynamic>.value(null),
+    ]);
+
+    state = state.copyWith(
+      recommendations: loadRecommended ? (results[0] as List<RecommendedModel>?) ?? const [] : state.recommendations,
+      favourites: loadFavouritesSection ? (results[1] as List<ItemBaseModel>?) ?? const [] : state.favourites,
+      genres: loadGenresSection ? (results[2] as List<RecommendedModel>?) ?? const [] : state.genres,
+    );
     return null;
   }
 
-  Future<void> loadResume(ViewModel viewModel) async {}
+  Future<List<RecommendedModel>> _fetchRecommendations(ViewModel viewModel) async {
+    final collectionType = viewModel.collectionType;
+    final fetchContinue = collectionType == CollectionType.movies ||
+        collectionType == CollectionType.tvshows ||
+        collectionType == CollectionType.homevideos;
+    final fetchNextUp = collectionType == CollectionType.tvshows;
+    final fetchMovieRecs = collectionType == CollectionType.movies;
+    final fetchLatest = collectionType != CollectionType.livetv;
 
-  Future<void> loadRecommendations(ViewModel viewModel) async {
-    RecommendedModel continueRecommendations = RecommendedModel(name: const Continue(), posters: []);
-    RecommendedModel nextUpRecommendations = RecommendedModel(name: const NextUp(), posters: []);
-    RecommendedModel latestRecommendations = RecommendedModel(name: const Latest(), posters: []);
-    List<RecommendedModel> otherRecommendations = [];
+    final resumeFuture = fetchContinue
+        ? api.usersUserIdItemsResumeGet(
+            parentId: viewModel.id,
+            limit: 9,
+            enableUserData: true,
+            fields: [
+              ItemFields.overview,
+              ItemFields.primaryimageaspectratio,
+            ],
+            enableImageTypes: [
+              ImageType.primary,
+              ImageType.banner,
+              ImageType.screenshot,
+            ],
+            mediaTypes: [MediaType.video],
+            enableTotalRecordCount: false,
+          )
+        : Future<Response?>.value(null);
 
-    final resume = await api.usersUserIdItemsResumeGet(
-      parentId: viewModel.id,
-      limit: 9,
-      enableUserData: true,
-      fields: [
-        ItemFields.overview,
-        ItemFields.primaryimageaspectratio,
-      ],
-      enableImageTypes: [
-        ImageType.primary,
-        ImageType.banner,
-        ImageType.screenshot,
-      ],
-      mediaTypes: [MediaType.video],
-      enableTotalRecordCount: false,
-    );
-    continueRecommendations = RecommendedModel(
-      name: const Continue(),
-      posters: resume.body?.items?.map((e) => ItemBaseModel.fromBaseDto(e, ref)).toList() ?? [],
-      type: null,
-    );
+    final nextUpFuture = fetchNextUp
+        ? api.showsNextUpGet(
+            parentId: viewModel.id,
+            limit: 9,
+            imageTypeLimit: 1,
+            fields: [
+              ItemFields.mediasourcecount,
+              ItemFields.primaryimageaspectratio,
+              ItemFields.overview,
+            ],
+          )
+        : Future<Response?>.value(null);
 
-    if (viewModel.collectionType == CollectionType.movies) {
-      final response = await api.moviesRecommendationsGet(
-        parentId: viewModel.id,
-        categoryLimit: 6,
-        fields: [
-          ItemFields.overview,
-          ItemFields.primaryimageaspectratio,
-        ],
-        itemLimit: 9,
+    final moviesRecFuture = fetchMovieRecs
+        ? api.moviesRecommendationsGet(
+            parentId: viewModel.id,
+            categoryLimit: 6,
+            fields: [
+              ItemFields.overview,
+              ItemFields.primaryimageaspectratio,
+            ],
+            itemLimit: 9,
+          )
+        : Future<Response<List<RecommendationDto>?>?>.value(null);
+
+    final latestFuture = fetchLatest ? _fetchLatestForView(viewModel) : Future<Response?>.value(null);
+
+    final results = await Future.wait<dynamic>([
+      resumeFuture,
+      moviesRecFuture,
+      nextUpFuture,
+      latestFuture,
+    ]);
+
+    final shelves = <RecommendedModel>[];
+
+    if (fetchContinue) {
+      final resume = results[0] as Response?;
+      shelves.add(
+        RecommendedModel(
+          name: const Continue(),
+          posters: _mapItemPosters(resume?.body?.items),
+          type: null,
+        ),
       );
-      otherRecommendations = (response.body?.map(
-                (e) => RecommendedModel.fromBaseDto(e, ref),
-              ) ??
-              [])
-          .toList();
     }
 
-    final nextUp = await api.showsNextUpGet(
-      parentId: viewModel.id,
-      limit: 9,
-      imageTypeLimit: 1,
-      fields: [
-        ItemFields.mediasourcecount,
-        ItemFields.primaryimageaspectratio,
-        ItemFields.overview,
-      ],
-    );
-    final latest = await api.usersUserIdItemsGet(
+    if (fetchNextUp) {
+      final nextUp = results[2] as Response?;
+      shelves.add(
+        RecommendedModel(
+          name: const NextUp(),
+          posters: _mapItemPosters(nextUp?.body?.items),
+          type: null,
+        ),
+      );
+    }
+
+    if (fetchLatest) {
+      final latest = results[3] as Response?;
+      shelves.add(
+        RecommendedModel(
+          name: const Latest(),
+          posters: _latestPosters(latest, collectionType),
+          type: null,
+        ),
+      );
+    }
+
+    if (fetchMovieRecs) {
+      final moviesRecommendations = results[1] as Response<List<RecommendationDto>?>?;
+      shelves.addAll(
+        moviesRecommendations?.body?.map((e) => RecommendedModel.fromBaseDto(e, ref)).toList() ?? const [],
+      );
+    }
+
+    return shelves..removeWhere((element) => element.posters.isEmpty);
+  }
+
+  Future<Response> _fetchLatestForView(ViewModel viewModel) {
+    if (viewModel.collectionType == CollectionType.playlists) {
+      return api.itemsGet(
+        parentId: viewModel.id,
+        sortBy: [ItemSortBy.datecreated, ItemSortBy.sortname],
+        sortOrder: [SortOrder.descending],
+        limit: 9,
+        includeItemTypes: [BaseItemKind.playlist],
+        enableImageTypes: [ImageType.primary],
+        fields: [
+          ItemFields.mediasourcecount,
+          ItemFields.primaryimageaspectratio,
+          ItemFields.overview,
+        ],
+        enableTotalRecordCount: false,
+      );
+    }
+
+    return api.usersUserIdItemsGet(
       parentId: viewModel.id,
       sortBy: [ItemSortBy.datelastcontentadded, ItemSortBy.datecreated, ItemSortBy.sortname],
       sortOrder: [SortOrder.descending],
       limit: 9,
       includeItemTypes: viewModel.collectionType.itemKinds.map((e) => e.dtoKind).toList(),
     );
-    latestRecommendations = RecommendedModel(
-      name: const Latest(),
-      posters: latest.body?.items?.map((e) => ItemBaseModel.fromBaseDto(e, ref)).toList() ?? [],
-      type: null,
-    );
-
-    nextUpRecommendations = RecommendedModel(
-      name: const NextUp(),
-      posters: nextUp.body?.items?.map((e) => ItemBaseModel.fromBaseDto(e, ref)).toList() ?? [],
-      type: null,
-    );
-
-    state = state.copyWith(
-      recommendations: [
-        continueRecommendations,
-        nextUpRecommendations,
-        latestRecommendations,
-        ...otherRecommendations,
-      ]..removeWhere((element) => element.posters.isEmpty),
-    );
   }
 
-  Future<Response?> loadFavourites(ViewModel viewModel) async {
+  List<ItemBaseModel> _latestPosters(Response? response, CollectionType? collectionType) {
+    if (response == null) return const [];
+    if (collectionType == CollectionType.playlists) {
+      return response.body?.items ?? const [];
+    }
+    return _mapItemPosters(response.body?.items);
+  }
+
+  Future<List<ItemBaseModel>> _fetchFavourites(ViewModel viewModel) async {
     final response = await api.itemsGet(
       parentId: viewModel.id,
       isFavorite: true,
@@ -209,11 +303,10 @@ class LibraryScreen extends _$LibraryScreen {
       enableTotalRecordCount: false,
     );
 
-    state = state.copyWith(favourites: response.body?.items ?? []);
-    return response;
+    return response.body?.items ?? [];
   }
 
-  Future<Response?> loadGenres(ViewModel viewModel) async {
+  Future<List<RecommendedModel>> _fetchGenres(ViewModel viewModel) async {
     final genres = await api.genresGet(
       sortBy: [ItemSortBy.sortname],
       sortOrder: [SortOrder.ascending],
@@ -228,7 +321,7 @@ class LibraryScreen extends _$LibraryScreen {
             [])
         .toList();
 
-    if (filteredGenres.isEmpty) return null;
+    if (filteredGenres.isEmpty) return const [];
 
     final futures = filteredGenres.map((genre) {
       return api
@@ -260,14 +353,19 @@ class LibraryScreen extends _$LibraryScreen {
 
     final results = await Future.wait(futures);
 
-    state = state.copyWith(
-      genres: results.whereType<RecommendedModel>().toList(),
-    );
+    return results.whereType<RecommendedModel>().toList();
+  }
 
-    return null;
+  List<ItemBaseModel> _mapItemPosters(Iterable<dynamic>? items) {
+    if (items == null) return const [];
+    return items.map<ItemBaseModel>((e) => ItemBaseModel.fromBaseDto(e, ref)).toList();
   }
 
   void clear() {
-    state = LibraryScreenModel();
+    state = LibraryScreenModel(
+      viewType: OxplayerConfig.isEnabled
+          ? {}
+          : {LibraryViewType.recommended, LibraryViewType.favourites},
+    );
   }
 }

@@ -12,7 +12,9 @@ import 'package:fladder/models/collection_types.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/library_search/library_search_options.dart';
 import 'package:fladder/models/settings/home_settings_model.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_dashboard_empty_help.dart';
+import 'package:fladder/oxplayer/oxplayer_dashboard_skeleton.dart';
 import 'package:fladder/providers/dashboard_mode_provider.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
@@ -57,6 +59,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    if (OxplayerConfig.isEnabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final dashboard = ref.read(dashboardProvider);
+        final views = ref.read(viewsProvider);
+        if (oxHomeDashboardHasCachedContent(dashboard, views)) return;
+        unawaited(ref.read(dashboardProvider.notifier).fetchNextUpAndResume());
+      });
+    }
     _timer = Timer.periodic(const Duration(seconds: 120), (timer) {
       _refreshIndicatorKey.currentState?.show();
     });
@@ -72,6 +82,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     if (!mounted) return;
     await ref.read(userProvider.notifier).updateInformation();
     if (!mounted) return;
+    if (OxplayerConfig.isEnabled) {
+      await Future.wait([
+        ref.read(viewsProvider.notifier).fetchViews(),
+        ref.read(dashboardProvider.notifier).fetchNextUpAndResume(),
+      ]);
+      return;
+    }
     await ref.read(viewsProvider.notifier).fetchViews();
     if (!mounted) return;
     await ref.read(dashboardProvider.notifier).fetchNextUpAndResume();
@@ -105,6 +122,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final viewSize = AdaptiveLayout.viewSizeOf(context);
 
     final useTVExpandedLayout = ref.watch(clientSettingsProvider.select((value) => value.useTVExpandedLayout));
+    final homeCached = oxHomeDashboardHasCachedContent(dashboardData, views);
+    final showBannerSkeleton = oxShowHomeBannerSkeleton(
+      homeBanner: homeBanner,
+      dashboardLoading: dashboardData.loading,
+      carouselHasItems: homeCarouselItems.isNotEmpty,
+    );
+    final showListSkeleton = oxShowHomeListSkeleton(
+      viewsLoading: views.loading,
+      views: views,
+    );
 
     return NestedScaffold(
       background: ValueListenableBuilder<ItemBaseModel?>(
@@ -127,6 +154,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       body: PullToRefresh(
         refreshKey: _refreshIndicatorKey,
         displacement: 80 + MediaQuery.of(context).viewPadding.top,
+        refreshOnStart: OxplayerConfig.isEnabled ? !homeCached : true,
         onRefresh: () async => await _refreshHome(),
         child: (context) => PinchPosterZoom(
           scaleDifference: (difference) => ref.read(clientSettingsProvider.notifier).addPosterSize(difference),
@@ -140,7 +168,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   route: LibrarySearchRoute(),
                   parent: context,
                 ),
-              if (homeBanner && homeCarouselItems.isNotEmpty) ...{
+              if (showBannerSkeleton)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: AdaptiveLayout.adaptivePadding(
+                      context,
+                      horizontalPadding: 0,
+                    ),
+                    child: OxHomeBannerSkeleton(bannerType: bannerType),
+                  ),
+                )
+              else if (homeBanner && homeCarouselItems.isNotEmpty) ...{
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: AdaptiveLayout.adaptivePadding(
@@ -167,6 +205,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 views: views,
                 dashboard: dashboardData,
               ),
+              if (showListSkeleton) ...[
+                SliverToBoxAdapter(
+                  child: OxPosterRowSkeleton(contentPadding: padding),
+                ),
+                SliverToBoxAdapter(
+                  child: OxPosterRowSkeleton(contentPadding: padding),
+                ),
+              ],
               ...[
                 if (tvChannels.isNotEmpty)
                   PosterRow(
