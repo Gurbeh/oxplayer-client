@@ -105,7 +105,12 @@ class ItemActionButton extends ItemAction {
   @override
   PopupMenuItem toPopupMenuItem({bool useIcons = false}) {
     return PopupMenuItem(
-      onTap: action,
+      onTap: action == null
+          ? null
+          : () {
+              final callback = action!;
+              Future.microtask(() => callback());
+            },
       enabled: action != null,
       child: Builder(
         builder: (context) {

@@ -2824,5 +2824,17 @@
   "oxplayerFollowAdded": "Added to your follows",
   "@oxplayerFollowAdded": {},
   "oxplayerFollowRemoved": "Removed from your follows",
-  "@oxplayerFollowRemoved": {}
+  "@oxplayerFollowRemoved": {},
+  "oxplayerWatchlist": "Watch Later",
+  "@oxplayerWatchlist": {},
+  "oxplayerUnwatchlist": "Remove from Watch Later",
+  "@oxplayerUnwatchlist": {},
+  "oxplayerWatchlistAdded": "Added to your Watch Later",
+  "@oxplayerWatchlistAdded": {},
+  "oxplayerWatchlistRemoved": "Removed from your Watch Later",
+  "@oxplayerWatchlistRemoved": {},
+  "oxplayerFollowFailed": "Could not update follow status",
+  "@oxplayerFollowFailed": {},
+  "oxplayerWatchlistFailed": "Could not update Watch Later",
+  "@oxplayerWatchlistFailed": {}
 }

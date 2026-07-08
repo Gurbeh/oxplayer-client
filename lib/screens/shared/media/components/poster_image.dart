@@ -13,6 +13,7 @@ import 'package:fladder/theme.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/fladder_image.dart';
 import 'package:fladder/util/focus_provider.dart';
+import 'package:fladder/oxplayer/oxplayer_catalog_interest_status.dart';
 import 'package:fladder/util/item_base_model/item_base_model_extensions.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/refresh_state.dart';
@@ -180,29 +181,29 @@ class PosterImage extends ConsumerWidget {
     );
   }
 
-  void _showBottomSheet(BuildContext context, WidgetRef ref) {
+  Future<void> _showBottomSheet(BuildContext context, WidgetRef ref) async {
+    await oxPrefetchCatalogInterestStatus(ref, poster);
+    if (!context.mounted) return;
     showBottomSheetPill(
       context: context,
       item: poster,
-      content: (scrollContext, scrollController) => ListView(
-        shrinkWrap: true,
-        controller: scrollController,
-        children: poster
-            .generateActions(
-              context,
-              ref,
-              exclude: excludeActions,
-              otherActions: otherActions,
-              onUserDataChanged: onUserDataChanged,
-              onDeleteSuccesFully: onItemRemoved,
-              onItemUpdated: onItemUpdated,
-            )
-            .listTileItems(scrollContext, useIcons: true),
+      content: (scrollContext, scrollController) => oxReactivePosterActionsList(
+        context: scrollContext,
+        ref: ref,
+        poster: poster,
+        scrollController: scrollController,
+        excludeActions: excludeActions,
+        otherActions: otherActions,
+        onUserDataChanged: onUserDataChanged,
+        onDeleteSuccesFully: onItemRemoved,
+        onItemUpdated: onItemUpdated,
       ),
     );
   }
 
   Future<void> _showContextMenu(BuildContext context, WidgetRef ref, Offset globalPos) async {
+    await oxPrefetchCatalogInterestStatus(ref, poster);
+    if (!context.mounted) return;
     final position = RelativeRect.fromLTRB(globalPos.dx, globalPos.dy, globalPos.dx, globalPos.dy);
     await showMenu(
       context: context,

@@ -14,8 +14,10 @@ import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/series_model.dart';
+import 'package:fladder/oxplayer/oxplayer_catalog_interest_status.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_follow_action.dart';
+import 'package:fladder/oxplayer/oxplayer_watchlist_action.dart';
 import 'package:fladder/oxplayer/oxplayer_media_issue_action.dart';
 import 'package:fladder/oxplayer/oxplayer_share_action.dart';
 import 'package:fladder/providers/sync_provider.dart';
@@ -109,6 +111,8 @@ enum ItemActions {
 
 extension ItemBaseModelExtensions on ItemBaseModel {
   Future<void> showDetailsMenu(BuildContext context, WidgetRef ref, Offset globalPos) async {
+    await oxPrefetchCatalogInterestStatus(ref, this);
+    if (!context.mounted) return;
     final position = RelativeRect.fromLTRB(globalPos.dx, globalPos.dy, globalPos.dx, globalPos.dy);
     await showMenu(
       context: context,
@@ -298,6 +302,7 @@ extension ItemBaseModelExtensions on ItemBaseModel {
         ),
       ...(OxplayerConfig.isEnabled ? oxplayerShareActions(context, this) : const <ItemAction>[]),
       ...(OxplayerConfig.isEnabled ? oxplayerFollowActions(context, ref, this) : const <ItemAction>[]),
+      ...(OxplayerConfig.isEnabled ? oxplayerWatchlistActions(context, ref, this) : const <ItemAction>[]),
       ...(OxplayerConfig.isEnabled ? oxplayerMediaIssueActions(context, ref, this) : const <ItemAction>[]),
       ...otherActions,
       ItemActionDivider(),

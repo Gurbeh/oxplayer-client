@@ -6,7 +6,7 @@ part of 'ox_tmdb_interest.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$oxTmdbInterestHash() => r'8450bc57934366b9909c8a1abea45afbc701b114';
+String _$oxTmdbInterestHash() => r'bf565d159f520caf6e527860e2999aa9a8ad2494';
 
 /// Copied from Dart SDK
 class _SystemHash {

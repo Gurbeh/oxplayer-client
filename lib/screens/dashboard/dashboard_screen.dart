@@ -15,6 +15,8 @@ import 'package:fladder/models/settings/home_settings_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_dashboard_empty_help.dart';
 import 'package:fladder/oxplayer/oxplayer_dashboard_skeleton.dart';
+import 'package:fladder/oxplayer/oxplayer_dashboard_watchlist.dart';
+import 'package:fladder/oxplayer/providers/ox_watchlist_dashboard.dart';
 import 'package:fladder/providers/dashboard_mode_provider.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
@@ -83,6 +85,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     await ref.read(userProvider.notifier).updateInformation();
     if (!mounted) return;
     if (OxplayerConfig.isEnabled) {
+      ref.invalidate(oxWatchlistDashboardProvider);
       await Future.wait([
         ref.read(viewsProvider.notifier).fetchViews(),
         ref.read(dashboardProvider.notifier).fetchNextUpAndResume(),
@@ -264,45 +267,53 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     label: context.localized.dashboardContinue,
                     posters: [...allResume, ...dashboardData.nextUp],
                   ),
-                ...views.dashboardViews
-                    .where(
-                      (element) => element.recentlyAdded.isNotEmpty && element.collectionType != CollectionType.livetv,
-                    )
-                    .map(
-                      (view) => PosterRow(
-                        tvMode: useTVExpandedLayout,
-                        contentPadding: padding,
-                        label: context.localized.dashboardRecentlyAdded(view.name),
-                        collectionAspectRatio: view.collectionType.aspectRatio,
-                        onLabelClick: () {
-                          if (view.collectionType == CollectionType.livetv) {
-                            return LiveTvRoute().navigate(context);
-                          }
-                          return context.router.push(
-                            LibrarySearchRoute(
-                              viewModelId: view.id,
-                              types: switch (view.collectionType) {
-                                CollectionType.tvshows => {
-                                    FladderItemType.episode: true,
-                                  },
-                                _ => {},
-                              },
-                              sortingOptions: switch (view.collectionType) {
-                                CollectionType.books ||
-                                CollectionType.boxsets ||
-                                CollectionType.folders ||
-                                CollectionType.music =>
-                                  SortingOptions.dateLastContentAdded,
-                                _ => SortingOptions.dateAdded,
-                              },
-                              sortOrder: SortingOrder.descending,
-                              recursive: true,
-                            ),
-                          );
-                        },
-                        posters: view.recentlyAdded,
+                ...oxplayerDashboardRecentlyAddedRows(
+                  context: context,
+                  ref: ref,
+                  views: views,
+                  padding: padding,
+                  useTVExpandedLayout: useTVExpandedLayout,
+                  defaultRows: views.dashboardViews
+                      .where(
+                        (element) =>
+                            element.recentlyAdded.isNotEmpty && element.collectionType != CollectionType.livetv,
+                      )
+                      .map(
+                        (view) => PosterRow(
+                          tvMode: useTVExpandedLayout,
+                          contentPadding: padding,
+                          label: context.localized.dashboardRecentlyAdded(view.name),
+                          collectionAspectRatio: view.collectionType.aspectRatio,
+                          onLabelClick: () {
+                            if (view.collectionType == CollectionType.livetv) {
+                              return LiveTvRoute().navigate(context);
+                            }
+                            return context.router.push(
+                              LibrarySearchRoute(
+                                viewModelId: view.id,
+                                types: switch (view.collectionType) {
+                                  CollectionType.tvshows => {
+                                      FladderItemType.episode: true,
+                                    },
+                                  _ => {},
+                                },
+                                sortingOptions: switch (view.collectionType) {
+                                  CollectionType.books ||
+                                  CollectionType.boxsets ||
+                                  CollectionType.folders ||
+                                  CollectionType.music =>
+                                    SortingOptions.dateLastContentAdded,
+                                  _ => SortingOptions.dateAdded,
+                                },
+                                sortOrder: SortingOrder.descending,
+                                recursive: true,
+                              ),
+                            );
+                          },
+                          posters: view.recentlyAdded,
+                        ),
                       ),
-                    ),
+                ),
               ]
                   .nonNulls
                   .toList()

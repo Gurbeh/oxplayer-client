@@ -49,6 +49,16 @@ class OxSeerrInterestButtons extends ConsumerWidget {
         ),
         SelectableIconButton(
           refreshOnEnd: false,
+          selected: interest.watchlisted,
+          icon: IconsaxPlusLinear.bookmark,
+          selectedIcon: IconsaxPlusBold.bookmark,
+          label: interest.watchlisted ? context.localized.oxplayerUnwatchlist : context.localized.oxplayerWatchlist,
+          backgroundColor: theme.tertiaryContainer,
+          iconColor: theme.onTertiaryContainer,
+          onPressed: () => _toggleWatchlist(context, ref, provider, interest.watchlisted, posterUrl),
+        ),
+        SelectableIconButton(
+          refreshOnEnd: false,
           selected: interest.favorited,
           icon: IconsaxPlusLinear.heart_add,
           selectedIcon: IconsaxPlusBold.heart,
@@ -86,6 +96,31 @@ class OxSeerrInterestButtons extends ConsumerWidget {
     if (nowFollowing == wasFollowing) return;
     FladderSnack.show(
       nowFollowing ? context.localized.oxplayerFollowAdded : context.localized.oxplayerFollowRemoved,
+      context: context,
+    );
+  }
+
+  Future<void> _toggleWatchlist(
+    BuildContext context,
+    WidgetRef ref,
+    OxTmdbInterestProvider provider,
+    bool wasWatchlisted,
+    String posterUrl,
+  ) async {
+    final ok = await ref.read(provider.notifier).setWatchlisted(
+          !wasWatchlisted,
+          title: poster.title,
+          posterUrl: posterUrl,
+        );
+    if (!context.mounted) return;
+    if (!ok) {
+      FladderSnack.show(context.localized.somethingWentWrong, context: context);
+      return;
+    }
+    final nowWatchlisted = ref.read(provider).value?.watchlisted ?? false;
+    if (nowWatchlisted == wasWatchlisted) return;
+    FladderSnack.show(
+      nowWatchlisted ? context.localized.oxplayerWatchlistAdded : context.localized.oxplayerWatchlistRemoved,
       context: context,
     );
   }

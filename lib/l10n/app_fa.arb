@@ -2088,5 +2088,11 @@
     "oxplayerFollow": "دنبال کردن",
     "oxplayerUnfollow": "لغو دنبال کردن",
     "oxplayerFollowAdded": "سریال/فیلم به دنبال‌شده‌ها اضافه شد",
-    "oxplayerFollowRemoved": "از دنبال‌شده‌ها حذف شد"
+    "oxplayerFollowRemoved": "از دنبال‌شده‌ها حذف شد",
+    "oxplayerWatchlist": "لیست تماشای آینده",
+    "oxplayerUnwatchlist": "حذف از لیست تماشای آینده",
+    "oxplayerWatchlistAdded": "به لیست تماشای آینده اضافه شد",
+    "oxplayerWatchlistRemoved": "از لیست تماشای آینده حذف شد",
+    "oxplayerFollowFailed": "به‌روزرسانی دنبال‌کردن ناموفق بود",
+    "oxplayerWatchlistFailed": "به‌روزرسانی لیست تماشای آینده ناموفق بود"
 }

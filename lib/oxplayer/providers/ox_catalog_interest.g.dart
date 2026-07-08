@@ -1,13 +1,12 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'ox_catalog_follow.dart';
+part of 'ox_catalog_interest.dart';
 
 // **************************************************************************
 // RiverpodGenerator
 // **************************************************************************
 
-String _$oxCatalogFollowStatusHash() =>
-    r'2995dce0bceaacf210e6602b832f698e526146f3';
+String _$oxCatalogInterestHash() => r'09947559c13ebe29c8fa9c47fcee91d894ad530b';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -30,36 +29,37 @@ class _SystemHash {
   }
 }
 
-abstract class _$OxCatalogFollowStatus
-    extends BuildlessAutoDisposeAsyncNotifier<bool> {
+abstract class _$OxCatalogInterest
+    extends BuildlessAutoDisposeAsyncNotifier<OxCatalogInterestState> {
   late final String catalogId;
 
-  FutureOr<bool> build(
+  FutureOr<OxCatalogInterestState> build(
     String catalogId,
   );
 }
 
-/// See also [OxCatalogFollowStatus].
-@ProviderFor(OxCatalogFollowStatus)
-const oxCatalogFollowStatusProvider = OxCatalogFollowStatusFamily();
+/// See also [OxCatalogInterest].
+@ProviderFor(OxCatalogInterest)
+const oxCatalogInterestProvider = OxCatalogInterestFamily();
 
-/// See also [OxCatalogFollowStatus].
-class OxCatalogFollowStatusFamily extends Family<AsyncValue<bool>> {
-  /// See also [OxCatalogFollowStatus].
-  const OxCatalogFollowStatusFamily();
+/// See also [OxCatalogInterest].
+class OxCatalogInterestFamily
+    extends Family<AsyncValue<OxCatalogInterestState>> {
+  /// See also [OxCatalogInterest].
+  const OxCatalogInterestFamily();
 
-  /// See also [OxCatalogFollowStatus].
-  OxCatalogFollowStatusProvider call(
+  /// See also [OxCatalogInterest].
+  OxCatalogInterestProvider call(
     String catalogId,
   ) {
-    return OxCatalogFollowStatusProvider(
+    return OxCatalogInterestProvider(
       catalogId,
     );
   }
 
   @override
-  OxCatalogFollowStatusProvider getProviderOverride(
-    covariant OxCatalogFollowStatusProvider provider,
+  OxCatalogInterestProvider getProviderOverride(
+    covariant OxCatalogInterestProvider provider,
   ) {
     return call(
       provider.catalogId,
@@ -78,30 +78,30 @@ class OxCatalogFollowStatusFamily extends Family<AsyncValue<bool>> {
       _allTransitiveDependencies;
 
   @override
-  String? get name => r'oxCatalogFollowStatusProvider';
+  String? get name => r'oxCatalogInterestProvider';
 }
 
-/// See also [OxCatalogFollowStatus].
-class OxCatalogFollowStatusProvider
-    extends AutoDisposeAsyncNotifierProviderImpl<OxCatalogFollowStatus, bool> {
-  /// See also [OxCatalogFollowStatus].
-  OxCatalogFollowStatusProvider(
+/// See also [OxCatalogInterest].
+class OxCatalogInterestProvider extends AutoDisposeAsyncNotifierProviderImpl<
+    OxCatalogInterest, OxCatalogInterestState> {
+  /// See also [OxCatalogInterest].
+  OxCatalogInterestProvider(
     String catalogId,
   ) : this._internal(
-          () => OxCatalogFollowStatus()..catalogId = catalogId,
-          from: oxCatalogFollowStatusProvider,
-          name: r'oxCatalogFollowStatusProvider',
+          () => OxCatalogInterest()..catalogId = catalogId,
+          from: oxCatalogInterestProvider,
+          name: r'oxCatalogInterestProvider',
           debugGetCreateSourceHash:
               const bool.fromEnvironment('dart.vm.product')
                   ? null
-                  : _$oxCatalogFollowStatusHash,
-          dependencies: OxCatalogFollowStatusFamily._dependencies,
+                  : _$oxCatalogInterestHash,
+          dependencies: OxCatalogInterestFamily._dependencies,
           allTransitiveDependencies:
-              OxCatalogFollowStatusFamily._allTransitiveDependencies,
+              OxCatalogInterestFamily._allTransitiveDependencies,
           catalogId: catalogId,
         );
 
-  OxCatalogFollowStatusProvider._internal(
+  OxCatalogInterestProvider._internal(
     super._createNotifier, {
     required super.name,
     required super.dependencies,
@@ -114,8 +114,8 @@ class OxCatalogFollowStatusProvider
   final String catalogId;
 
   @override
-  FutureOr<bool> runNotifierBuild(
-    covariant OxCatalogFollowStatus notifier,
+  FutureOr<OxCatalogInterestState> runNotifierBuild(
+    covariant OxCatalogInterest notifier,
   ) {
     return notifier.build(
       catalogId,
@@ -123,10 +123,10 @@ class OxCatalogFollowStatusProvider
   }
 
   @override
-  Override overrideWith(OxCatalogFollowStatus Function() create) {
+  Override overrideWith(OxCatalogInterest Function() create) {
     return ProviderOverride(
       origin: this,
-      override: OxCatalogFollowStatusProvider._internal(
+      override: OxCatalogInterestProvider._internal(
         () => create()..catalogId = catalogId,
         from: from,
         name: null,
@@ -139,15 +139,14 @@ class OxCatalogFollowStatusProvider
   }
 
   @override
-  AutoDisposeAsyncNotifierProviderElement<OxCatalogFollowStatus, bool>
-      createElement() {
-    return _OxCatalogFollowStatusProviderElement(this);
+  AutoDisposeAsyncNotifierProviderElement<OxCatalogInterest,
+      OxCatalogInterestState> createElement() {
+    return _OxCatalogInterestProviderElement(this);
   }
 
   @override
   bool operator ==(Object other) {
-    return other is OxCatalogFollowStatusProvider &&
-        other.catalogId == catalogId;
+    return other is OxCatalogInterestProvider && other.catalogId == catalogId;
   }
 
   @override
@@ -161,18 +160,19 @@ class OxCatalogFollowStatusProvider
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-mixin OxCatalogFollowStatusRef on AutoDisposeAsyncNotifierProviderRef<bool> {
+mixin OxCatalogInterestRef
+    on AutoDisposeAsyncNotifierProviderRef<OxCatalogInterestState> {
   /// The parameter `catalogId` of this provider.
   String get catalogId;
 }
 
-class _OxCatalogFollowStatusProviderElement
-    extends AutoDisposeAsyncNotifierProviderElement<OxCatalogFollowStatus, bool>
-    with OxCatalogFollowStatusRef {
-  _OxCatalogFollowStatusProviderElement(super.provider);
+class _OxCatalogInterestProviderElement
+    extends AutoDisposeAsyncNotifierProviderElement<OxCatalogInterest,
+        OxCatalogInterestState> with OxCatalogInterestRef {
+  _OxCatalogInterestProviderElement(super.provider);
 
   @override
-  String get catalogId => (origin as OxCatalogFollowStatusProvider).catalogId;
+  String get catalogId => (origin as OxCatalogInterestProvider).catalogId;
 }
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
