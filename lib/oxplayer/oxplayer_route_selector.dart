@@ -58,6 +58,9 @@ abstract final class OxplayerRouteSelector {
       chosen = OxplayerEdge.global;
     } else if (arvanOk) {
       chosen = OxplayerEdge.arvan;
+    } else if (!globalOk && OxplayerRouteEnv.hasArvanRoute) {
+      // Iran hard-blocks Cloudflare (TCP refused) — global probe fails; try Arvan vanity.
+      chosen = OxplayerEdge.arvan;
     } else if (globalOk) {
       // Iran with Arvan down — start on global; 451 interceptor flips when enforce responds.
       chosen = OxplayerEdge.global;
