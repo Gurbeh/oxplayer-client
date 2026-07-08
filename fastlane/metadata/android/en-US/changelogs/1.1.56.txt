@@ -1,0 +1,1 @@
+Iran: oxplayer.ir CDN, TMDB posters via API proxy (no image.tmdb.org).

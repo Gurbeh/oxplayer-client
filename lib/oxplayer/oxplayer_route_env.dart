@@ -28,11 +28,11 @@ abstract final class OxplayerRouteEnv {
 
   static String? get arvanApiBaseUrl =>
       _normalizeBase(_pick(['OXPLAYER_API_BASE_ARVAN'], _cArvanApi)) ??
-      'https://api.kabazhe.ir';
+      'https://api.oxplayer.ir';
 
   static String? get arvanStreamBaseUrl =>
       _normalizeBase(_pick(['OXPLAYER_STREAM_BASE_ARVAN'], _cArvanStream)) ??
-      'https://stream.kabazhe.ir';
+      'https://stream.oxplayer.ir';
 
   static String? get arvanEdgeAddr {
     final t = _pick(['OXPLAYER_ARVAN_EDGE_ADDR'], _cArvanEdgeAddr);

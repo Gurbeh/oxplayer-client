@@ -1,5 +1,6 @@
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_route.dart';
 import 'package:fladder/providers/api_provider.dart';
 
 /// TMDB-relative or absolute image path → display URL for Seerr UI.
@@ -31,7 +32,7 @@ String? _resolve(String? path, {required String fladderBase, required String oxS
   final trimmed = path.trim();
   if (hasHttpScheme(trimmed)) return trimmed;
 
-  final api = OxplayerEnv.apiBaseUrl;
+  final api = OxplayerRoute.apiBaseUrl ?? OxplayerEnv.apiBaseUrl;
   if (api == null || api.isEmpty) {
     return '$fladderBase$path';
   }
