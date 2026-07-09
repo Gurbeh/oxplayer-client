@@ -39,11 +39,21 @@ bool oxShowHomeBannerSkeleton({
   return !dashboardLoaded && !carouselHasItems;
 }
 
+bool oxHomeDashboardDataReady({
+  required ViewsModel views,
+  required HomeModel dashboard,
+}) {
+  return views.loaded && !views.loading && dashboard.loaded && !dashboard.loading;
+}
+
 bool oxShowHomeListSkeleton({
   required bool viewsLoading,
+  required bool viewsLoaded,
   required ViewsModel views,
 }) {
-  return OxplayerConfig.isEnabled && viewsLoading && !oxHomeHasCachedLists(views);
+  if (!OxplayerConfig.isEnabled) return false;
+  if (!viewsLoaded) return true;
+  return viewsLoading && !oxHomeHasCachedLists(views);
 }
 
 /// Matches [HomeBannerWidget] / carousel / TV slider layout height to prevent home jump.

@@ -75,7 +75,8 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
         dashboardViews: _applyLibraryOrdering(newList
             .where((element) => !(ref.read(userProvider)?.latestItemsExcludes.contains(element.id) ?? true))
             .toList()),
-        loading: false);
+        loading: false,
+        loaded: true);
     return state;
     }
 

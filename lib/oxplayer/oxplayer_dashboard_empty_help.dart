@@ -5,10 +5,10 @@ import 'package:fladder/jellyfin/jellyfin_open_api.enums.swagger.dart';
 import 'package:fladder/models/home_model.dart';
 import 'package:fladder/models/views_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_dashboard_skeleton.dart';
 import 'package:fladder/oxplayer/oxplayer_help_content.dart';
 import 'package:fladder/oxplayer/oxplayer_navigation_seerr.dart';
 import 'package:fladder/providers/user_provider.dart';
-import 'package:fladder/providers/views_provider.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/focus_provider.dart';
 import 'package:fladder/util/localization_helper.dart';
@@ -36,7 +36,7 @@ bool oxplayerIsHomeLibraryEmpty({
 }
 
 /// Shows [OxplayerHelpContent] on Home when the user's library has no items yet.
-class OxplayerDashboardEmptyHelpSliver extends ConsumerStatefulWidget {
+class OxplayerDashboardEmptyHelpSliver extends ConsumerWidget {
   const OxplayerDashboardEmptyHelpSliver({
     required this.views,
     required this.dashboard,
@@ -47,30 +47,20 @@ class OxplayerDashboardEmptyHelpSliver extends ConsumerStatefulWidget {
   final HomeModel dashboard;
 
   @override
-  ConsumerState<OxplayerDashboardEmptyHelpSliver> createState() =>
-      _OxplayerDashboardEmptyHelpSliverState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!OxplayerConfig.isEnabled) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
 
-class _OxplayerDashboardEmptyHelpSliverState extends ConsumerState<OxplayerDashboardEmptyHelpSliver> {
-  var _viewsHydrated = false;
-
-  @override
-  Widget build(BuildContext context) {
-    ref.listen(viewsProvider, (previous, next) {
-      if (!_viewsHydrated && previous != next) {
-        setState(() => _viewsHydrated = true);
-      }
-    });
-
-    final showHelp = _viewsHydrated &&
-        oxplayerIsHomeLibraryEmpty(views: widget.views, dashboard: widget.dashboard);
+    final dataReady = oxHomeDashboardDataReady(views: views, dashboard: dashboard);
+    final showHelp = dataReady && oxplayerIsHomeLibraryEmpty(views: views, dashboard: dashboard);
 
     if (!showHelp) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
     }
 
     final theme = Theme.of(context);
-    final seerrDiscover = OxplayerConfig.isEnabled &&
+    final seerrDiscover =
         ref.watch(userProvider.select((u) => u?.seerrCredentials?.isConfigured == true));
 
     return SliverToBoxAdapter(

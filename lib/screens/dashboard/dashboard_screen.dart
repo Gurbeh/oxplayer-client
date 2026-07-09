@@ -141,6 +141,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         homeCarouselItems.isNotEmpty;
     final showListSkeleton = oxShowHomeListSkeleton(
       viewsLoading: views.loading,
+      viewsLoaded: views.loaded,
       views: views,
     );
 
