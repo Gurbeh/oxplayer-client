@@ -1,0 +1,1 @@
+Smoother dashboard loading and watchlist actions.
