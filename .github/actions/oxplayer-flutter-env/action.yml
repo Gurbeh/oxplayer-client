@@ -7,7 +7,7 @@ runs:
       shell: bash
       run: |
         missing=()
-        for var in BOT_USERNAME OXPLAYER_API_BASE_URL OXPLAYER_API_BASE_ARVAN OXPLAYER_STREAM_BASE_ARVAN; do
+        for var in BOT_USERNAME OXPLAYER_API_BASE_URL; do
           [ -z "${!var:-}" ] && missing+=("$var")
         done
         if [ ${#missing[@]} -gt 0 ]; then
@@ -34,11 +34,8 @@ runs:
             "BOT_USERNAME": env_first("BOT_USERNAME"),
             "OXPLAYER_API_BASE_URL": env_first("OXPLAYER_API_BASE_URL"),
         }
-        arvan_api = env_first("OXPLAYER_API_BASE_ARVAN")
-        arvan_stream = env_first("OXPLAYER_STREAM_BASE_ARVAN")
-        if not arvan_api or not arvan_stream:
-            print("Missing OXPLAYER_API_BASE_ARVAN or OXPLAYER_STREAM_BASE_ARVAN in CI env.")
-            raise SystemExit(1)
+        arvan_api = env_first("OXPLAYER_API_BASE_ARVAN") or "https://api.oxplayer.ir"
+        arvan_stream = env_first("OXPLAYER_STREAM_BASE_ARVAN") or "https://stream.oxplayer.ir"
         keys["OXPLAYER_API_BASE_ARVAN"] = arvan_api
         keys["OXPLAYER_STREAM_BASE_ARVAN"] = arvan_stream
         sentry_env = env_first("SENTRY_ENVIRONMENT") or "production"
