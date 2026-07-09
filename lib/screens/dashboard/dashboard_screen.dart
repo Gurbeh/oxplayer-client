@@ -63,10 +63,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     super.initState();
     if (OxplayerConfig.isEnabled) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final homeBanner = ref.read(homeSettingsProvider).homeBanner != HomeBanner.hide;
         final dashboard = ref.read(dashboardProvider);
-        final views = ref.read(viewsProvider);
-        if (oxHomeDashboardHasCachedContent(dashboard, views)) return;
-        unawaited(ref.read(dashboardProvider.notifier).fetchNextUpAndResume());
+        if (homeBanner && !dashboard.loaded && !dashboard.loading) {
+          unawaited(ref.read(dashboardProvider.notifier).fetchNextUpAndResume());
+        }
       });
     }
     _timer = Timer.periodic(const Duration(seconds: 120), (timer) {
@@ -126,11 +128,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     final useTVExpandedLayout = ref.watch(clientSettingsProvider.select((value) => value.useTVExpandedLayout));
     final homeCached = oxHomeDashboardHasCachedContent(dashboardData, views);
+    final sliderCached = oxHomeHasCachedSliderData(dashboardData);
     final showBannerSkeleton = oxShowHomeBannerSkeleton(
       homeBanner: homeBanner,
       dashboardLoading: dashboardData.loading,
+      dashboardLoaded: dashboardData.loaded,
       carouselHasItems: homeCarouselItems.isNotEmpty,
     );
+    final showBanner = homeBanner &&
+        dashboardData.loaded &&
+        !dashboardData.loading &&
+        homeCarouselItems.isNotEmpty;
     final showListSkeleton = oxShowHomeListSkeleton(
       viewsLoading: views.loading,
       views: views,
@@ -157,7 +165,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       body: PullToRefresh(
         refreshKey: _refreshIndicatorKey,
         displacement: 80 + MediaQuery.of(context).viewPadding.top,
-        refreshOnStart: OxplayerConfig.isEnabled ? !homeCached : true,
+        refreshOnStart: OxplayerConfig.isEnabled ? (!homeCached || (homeBanner && !sliderCached)) : true,
         onRefresh: () async => await _refreshHome(),
         child: (context) => PinchPosterZoom(
           scaleDifference: (difference) => ref.read(clientSettingsProvider.notifier).addPosterSize(difference),
@@ -171,30 +179,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   route: LibrarySearchRoute(),
                   parent: context,
                 ),
-              if (showBannerSkeleton)
+              if (showBannerSkeleton || showBanner)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: AdaptiveLayout.adaptivePadding(
                       context,
                       horizontalPadding: 0,
                     ),
-                    child: OxHomeBannerSkeleton(bannerType: bannerType),
-                  ),
-                )
-              else if (homeBanner && homeCarouselItems.isNotEmpty) ...{
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: AdaptiveLayout.adaptivePadding(
-                      context,
-                      horizontalPadding: 0,
-                    ),
-                    child: HomeBannerWidget(
-                      posters: homeCarouselItems,
-                      onSelect: (poster) => selectedPoster.value = poster,
+                    child: AnimatedCrossFade(
+                      duration: const Duration(milliseconds: 250),
+                      sizeCurve: Curves.easeOutCubic,
+                      firstCurve: Curves.easeOut,
+                      secondCurve: Curves.easeIn,
+                      crossFadeState: showBanner ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                      firstChild: OxHomeBannerSkeleton(bannerType: bannerType),
+                      secondChild: showBanner
+                          ? HomeBannerWidget(
+                              posters: homeCarouselItems,
+                              onSelect: (poster) => selectedPoster.value = poster,
+                            )
+                          : const SizedBox.shrink(),
                     ),
                   ),
                 ),
-              },
               if (AdaptiveLayout.of(context).isDesktop)
                 const SliverToBoxAdapter(
                   child: Row(

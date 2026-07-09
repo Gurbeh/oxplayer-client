@@ -50,31 +50,24 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
     List<ViewModel> newList = [];
 
     if (createdViews != null) {
-      newList = await Future.wait(createdViews.map((e) async {
-        if (ref.read(userProvider)?.latestItemsExcludes.contains(e.id) == true) return e;
-        final recents = await api.usersUserIdItemsLatestGet(
-          parentId: e.id,
-          imageTypeLimit: 1,
-          limit: 16,
-          includeItemTypes:
-              (e.collectionType == CollectionType.books && !showAllCollections) ? [BaseItemKind.book] : null,
-          enableImageTypes: [
-            ImageType.primary,
-            ImageType.backdrop,
-            ImageType.thumb,
-          ],
-          fields: [
-            ItemFields.parentid,
-            ItemFields.mediastreams,
-            ItemFields.mediasources,
-            ItemFields.candelete,
-            ItemFields.candownload,
-            ItemFields.primaryimageaspectratio,
-            ItemFields.overview,
-          ],
+      if (OxplayerConfig.isEnabled) {
+        newList = createdViews.toList();
+        _publishViews(newList, loading: true);
+
+        await Future.wait(
+          newList.map((view) async {
+            final updated = await _fetchRecentlyAdded(view, showAllCollections: showAllCollections);
+            final index = newList.indexWhere((element) => element.id == updated.id);
+            if (index == -1) return;
+            newList[index] = updated;
+            _publishViews(newList, loading: true);
+          }),
         );
-        return e.copyWith(recentlyAdded: recents.body?.map((e) => ItemBaseModel.fromBaseDto(e, ref)).toList());
-      }));
+      } else {
+        newList = await Future.wait(
+          createdViews.map((e) => _fetchRecentlyAdded(e, showAllCollections: showAllCollections)),
+        );
+      }
     }
 
     state = state.copyWith(
@@ -90,6 +83,43 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
       return OxplayerScreenTelemetry.trackLoad(screen: 'home', phase: 'views', load: load);
     }
     return load();
+  }
+
+  Future<ViewModel> _fetchRecentlyAdded(ViewModel view, {required bool showAllCollections}) async {
+    if (ref.read(userProvider)?.latestItemsExcludes.contains(view.id) == true) return view;
+    final recents = await api.usersUserIdItemsLatestGet(
+      parentId: view.id,
+      imageTypeLimit: 1,
+      limit: 16,
+      includeItemTypes: (view.collectionType == CollectionType.books && !showAllCollections) ? [BaseItemKind.book] : null,
+      enableImageTypes: [
+        ImageType.primary,
+        ImageType.backdrop,
+        ImageType.thumb,
+      ],
+      fields: [
+        ItemFields.parentid,
+        ItemFields.mediastreams,
+        ItemFields.mediasources,
+        ItemFields.candelete,
+        ItemFields.candownload,
+        ItemFields.primaryimageaspectratio,
+        ItemFields.overview,
+      ],
+    );
+    return view.copyWith(recentlyAdded: recents.body?.map((e) => ItemBaseModel.fromBaseDto(e, ref)).toList());
+  }
+
+  void _publishViews(List<ViewModel> views, {required bool loading}) {
+    state = state.copyWith(
+      views: _applyLibraryOrdering(views),
+      dashboardViews: _applyLibraryOrdering(
+        views
+            .where((element) => !(ref.read(userProvider)?.latestItemsExcludes.contains(element.id) ?? true))
+            .toList(),
+      ),
+      loading: loading,
+    );
   }
 
   List<ViewModel> _applyLibraryOrdering(List<ViewModel> views) {

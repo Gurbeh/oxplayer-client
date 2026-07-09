@@ -31,9 +31,12 @@ bool oxHomeHasCachedSliderData(HomeModel dashboard) {
 bool oxShowHomeBannerSkeleton({
   required bool homeBanner,
   required bool dashboardLoading,
+  required bool dashboardLoaded,
   required bool carouselHasItems,
 }) {
-  return OxplayerConfig.isEnabled && homeBanner && dashboardLoading && !carouselHasItems;
+  if (!OxplayerConfig.isEnabled || !homeBanner) return false;
+  if (dashboardLoading) return true;
+  return !dashboardLoaded && !carouselHasItems;
 }
 
 bool oxShowHomeListSkeleton({
@@ -41,6 +44,18 @@ bool oxShowHomeListSkeleton({
   required ViewsModel views,
 }) {
   return OxplayerConfig.isEnabled && viewsLoading && !oxHomeHasCachedLists(views);
+}
+
+/// Matches [HomeBannerWidget] / carousel / TV slider layout height to prevent home jump.
+double oxHomeBannerSkeletonHeight(BuildContext context, HomeBanner bannerType) {
+  final maxHeight = (MediaQuery.sizeOf(context).shortestSide * 0.6).clamp(125.0, 375.0);
+  return switch (bannerType) {
+    HomeBanner.tvSliderBanner => maxHeight * 1.3 + 32,
+    HomeBanner.carousel => (AdaptiveLayout.of(context).isDesktop ? 6.0 : 10.0) + maxHeight + 24,
+    HomeBanner.banner => maxHeight,
+    HomeBanner.detailedBanner => maxHeight * 1.2 + 160,
+    HomeBanner.hide => 0,
+  };
 }
 
 /// Reserves home carousel / slider height while Next Up + resume data loads.
@@ -52,6 +67,7 @@ class OxHomeBannerSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final maxHeight = (MediaQuery.sizeOf(context).shortestSide * 0.6).clamp(125.0, 375.0);
+    final reservedHeight = oxHomeBannerSkeletonHeight(context, bannerType);
     final radius = BorderRadius.circular(
       bannerType == HomeBanner.detailedBanner ? 0 : 18,
     );
@@ -105,21 +121,28 @@ class OxHomeBannerSkeleton extends StatelessWidget {
       );
     }
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Padding(
-          padding: EdgeInsets.only(top: AdaptiveLayout.of(context).isDesktop ? 6 : 10),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: OxSkeletonBox(
-              height: maxHeight,
-              borderRadius: radius,
+    return SizedBox(
+      height: reservedHeight,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: EdgeInsets.only(top: AdaptiveLayout.of(context).isDesktop ? 6 : 10),
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: bannerType == HomeBanner.tvSliderBanner ? 16 : 6,
+              ),
+              child: OxSkeletonBox(
+                height: bannerType == HomeBanner.tvSliderBanner ? maxHeight * 1.3 : maxHeight,
+                borderRadius: bannerType == HomeBanner.tvSliderBanner
+                    ? FladderTheme.largeShape.borderRadius
+                    : radius,
+              ),
             ),
           ),
-        ),
-        if (bannerType == HomeBanner.carousel) const SizedBox(height: 24),
-      ],
+          if (bannerType == HomeBanner.carousel) const SizedBox(height: 24),
+        ],
+      ),
     );
   }
 }

@@ -27,17 +27,14 @@ List<ItemAction> oxplayerWatchlistActions(BuildContext context, WidgetRef ref, I
 }
 
 Future<void> _toggleWatchlist(BuildContext context, WidgetRef ref, String catalogId) async {
+  final loc = context.localized;
   final wasWatchlisted = (await ref.read(oxCatalogInterestProvider(catalogId).future)).watchlisted;
   final ok = await ref.read(oxCatalogInterestProvider(catalogId).notifier).toggleWatchlisted();
-  if (!context.mounted) return;
   if (!ok) {
-    FladderSnack.show(context.localized.oxplayerWatchlistFailed, context: context);
+    FladderSnack.show(loc.oxplayerWatchlistFailed);
     return;
   }
   final nowWatchlisted = ref.read(oxCatalogInterestProvider(catalogId)).value?.watchlisted ?? false;
   if (nowWatchlisted == wasWatchlisted) return;
-  FladderSnack.show(
-    nowWatchlisted ? context.localized.oxplayerWatchlistAdded : context.localized.oxplayerWatchlistRemoved,
-    context: context,
-  );
+  FladderSnack.show(nowWatchlisted ? loc.oxplayerWatchlistAdded : loc.oxplayerWatchlistRemoved);
 }

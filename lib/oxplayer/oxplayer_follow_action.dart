@@ -32,17 +32,14 @@ List<ItemAction> oxplayerFollowActions(BuildContext context, WidgetRef ref, Item
 }
 
 Future<void> _toggleFollow(BuildContext context, WidgetRef ref, String catalogId) async {
+  final loc = context.localized;
   final wasFollowing = (await ref.read(oxCatalogInterestProvider(catalogId).future)).following;
   final ok = await ref.read(oxCatalogInterestProvider(catalogId).notifier).toggleFollowing();
-  if (!context.mounted) return;
   if (!ok) {
-    FladderSnack.show(context.localized.oxplayerFollowFailed, context: context);
+    FladderSnack.show(loc.oxplayerFollowFailed);
     return;
   }
   final nowFollowing = ref.read(oxCatalogInterestProvider(catalogId)).value?.following ?? false;
   if (nowFollowing == wasFollowing) return;
-  FladderSnack.show(
-    nowFollowing ? context.localized.oxplayerFollowAdded : context.localized.oxplayerFollowRemoved,
-    context: context,
-  );
+  FladderSnack.show(nowFollowing ? loc.oxplayerFollowAdded : loc.oxplayerFollowRemoved);
 }

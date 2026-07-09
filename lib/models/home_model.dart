@@ -3,6 +3,7 @@ import 'package:fladder/models/item_base_model.dart';
 
 class HomeModel {
   final bool loading;
+  final bool loaded;
   final List<ItemBaseModel> resumeVideo;
   final List<ItemBaseModel> resumeAudio;
   final List<ItemBaseModel> resumeBooks;
@@ -11,6 +12,7 @@ class HomeModel {
 
   HomeModel({
     this.loading = false,
+    this.loaded = false,
     this.resumeVideo = const [],
     this.resumeAudio = const [],
     this.resumeBooks = const [],
@@ -20,6 +22,7 @@ class HomeModel {
 
   HomeModel copyWith({
     bool? loading,
+    bool? loaded,
     List<ItemBaseModel>? resumeVideo,
     List<ItemBaseModel>? resumeAudio,
     List<ItemBaseModel>? resumeBooks,
@@ -29,6 +32,7 @@ class HomeModel {
   }) {
     return HomeModel(
       loading: loading ?? this.loading,
+      loaded: loaded ?? this.loaded,
       resumeVideo: resumeVideo ?? this.resumeVideo,
       resumeAudio: resumeAudio ?? this.resumeAudio,
       resumeBooks: resumeBooks ?? this.resumeBooks,
