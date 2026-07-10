@@ -34,10 +34,10 @@ runs:
             "BOT_USERNAME": env_first("BOT_USERNAME"),
             "OXPLAYER_API_BASE_URL": env_first("OXPLAYER_API_BASE_URL"),
         }
-        arvan_api = env_first("OXPLAYER_API_BASE_ARVAN") or "https://api.oxplayer.ir"
-        arvan_stream = env_first("OXPLAYER_STREAM_BASE_ARVAN") or "https://stream.oxplayer.ir"
-        keys["OXPLAYER_API_BASE_ARVAN"] = arvan_api
-        keys["OXPLAYER_STREAM_BASE_ARVAN"] = arvan_stream
+        iran_api = env_first("OXPLAYER_API_BASE_IRAN", "OXPLAYER_API_BASE_ARVAN") or "https://api.oxplayer.ir"
+        iran_stream = env_first("OXPLAYER_STREAM_BASE_IRAN", "OXPLAYER_STREAM_BASE_ARVAN") or "https://stream.oxplayer.ir"
+        keys["OXPLAYER_API_BASE_IRAN"] = iran_api
+        keys["OXPLAYER_STREAM_BASE_IRAN"] = iran_stream
         sentry_env = env_first("SENTRY_ENVIRONMENT") or "production"
         keys["SENTRY_ENVIRONMENT"] = sentry_env
 

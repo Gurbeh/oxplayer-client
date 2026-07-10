@@ -12,7 +12,7 @@ import 'package:fladder/oxplayer/oxplayer_route_selector.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_nodes_api.dart';
 import 'package:fladder/providers/api_provider.dart';
 
-/// On HTTP 451 or connection failure to global CDN, flips to Arvan and retries once.
+/// On HTTP 451 or connection failure to global CDN, flips to Iran edge and retries once.
 class OxplayerRouteInterceptor implements Interceptor {
   OxplayerRouteInterceptor(this.ref);
 
@@ -38,30 +38,30 @@ class OxplayerRouteInterceptor implements Interceptor {
         if (!_isOxRouteRequired(response)) {
           return response;
         }
-        if (OxplayerRoute.active == OxplayerEdge.arvan) {
+        if (OxplayerRoute.active == OxplayerEdge.iran) {
           return response;
         }
 
-        await _flipToArvan();
+        await _flipToIran();
         routeRetries++;
       } on IOException catch (e) {
         if (!_shouldFlipOnConnectionError(e) || routeRetries >= _maxRouteRetries) {
           rethrow;
         }
-        await _flipToArvan();
+        await _flipToIran();
         routeRetries++;
       }
     }
   }
 
-  Future<void> _flipToArvan() async {
-    await OxplayerRouteSelector.switchTo(OxplayerEdge.arvan);
+  Future<void> _flipToIran() async {
+    await OxplayerRouteSelector.switchTo(OxplayerEdge.iran);
     OxplayerStreamNodesApi.invalidateCache();
     ref.invalidate(serverUrlProvider);
   }
 
   bool _shouldFlipOnConnectionError(IOException error) {
-    if (!OxplayerRouteEnv.hasArvanRoute || OxplayerRoute.active == OxplayerEdge.arvan) {
+    if (!OxplayerRouteEnv.hasIranRoute || OxplayerRoute.active == OxplayerEdge.iran) {
       return false;
     }
     final global = OxplayerRouteEnv.globalApiBaseUrl;
@@ -74,7 +74,7 @@ class OxplayerRouteInterceptor implements Interceptor {
 
   bool _isOxRouteRequired(Response<dynamic> response) {
     final header = response.headers['x-ox-route-required'] ?? response.headers['X-Ox-Route-Required'];
-    if (header != null && header.trim().toLowerCase() == 'arvan') {
+    if (header != null && _isIranRouteHeader(header)) {
       return true;
     }
 
@@ -92,5 +92,15 @@ class OxplayerRouteInterceptor implements Interceptor {
       }
     } catch (_) {}
     return false;
+  }
+
+  bool _isIranRouteHeader(String header) {
+    switch (header.trim().toLowerCase()) {
+      case 'iran':
+      case 'arvan':
+        return true;
+      default:
+        return false;
+    }
   }
 }

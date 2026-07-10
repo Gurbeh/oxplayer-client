@@ -3,7 +3,7 @@ import 'package:fladder/oxplayer/oxplayer_route_env.dart';
 /// Active CDN edge for API + stream traffic.
 enum OxplayerEdge {
   global,
-  arvan;
+  iran;
 
   static OxplayerEdge? tryParse(String raw) {
     switch (raw.trim().toLowerCase()) {
@@ -11,8 +11,9 @@ enum OxplayerEdge {
       case 'cloudflare':
       case 'cf':
         return OxplayerEdge.global;
+      case 'iran':
       case 'arvan':
-        return OxplayerEdge.arvan;
+        return OxplayerEdge.iran;
       default:
         return null;
     }
@@ -34,18 +35,18 @@ abstract final class OxplayerRoute {
     switch (_active) {
       case OxplayerEdge.global:
         return OxplayerRouteEnv.globalApiBaseUrl;
-      case OxplayerEdge.arvan:
-        return OxplayerRouteEnv.arvanApiBaseUrl ?? OxplayerRouteEnv.globalApiBaseUrl;
+      case OxplayerEdge.iran:
+        return OxplayerRouteEnv.iranApiBaseUrl ?? OxplayerRouteEnv.globalApiBaseUrl;
     }
   }
 
-  /// TCP target for Chopper / http — may pin Arvan edge IP while keeping logical host in [connectHostHeader].
+  /// TCP target for Chopper / http — may pin edge IP while keeping logical host in [connectHostHeader].
   static String? get connectBaseUrl {
     final logical = apiBaseUrl;
     if (logical == null) return null;
-    if (_active != OxplayerEdge.arvan) return logical;
+    if (_active != OxplayerEdge.iran) return logical;
 
-    final pin = OxplayerRouteEnv.arvanEdgeAddr;
+    final pin = OxplayerRouteEnv.iranEdgeAddr;
     if (pin == null || pin.isEmpty) return logical;
 
     final uri = Uri.parse(logical);
@@ -54,8 +55,8 @@ abstract final class OxplayerRoute {
 
   /// Host header when [connectBaseUrl] uses an edge IP pin.
   static String? get connectHostHeader {
-    if (_active != OxplayerEdge.arvan) return null;
-    final pin = OxplayerRouteEnv.arvanEdgeAddr;
+    if (_active != OxplayerEdge.iran) return null;
+    final pin = OxplayerRouteEnv.iranEdgeAddr;
     if (pin == null || pin.isEmpty) return null;
     return Uri.tryParse(apiBaseUrl ?? '')?.host;
   }
@@ -70,15 +71,15 @@ abstract final class OxplayerRoute {
     switch (_active) {
       case OxplayerEdge.global:
         return null;
-      case OxplayerEdge.arvan:
-        return OxplayerRouteEnv.arvanStreamBaseUrl;
+      case OxplayerEdge.iran:
+        return OxplayerRouteEnv.iranStreamBaseUrl;
     }
   }
 
-  /// Rewrites stream playback URLs for Arvan edge pin or vanity stream host.
+  /// Rewrites stream playback URLs for Iran edge pin or vanity stream host.
   static String rewriteStreamUri(String url) {
     url = OxplayerRouteEnv.rewriteLegacyIranUrl(url);
-    if (_active != OxplayerEdge.arvan) return url;
+    if (_active != OxplayerEdge.iran) return url;
 
     final uri = Uri.tryParse(url);
     if (uri == null || !uri.hasAuthority) return url;
@@ -100,12 +101,10 @@ abstract final class OxplayerRoute {
       }
     }
 
-    final pin = OxplayerRouteEnv.arvanEdgeAddr;
+    final pin = OxplayerRouteEnv.iranEdgeAddr;
     if (pin != null && pin.isNotEmpty && next.host != pin) {
       final logicalHost = next.host;
       next = next.replace(host: pin);
-      // Caller / player must send Host: logicalHost when pinning; mpv uses URL host only.
-      // Vanity stream.oxplayer.app on Arvan usually resolves correctly without pin.
       if (_isStreamHost(logicalHost)) {
         return next.toString();
       }

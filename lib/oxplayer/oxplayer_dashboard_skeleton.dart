@@ -52,8 +52,11 @@ bool oxShowHomeListSkeleton({
   required ViewsModel views,
 }) {
   if (!OxplayerConfig.isEnabled) return false;
-  if (!viewsLoaded) return true;
-  return viewsLoading && !oxHomeHasCachedLists(views);
+  // Hide placeholder as soon as any shelf has data (incremental views publish).
+  if (oxHomeHasCachedLists(views)) return false;
+  // Empty library: fetch finished, nothing to show.
+  if (viewsLoaded && !viewsLoading) return false;
+  return true;
 }
 
 /// Matches [HomeBannerWidget] / carousel / TV slider layout height to prevent home jump.

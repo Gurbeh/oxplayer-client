@@ -27,15 +27,15 @@ abstract final class OxplayerRouteSelector {
       }
     }
 
-    // Iran web entrypoint: always Arvan oxplayer.ir (ignore global probe / stale kabazhe builds).
+    // Iran web entrypoint: always .ir hosts (ignore global probe / stale kabazhe builds).
     if (kIsWeb && _isOxplayerIranWebHost()) {
-      OxplayerRoute.setActive(OxplayerEdge.arvan);
+      OxplayerRoute.setActive(OxplayerEdge.iran);
       final prefs = await SharedPreferences.getInstance();
-      await OxplayerRouteStore(prefs).saveEdge(OxplayerEdge.arvan);
+      await OxplayerRouteStore(prefs).saveEdge(OxplayerEdge.iran);
       return;
     }
 
-    if (!OxplayerRouteEnv.hasArvanRoute) {
+    if (!OxplayerRouteEnv.hasIranRoute) {
       OxplayerRoute.setActive(OxplayerEdge.global);
       return;
     }
@@ -45,12 +45,12 @@ abstract final class OxplayerRouteSelector {
     final stored = store.readEdge();
 
     final global = OxplayerRouteEnv.globalApiBaseUrl;
-    final arvan = OxplayerRouteEnv.arvanApiBaseUrl;
-    if (global == null && arvan == null) return;
+    final iran = OxplayerRouteEnv.iranApiBaseUrl;
+    if (global == null && iran == null) return;
 
     final probes = await Future.wait([
       if (global != null) _probeHealth(global, edge: OxplayerEdge.global),
-      if (arvan != null) _probeHealth(arvan, edge: OxplayerEdge.arvan),
+      if (iran != null) _probeHealth(iran, edge: OxplayerEdge.iran),
     ]);
 
     final healthy = <OxplayerEdge, bool>{
@@ -58,20 +58,17 @@ abstract final class OxplayerRouteSelector {
     };
 
     final globalOk = healthy[OxplayerEdge.global] == true;
-    final arvanOk = healthy[OxplayerEdge.arvan] == true;
+    final iranOk = healthy[OxplayerEdge.iran] == true;
     final globalBlocked = global != null && globalOk && await _globalPathBlocked(global);
 
     final OxplayerEdge chosen;
     if (globalOk && !globalBlocked) {
-      // Outside Iran: always global CDN → Hetzner (ignore stored arvan from a past Iran session).
       chosen = OxplayerEdge.global;
-    } else if (arvanOk) {
-      chosen = OxplayerEdge.arvan;
-    } else if (!globalOk && OxplayerRouteEnv.hasArvanRoute) {
-      // Iran hard-blocks Cloudflare (TCP refused) — global probe fails; try Arvan vanity.
-      chosen = OxplayerEdge.arvan;
+    } else if (iranOk) {
+      chosen = OxplayerEdge.iran;
+    } else if (!globalOk && OxplayerRouteEnv.hasIranRoute) {
+      chosen = OxplayerEdge.iran;
     } else if (globalOk) {
-      // Iran with Arvan down — start on global; 451 interceptor flips when enforce responds.
       chosen = OxplayerEdge.global;
     } else {
       chosen = stored ?? OxplayerEdge.global;
@@ -83,7 +80,7 @@ abstract final class OxplayerRouteSelector {
 
   static Future<({OxplayerEdge edge, bool ok})> _probeHealth(String baseUrl, {required OxplayerEdge edge}) async {
     try {
-      final pin = edge == OxplayerEdge.arvan ? OxplayerRouteEnv.arvanEdgeAddr : null;
+      final pin = edge == OxplayerEdge.iran ? OxplayerRouteEnv.iranEdgeAddr : null;
       var uri = Uri.parse('$baseUrl/health');
       final headers = <String, String>{};
       if (pin != null && pin.isNotEmpty) {
@@ -115,10 +112,20 @@ abstract final class OxplayerRouteSelector {
           .timeout(_probeTimeout);
       if (response.statusCode != 451) return false;
       final header = response.headers['x-ox-route-required'];
-      if (header != null && header.trim().toLowerCase() == 'arvan') return true;
+      if (header != null && _isIranRouteRequired(header)) return true;
       return response.body.contains('ox_route_required');
     } catch (_) {
       return false;
+    }
+  }
+
+  static bool _isIranRouteRequired(String header) {
+    switch (header.trim().toLowerCase()) {
+      case 'iran':
+      case 'arvan':
+        return true;
+      default:
+        return false;
     }
   }
 
