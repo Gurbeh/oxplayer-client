@@ -36,12 +36,31 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Connect Tailscale
-      if: inputs.connect-tailscale == 'true'
+    # macOS: brew binary — tailscale/github-action@v3 compiles from source and often
+    # times out on proxy.golang.org during go mod download.
+    - name: Connect Tailscale (macOS)
+      if: inputs.connect-tailscale == 'true' && runner.os == 'macOS'
+      shell: bash
+      run: |
+        set -euo pipefail
+        if ! command -v tailscale &>/dev/null; then
+          brew install tailscale
+        fi
+        sudo tailscaled --state=mem: &
+        for i in $(seq 1 30); do
+          if tailscale status &>/dev/null; then break; fi
+          sleep 1
+        done
+        tailscale up --auth-key="${TS_AUTHKEY}" --accept-routes --reset
+      env:
+        TS_AUTHKEY: ${{ inputs.tailscale-authkey }}
+
+    - name: Connect Tailscale (Linux / Windows)
+      if: inputs.connect-tailscale == 'true' && runner.os != 'macOS'
       uses: tailscale/github-action@v3
       with:
         authkey: ${{ inputs.tailscale-authkey }}
-        version: latest
+        version: 1.78.1
 
     - name: Fetch secrets from Infisical
       uses: Infisical/secrets-action@v1.0.12
