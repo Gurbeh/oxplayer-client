@@ -1,4 +1,4 @@
-import { SITE_ORIGIN } from "@/config/site";
+import { WEB_APP_ORIGIN, WEB_APP_ORIGIN_IRAN } from "@/config/site";
 
 export const GITHUB_REPO = "Gurbeh/oxplayer-client";
 
@@ -8,8 +8,11 @@ export const RELEASES_PAGE_URL = `https://github.com/${GITHUB_REPO}/releases/lat
 export const PLAY_STORE_ANDROID_URL =
   "https://play.google.com/store/apps/details?id=app.oxplayer";
 
-/** Live web app (deployed from release builds). */
-export const WEB_APP_URL = `${SITE_ORIGIN}/web/`;
+/** Live Flutter web app — global cohort. */
+export const WEB_APP_URL = `${WEB_APP_ORIGIN}/`;
+
+/** Live Flutter web app — Iran CDN.ir cohort. */
+export const WEB_APP_URL_IRAN = `${WEB_APP_ORIGIN_IRAN}/`;
 
 export type PlatformId = "Android" | "AndroidTV" | "iOS" | "macOS" | "Windows" | "Linux" | "Web";
 

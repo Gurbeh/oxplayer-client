@@ -1,7 +1,5 @@
-# Marketing site + Flutter web app on GitHub Pages.
-# Site: https://gurbeh.github.io/oxplayer-client/
-# Web app: https://oxplayer.app/web/ (custom domain; was /oxplayer-client/web/ on github.io only)
-# Privacy: https://gurbeh.github.io/oxplayer-client/privacy-policy.html
+# Marketing site on GitHub Pages: https://oxplayer.app/
+# Flutter web app: https://web.oxplayer.app (global) + https://web.oxplayer.ir (Iran CDN.ir)
 name: Deploy website (GitHub Pages)
 
 on:
@@ -63,27 +61,10 @@ jobs:
           npm run verify:export
           node scripts/patch-404-share.mjs
 
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          flutter-version-file: .fvmrc
-          cache: true
-
-      - run: flutter pub get
-
-      - uses: ./.github/actions/oxplayer-flutter-env
-
-      - name: Build Flutter web for /web/
-        run: |
-          flutter build web --release \
-            --base-href /web/ \
-            --no-web-resources-cdn \
-            --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
-
-      - name: Merge marketing site and web app
+      - name: Merge marketing site (web app lives on web.oxplayer.app)
         run: |
           mkdir -p website/out/web
-          cp -r build/web/. website/out/web/
+          cp website/public/web/index.html website/out/web/index.html
 
       - uses: actions/configure-pages@v4
 

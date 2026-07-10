@@ -3,7 +3,7 @@
 import Container from "@/components/ui/Container";
 import Heading from "@/components/ui/Heading";
 import Paragraph from "@/components/ui/Paragraph";
-import { SITE_ORIGIN } from "@/config/site";
+import { WEB_APP_ORIGIN } from "@/config/site";
 import PlatformDownloads from "@/features/home/PlatformDownloads";
 import clsx from "clsx";
 import { useEffect, useMemo } from "react";
@@ -51,7 +51,7 @@ export default function ShareLanding({ catalogId, mediaSourceId }: ShareLandingP
   if (mediaSourceId?.trim()) {
     detailParams.set("mediaSourceId", mediaSourceId.trim());
   }
-  const webAppUrl = `${SITE_ORIGIN}/web/#/details?${detailParams.toString()}`;
+  const webAppUrl = `${WEB_APP_ORIGIN}/#/details?${detailParams.toString()}`;
   const customSchemeUrl = `oxplayer:///share/${id}${mediaSourceQuery}`;
 
   // Custom scheme works for dev (app.oxplayer.dev) and prod (app.oxplayer) builds.

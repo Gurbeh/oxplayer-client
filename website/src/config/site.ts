@@ -1,5 +1,11 @@
-/** Production site origin (custom domain). */
+/** Production marketing site origin (custom domain). */
 export const SITE_ORIGIN = "https://oxplayer.app";
+
+/** Flutter web app — global (Cloudflare → Hetzner). */
+export const WEB_APP_ORIGIN = "https://web.oxplayer.app";
+
+/** Flutter web app — Iran (CDN.ir edge). */
+export const WEB_APP_ORIGIN_IRAN = "https://web.oxplayer.ir";
 
 /** Public asset path safe for static export + client hydration. */
 export function assetPath(path: string): string {

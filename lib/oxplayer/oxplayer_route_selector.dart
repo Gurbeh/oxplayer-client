@@ -131,6 +131,8 @@ abstract final class OxplayerRouteSelector {
 
   static bool _isOxplayerIranWebHost() {
     final host = Uri.base.host.toLowerCase();
-    return host == 'oxplayer.ir' || host == 'www.oxplayer.ir';
+    return host == 'oxplayer.ir' ||
+        host == 'www.oxplayer.ir' ||
+        host == 'web.oxplayer.ir';
   }
 }

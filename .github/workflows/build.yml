@@ -734,7 +734,7 @@ jobs:
       - name: Build web app
         run: |
           flutter build web --release \
-            --base-href /web/ \
+            --base-href / \
             --no-web-resources-cdn \
             --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
             --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
