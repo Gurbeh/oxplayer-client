@@ -16,6 +16,7 @@ import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_dashboard_empty_help.dart';
 import 'package:fladder/oxplayer/oxplayer_dashboard_skeleton.dart';
 import 'package:fladder/oxplayer/oxplayer_dashboard_watchlist.dart';
+import 'package:fladder/oxplayer/oxplayer_home_refresh.dart';
 import 'package:fladder/oxplayer/providers/ox_watchlist_dashboard.dart';
 import 'package:fladder/providers/dashboard_mode_provider.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
@@ -61,7 +62,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    if (OxplayerConfig.isEnabled) {
+    if (!OxplayerConfig.isEnabled) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         final homeBanner = ref.read(homeSettingsProvider).homeBanner != HomeBanner.hide;
@@ -84,16 +85,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Future<void> _refreshHome() async {
     if (!mounted) return;
-    await ref.read(userProvider.notifier).updateInformation();
-    if (!mounted) return;
     if (OxplayerConfig.isEnabled) {
       ref.invalidate(oxWatchlistDashboardProvider);
-      await Future.wait([
-        ref.read(viewsProvider.notifier).fetchViews(),
-        ref.read(dashboardProvider.notifier).fetchNextUpAndResume(),
-      ]);
+      await OxplayerHomeRefresh.refresh(ref);
       return;
     }
+    await ref.read(userProvider.notifier).updateInformation();
+    if (!mounted) return;
     await ref.read(viewsProvider.notifier).fetchViews();
     if (!mounted) return;
     await ref.read(dashboardProvider.notifier).fetchNextUpAndResume();

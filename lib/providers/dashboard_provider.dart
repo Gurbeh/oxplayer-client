@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fladder/jellyfin/jellyfin_open_api.enums.swagger.dart';
 import 'package:fladder/models/home_model.dart';
 import 'package:fladder/models/item_base_model.dart';
+import 'package:fladder/oxplayer/oxplayer_home_feed.dart';
 import 'package:fladder/models/items/channel_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
@@ -24,6 +25,8 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
   late final JellyService api = ref.read(jellyApiProvider);
 
   Future<void> fetchNextUpAndResume() async {
+    if (OxplayerConfig.isEnabled && state.loaded) return;
+
     Future<void> load() async {
       if (state.loading) return;
       state = state.copyWith(loading: true);
@@ -141,6 +144,15 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
     );
 
     return response.body?.items?.map((e) => ItemBaseModel.fromBaseDto(e, ref)).toList() ?? const [];
+  }
+
+  void applyOxHomeFeed(OxHomeFeedDashboard feed) {
+    state = state.copyWith(
+      nextUp: feed.nextUp,
+      resumeVideo: feed.resumeVideo,
+      loading: false,
+      loaded: true,
+    );
   }
 
   void clear() {

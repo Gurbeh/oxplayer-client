@@ -35,8 +35,8 @@ bool oxShowHomeBannerSkeleton({
   required bool carouselHasItems,
 }) {
   if (!OxplayerConfig.isEnabled || !homeBanner) return false;
-  if (dashboardLoading) return true;
-  return !dashboardLoaded && !carouselHasItems;
+  if (carouselHasItems) return false;
+  return dashboardLoading || !dashboardLoaded;
 }
 
 bool oxHomeDashboardDataReady({

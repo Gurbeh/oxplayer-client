@@ -5,6 +5,7 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/view_model.dart';
 import 'package:fladder/models/views_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_home_feed.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
@@ -42,6 +43,29 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
       if (state.loading) return null;
       state = state.copyWith(loading: true);
       final showAllCollections = ref.read(clientSettingsProvider.select((value) => value.showAllCollectionTypes));
+
+      if (OxplayerConfig.isEnabled) {
+        final feed = await OxplayerHomeFeed.fetch(ref);
+        if (feed != null) {
+          final filtered = feed.views
+              .where((v) => showAllCollections || enableCollectionTypes.contains(v.collectionType))
+              .toList();
+          final ordered = _applyLibraryOrdering(filtered);
+          state = state.copyWith(
+            views: ordered,
+            dashboardViews: _applyLibraryOrdering(
+              ordered
+                  .where((element) => !(ref.read(userProvider)?.latestItemsExcludes.contains(element.id) ?? true))
+                  .toList(),
+            ),
+            loading: false,
+            loaded: true,
+          );
+          OxplayerHomeFeed.applyDashboard(ref, feed.dashboard);
+          return state;
+        }
+      }
+
       final response = await api.usersUserIdViewsGet();
     final createdViews = response.body?.items?.map((e) => ViewModel.fromBodyDto(e, ref)).where((element) {
       return showAllCollections ? true : enableCollectionTypes.contains(element.collectionType);
