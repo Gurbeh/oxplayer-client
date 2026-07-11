@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_route.dart';
 import 'package:fladder/oxplayer/services/ox_github_update_service.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
@@ -356,7 +357,7 @@ abstract final class OxUpdateService {
   }
 
   static Future<String?> _fetchTargetVersionFromBackend() async {
-    final base = OxplayerEnv.apiBaseUrl;
+    final base = OxplayerRoute.apiBaseUrl ?? OxplayerEnv.apiBaseUrl;
     if (base == null) return null;
 
     try {

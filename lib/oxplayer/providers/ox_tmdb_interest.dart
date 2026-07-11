@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 
@@ -9,6 +10,7 @@ import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
 import 'package:fladder/oxplayer/providers/ox_watchlist_dashboard.dart';
 import 'package:fladder/providers/api_provider.dart';
+import 'package:fladder/providers/views_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/seerr/seerr_models.dart';
 
@@ -133,7 +135,9 @@ class OxTmdbInterest extends _$OxTmdbInterest {
       ),
     );
     if (watchlisted != null) {
+      oxResetWatchlistHomeFeedRef(ref);
       ref.invalidate(oxWatchlistDashboardProvider);
+      unawaited(ref.read(viewsProvider.notifier).fetchViews());
     }
     return true;
   }

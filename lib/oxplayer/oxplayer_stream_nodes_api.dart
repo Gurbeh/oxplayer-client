@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_route.dart';
+import 'package:fladder/oxplayer/oxplayer_route_env.dart';
+import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 
 class OxplayerStreamNode {
   const OxplayerStreamNode({required this.id, required this.url});
@@ -70,24 +72,37 @@ class OxplayerStreamNodesApi {
     }
 
     final uri = Uri.parse('$base/api/v1/stream/nodes');
+    final iranStreamVanity = OxplayerRouteEnv.iranStreamBaseUrl ?? '';
+    final iranCdnStream = iranStreamVanity.toLowerCase().contains('.cdn.ir');
     final response = await _client.get(
       uri,
       headers: {
         'Authorization': 'MediaBrowser Token="${accessToken.trim()}"',
         'Accept': 'application/json',
+        if (OxplayerRoute.active == OxplayerEdge.iran && iranCdnStream) 'X-Ox-Edge': 'iran',
         ...OxplayerRoute.connectHeaders,
       },
     );
 
     if (response.statusCode != 200) {
+      OxplayerStreamLog.event('stream_nodes_http', fields: {
+        'status': response.statusCode,
+        'base': base,
+        'cached': _cache?.length ?? 0,
+      });
       return _cache ?? const [];
     }
 
     final decoded = jsonDecode(response.body);
     if (decoded is! Map<String, dynamic>) {
+      OxplayerStreamLog.event('stream_nodes_parse', fields: {'reason': 'not_object'});
       return _cache ?? const [];
     }
     final nodes = OxplayerStreamNodesResponse.fromJson(decoded).nodes;
+    OxplayerStreamLog.event('stream_nodes_ok', fields: {
+      'count': nodes.length,
+      'hosts': nodes.map((n) => Uri.tryParse(n.url)?.host).whereType<String>().join(','),
+    });
     _cache = List<OxplayerStreamNode>.from(nodes);
     _cacheAt = now;
     return nodes;

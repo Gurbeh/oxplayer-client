@@ -1,4 +1,5 @@
 import 'package:fladder/oxplayer/oxplayer_route_env.dart';
+import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 
 /// Active CDN edge for API + stream traffic.
 enum OxplayerEdge {
@@ -78,6 +79,7 @@ abstract final class OxplayerRoute {
 
   /// Rewrites stream playback URLs for Iran edge pin or vanity stream host.
   static String rewriteStreamUri(String url) {
+    final before = url;
     url = OxplayerRouteEnv.rewriteLegacyIranUrl(url);
     if (_active != OxplayerEdge.iran) return url;
 
@@ -85,19 +87,20 @@ abstract final class OxplayerRoute {
     if (uri == null || !uri.hasAuthority) return url;
 
     var next = uri;
+    String? rewriteKind;
 
     final vanity = streamBaseUrl;
     if (vanity != null) {
       final vanityUri = Uri.tryParse(vanity);
       if (vanityUri != null &&
           vanityUri.hasAuthority &&
-          _isGlobalStreamNodeHost(uri.host) &&
+          _isStreamHost(uri.host) &&
           uri.host != vanityUri.host) {
         next = next.replace(
           scheme: vanityUri.scheme,
           host: vanityUri.host,
-          port: vanityUri.hasPort ? vanityUri.port : null,
         );
+        rewriteKind = 'iran_cdn_vanity';
       }
     }
 
@@ -106,10 +109,22 @@ abstract final class OxplayerRoute {
       final logicalHost = next.host;
       next = next.replace(host: pin);
       if (_isStreamHost(logicalHost)) {
+        OxplayerStreamLog.event('rewrite_stream', fields: {
+          'kind': rewriteKind ?? 'iran_edge_pin',
+          'before': OxplayerStreamLog.describeUrl(before),
+          'after': OxplayerStreamLog.describeUrl(next.toString()),
+        });
         return next.toString();
       }
     }
 
+    if (before != next.toString()) {
+      OxplayerStreamLog.event('rewrite_stream', fields: {
+        'kind': rewriteKind ?? 'iran_vanity',
+        'before': OxplayerStreamLog.describeUrl(before),
+        'after': OxplayerStreamLog.describeUrl(next.toString()),
+      });
+    }
     return next.toString();
   }
 

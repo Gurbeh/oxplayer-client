@@ -3,7 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/item_base_model.dart';
-import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/providers/api_provider.dart';
 
 part 'ox_watchlist_dashboard.g.dart';
@@ -28,9 +28,30 @@ class OxWatchlistDashboardData {
   static const empty = OxWatchlistDashboardData();
 }
 
+/// Watch Later rows parsed from GET /Users/{id}/Home/Feed (no extra HTTP on home).
+final oxWatchlistDashboardFeedProvider = StateProvider<OxWatchlistDashboardData?>((ref) => null);
+
+/// True after home feed (or fallback batch) applied watch-later data.
+final oxWatchlistFeedHandledProvider = StateProvider<bool>((ref) => false);
+
+void oxApplyWatchlistFromHomeFeedRef(Ref ref, OxWatchlistDashboardData data) {
+  ref.read(oxWatchlistDashboardFeedProvider.notifier).state = data;
+  ref.read(oxWatchlistFeedHandledProvider.notifier).state = true;
+}
+
+void oxResetWatchlistHomeFeed(WidgetRef ref) {
+  ref.read(oxWatchlistDashboardFeedProvider.notifier).state = null;
+  ref.read(oxWatchlistFeedHandledProvider.notifier).state = false;
+}
+
+void oxResetWatchlistHomeFeedRef(Ref ref) {
+  ref.read(oxWatchlistDashboardFeedProvider.notifier).state = null;
+  ref.read(oxWatchlistFeedHandledProvider.notifier).state = false;
+}
+
 @riverpod
 Future<OxWatchlistDashboardData> oxWatchlistDashboard(Ref ref) async {
-  if (!OxplayerEnv.isEnabled) return OxWatchlistDashboardData.empty;
+  if (!OxplayerConfig.isEnabled) return OxWatchlistDashboardData.empty;
 
   final api = ref.read(jellyApiProvider);
   final playlistsResponse = await api.usersUserIdItemsGet(

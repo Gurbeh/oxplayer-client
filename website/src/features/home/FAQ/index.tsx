@@ -43,8 +43,8 @@ const faqs: { q: string; a: ReactNode }[] = [
           web.oxplayer.app
         </a>{" "}
         (global) or{" "}
-        <a href="https://web.oxplayer.ir/" className="link link-primary">
-          web.oxplayer.ir
+        <a href="https://oxweb.449494.ir.cdn.ir/" className="link link-primary">
+          oxweb CDN (Iran)
         </a>{" "}
         (Iran).
       </>

@@ -9,6 +9,7 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/library_search/library_search_options.dart';
 import 'package:fladder/models/views_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_dashboard_skeleton.dart';
 import 'package:fladder/oxplayer/providers/ox_watchlist_dashboard.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/shared/media/poster_row.dart';
@@ -107,6 +108,30 @@ class OxplayerWatchLaterPosterRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (!OxplayerConfig.isEnabled) return const SizedBox.shrink();
 
+    if (ref.watch(oxWatchlistFeedHandledProvider)) {
+      final data = ref.watch(oxWatchlistDashboardFeedProvider) ?? OxWatchlistDashboardData.empty;
+      if (data.items.isEmpty) return const SizedBox.shrink();
+      final playlistsView = views.dashboardViews.firstWhereOrNull(
+        (view) => view.collectionType == CollectionType.playlists,
+      );
+      return PosterRow(
+        tvMode: tvMode,
+        contentPadding: contentPadding,
+        label: context.localized.oxplayerWatchlist,
+        onLabelClick: data.playlistId == null || playlistsView == null
+            ? null
+            : () {
+                context.router.push(
+                  LibrarySearchRoute(
+                    viewModelId: playlistsView.id,
+                    folderId: [data.playlistId!],
+                  ),
+                );
+              },
+        posters: data.items,
+      );
+    }
+
     final watchlistAsync = ref.watch(oxWatchlistDashboardProvider);
     return watchlistAsync.when(
       data: (data) {
@@ -131,7 +156,7 @@ class OxplayerWatchLaterPosterRow extends ConsumerWidget {
           posters: data.items,
         );
       },
-      loading: () => const SizedBox.shrink(),
+      loading: () => OxPosterRowSkeleton(contentPadding: contentPadding),
       error: (_, __) => const SizedBox.shrink(),
     );
   }

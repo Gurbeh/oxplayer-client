@@ -7,6 +7,7 @@ import 'package:fladder/models/home_model.dart';
 import 'package:fladder/models/settings/home_settings_model.dart';
 import 'package:fladder/models/views_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/providers/ox_watchlist_dashboard.dart';
 import 'package:fladder/oxplayer/widgets/ox_skeleton_box.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/theme.dart';
@@ -33,8 +34,10 @@ bool oxShowHomeBannerSkeleton({
   required bool dashboardLoading,
   required bool dashboardLoaded,
   required bool carouselHasItems,
+  required bool homeFullyReady,
 }) {
   if (!OxplayerConfig.isEnabled || !homeBanner) return false;
+  if (!homeFullyReady) return true;
   if (carouselHasItems) return false;
   return dashboardLoading || !dashboardLoaded;
 }
@@ -46,17 +49,20 @@ bool oxHomeDashboardDataReady({
   return views.loaded && !views.loading && dashboard.loaded && !dashboard.loading;
 }
 
-bool oxShowHomeListSkeleton({
-  required bool viewsLoading,
-  required bool viewsLoaded,
+/// Views + slider rails + watch later all settled — safe to reveal home rows without jump.
+bool oxHomeDashboardFullyReady({
+  required WidgetRef ref,
   required ViewsModel views,
+  required HomeModel dashboard,
 }) {
+  if (!oxHomeDashboardDataReady(views: views, dashboard: dashboard)) return false;
+  if (!OxplayerConfig.isEnabled) return true;
+  return ref.watch(oxWatchlistFeedHandledProvider);
+}
+
+bool oxShowHomeListSkeleton({required bool homeFullyReady}) {
   if (!OxplayerConfig.isEnabled) return false;
-  // Hide placeholder as soon as any shelf has data (incremental views publish).
-  if (oxHomeHasCachedLists(views)) return false;
-  // Empty library: fetch finished, nothing to show.
-  if (viewsLoaded && !viewsLoading) return false;
-  return true;
+  return !homeFullyReady;
 }
 
 /// Matches [HomeBannerWidget] / carousel / TV slider layout height to prevent home jump.

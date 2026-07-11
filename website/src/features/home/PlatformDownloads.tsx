@@ -1,7 +1,7 @@
 "use client";
 
 import Button from "@/components/ui/Button";
-import type { PlatformId } from "@/config/downloads";
+import { resolvePlatformUrl, type PlatformId } from "@/config/downloads";
 import { platforms, type Platform } from "@/config/platforms";
 import { useReleaseDownloadUrls } from "@/providers/ReleaseDownloadsProvider";
 import clsx from "clsx";
@@ -195,7 +195,9 @@ const PlatformDownloads = ({
     <div className={className}>
       <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
         {items.map((platform) => {
-          const href = urls[platform.id as PlatformId] ?? "#";
+          const href =
+            urls[platform.id as PlatformId] ??
+            resolvePlatformUrl(platform.id, []);
 
           return (
             <PlatformCard

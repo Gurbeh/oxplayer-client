@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
@@ -6,8 +8,10 @@ import 'package:fladder/models/view_model.dart';
 import 'package:fladder/models/views_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_home_feed.dart';
+import 'package:fladder/oxplayer/providers/ox_watchlist_dashboard.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/providers/api_provider.dart';
+import 'package:fladder/providers/dashboard_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
@@ -51,6 +55,8 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
               .where((v) => showAllCollections || enableCollectionTypes.contains(v.collectionType))
               .toList();
           final ordered = _applyLibraryOrdering(filtered);
+          OxplayerHomeFeed.applyWatchLater(ref, feed.watchLater);
+          OxplayerHomeFeed.applyDashboard(ref, feed.dashboard);
           state = state.copyWith(
             views: ordered,
             dashboardViews: _applyLibraryOrdering(
@@ -61,7 +67,6 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
             loading: false,
             loaded: true,
           );
-          OxplayerHomeFeed.applyDashboard(ref, feed.dashboard);
           return state;
         }
       }
@@ -78,15 +83,20 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
         newList = createdViews.toList();
         _publishViews(newList, loading: true);
 
-        await Future.wait(
-          newList.map((view) async {
-            final updated = await _fetchRecentlyAdded(view, showAllCollections: showAllCollections);
-            final index = newList.indexWhere((element) => element.id == updated.id);
-            if (index == -1) return;
-            newList[index] = updated;
-            _publishViews(newList, loading: true);
-          }),
-        );
+        OxWatchlistDashboardData watchLaterData = OxWatchlistDashboardData.empty;
+        await Future.wait([
+          Future.wait(
+            newList.map((view) async {
+              final updated = await _fetchRecentlyAdded(view, showAllCollections: showAllCollections);
+              final index = newList.indexWhere((element) => element.id == updated.id);
+              if (index == -1) return;
+              newList[index] = updated;
+            }),
+          ),
+          ref.read(oxWatchlistDashboardProvider.future).then((data) => watchLaterData = data),
+          ref.read(dashboardProvider.notifier).fetchNextUpAndResume(),
+        ]);
+        oxApplyWatchlistFromHomeFeedRef(ref, watchLaterData);
       } else {
         newList = await Future.wait(
           createdViews.map((e) => _fetchRecentlyAdded(e, showAllCollections: showAllCollections)),

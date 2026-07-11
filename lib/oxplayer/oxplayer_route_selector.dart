@@ -133,6 +133,7 @@ abstract final class OxplayerRouteSelector {
     final host = Uri.base.host.toLowerCase();
     return host == 'oxplayer.ir' ||
         host == 'www.oxplayer.ir' ||
-        host == 'web.oxplayer.ir';
+        host == 'web.oxplayer.ir' ||
+        host.endsWith('.ir.cdn.ir');
   }
 }

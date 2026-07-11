@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 
@@ -7,6 +8,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:fladder/oxplayer/oxplayer_catalog_http.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/providers/ox_watchlist_dashboard.dart';
+import 'package:fladder/providers/views_provider.dart';
 import 'package:fladder/providers/api_provider.dart';
 
 part 'ox_catalog_interest.g.dart';
@@ -100,7 +102,9 @@ class OxCatalogInterest extends _$OxCatalogInterest {
     }
     final current = state.value ?? OxCatalogInterestState.empty;
     state = AsyncData(current.copyWith(watchlisted: watchlisted));
+    oxResetWatchlistHomeFeedRef(ref);
     ref.invalidate(oxWatchlistDashboardProvider);
+    unawaited(ref.read(viewsProvider.notifier).fetchViews());
     return true;
   }
 

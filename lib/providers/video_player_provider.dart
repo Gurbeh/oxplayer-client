@@ -14,6 +14,7 @@ import 'package:fladder/models/playback/playback_queue_state.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_native_playback.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
+import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
@@ -159,6 +160,13 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     if (media != null) {
       if (OxplayerEnv.isEnabled) {
         OxplayerStreamNodeSession.reset();
+        OxplayerStreamLog.event('player_load', fields: {
+          'itemId': model.item.id,
+          'startPosition': OxplayerStreamLog.formatDuration(effectiveStartPosition),
+          'startMs': effectiveStartPosition.inMilliseconds,
+          'streamUrl': OxplayerStreamLog.describeUrl(media.url),
+          'streamHost': OxplayerStreamLog.describeHost(media.url),
+        });
       }
       ref.read(playBackModel.notifier).update((state) => newPlaybackModel);
       await state.loadVideo(model, effectiveStartPosition, true);
@@ -193,11 +201,12 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
       if (_isOxStreamRemuxUrl(media.url) || (OxplayerEnv.isEnabled && oxplayerIsOxStreamUrl(media.url))) {
         OxplayerStreamRepairBridge.register(ref, newPlaybackModel);
         final runtime = model.item.overview.runTime;
+        // Keep buffering=true until ExoPlayer reports STATE_READY — premature false
+        // triggers stuck-repair loops during CDN resume seek (UI position already advanced).
         mediaState.update((state) {
           var next = state.copyWith(
             position: effectiveStartPosition,
             lastPosition: effectiveStartPosition,
-            buffering: false,
           );
           if (!deferCatalogDuration && runtime != null) {
             next = next.copyWith(duration: runtime);

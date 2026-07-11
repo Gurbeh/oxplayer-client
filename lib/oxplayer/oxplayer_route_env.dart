@@ -43,7 +43,7 @@ abstract final class OxplayerRouteEnv {
 
   static String? get iranStreamBaseUrl =>
       _normalizeBase(_pick(['OXPLAYER_STREAM_BASE_IRAN', 'OXPLAYER_STREAM_BASE_ARVAN'], _cIranStream)) ??
-      'https://stream.oxplayer.ir';
+      'https://oxstream.256251.ir.cdn.ir';
 
   static String? get iranEdgeAddr {
     final t = _pick(['OXPLAYER_IRAN_EDGE_ADDR', 'OXPLAYER_ARVAN_EDGE_ADDR'], _cIranEdgeAddr);

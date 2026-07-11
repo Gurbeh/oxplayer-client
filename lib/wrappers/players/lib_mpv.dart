@@ -24,6 +24,9 @@ import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_stream_mpv.dart';
+import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
+import 'package:fladder/oxplayer/oxplayer_stream_http_auth.dart';
 import 'package:fladder/oxplayer/playback/ox_subtitle_font.dart';
 import 'package:fladder/providers/settings/subtitle_settings_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
@@ -288,10 +291,41 @@ class LibMPV extends BasePlayer {
     final isOxStreamTs = _isOxStreamRemuxUrl(url);
     // Progressive ox-stream TS: long-lived HTTP read — no 5s reopen on web or Android mpv.
     final progressiveOxStream = isOxStreamTs;
+    final oxStreamDirectMkv = oxplayerStreamDirectMkvUrl(url);
+    final oxStreamResumeSeek = oxplayerStreamMpvResumeSeekGrace(url, startPosition);
     final serverSeek = isOxStreamTs && url.contains('start=');
     _remuxTimelineBase = serverSeek ? startPosition : Duration.zero;
 
+    if (oxStreamResumeSeek) {
+      OxplayerStreamLog.event('mpv_resume_grace', fields: {
+        'startPosition': OxplayerStreamLog.formatDuration(startPosition),
+        'retryIntervalSec': oxplayerStreamMpvResumeRetryInterval.inSeconds,
+        'maxRetrySec': oxplayerStreamMpvResumeMaxRetry.inSeconds,
+      });
+    }
+
     await setStartPosition(serverSeek ? Duration.zero : startPosition);
+
+    url = OxplayerStreamHttpAuth.stripAndRegister(url);
+
+    if (OxplayerStreamHttpAuth.headerAuthEnabled) {
+      final bearer = OxplayerStreamHttpAuth.bearerFor(url);
+      if (bearer != null && bearer.isNotEmpty && _player?.platform is mpv.NativePlayer) {
+        await (_player?.platform as dynamic).setProperty(
+          'http-header-fields',
+          'Authorization: Bearer $bearer\r\n',
+        );
+        OxplayerStreamLog.event('stream_header_auth', fields: {
+          'host': OxplayerStreamLog.describeHost(url),
+        });
+      } else if (OxplayerEnv.isEnabled && oxplayerIsOxStreamUrl(url)) {
+        OxplayerStreamLog.event('stream_header_auth_missing', fields: {
+          'host': OxplayerStreamLog.describeHost(url),
+          'hasBearer': bearer != null && bearer.isNotEmpty,
+          'nativeMpv': _player?.platform is mpv.NativePlayer,
+        });
+      }
+    }
 
     await _player?.open(mpv.Media(url), play: play);
 
@@ -300,11 +334,14 @@ class LibMPV extends BasePlayer {
 
     // Progressive remux is a long-lived HTTP read; reopening every 5s kills ffmpeg mid-pipe.
     if (!progressiveOxStream) {
+      final retryEvery =
+          oxStreamResumeSeek ? oxplayerStreamMpvResumeRetryInterval : _currentRetryDuration;
+      final maxRetry = oxStreamResumeSeek ? oxplayerStreamMpvResumeMaxRetry : _maxRetryDuration;
       _retryTimer = RestartableTimer(
-        _currentRetryDuration,
+        retryEvery,
         () async {
           await Future.delayed(const Duration(milliseconds: 150));
-          if (DateTime.now().isAfter(_firstLoadAttempt.add(_maxRetryDuration))) {
+          if (DateTime.now().isAfter(_firstLoadAttempt.add(maxRetry))) {
             log("Max retry duration reached, stopping retries.");
             if (OxplayerEnv.isEnabled && oxplayerIsOxStreamUrl(url)) {
               final bridgeRef = OxplayerStreamRepairBridge.ref;
@@ -377,16 +414,19 @@ class LibMPV extends BasePlayer {
         subPlaying?.cancel();
       }
 
-      if (progressiveOxStream) {
+      if (progressiveOxStream || oxStreamDirectMkv) {
         subPlaying = _player?.stream.playing.listen((event) {
           if (event) {
-            if (serverSeek && startPosition > Duration.zero) {
+            if ((serverSeek || oxStreamDirectMkv) && startPosition > Duration.zero) {
               setState(lastState.update(position: startPosition, buffering: false));
             }
             onReady();
           }
         });
-        remuxReadyTimeout = Timer(const Duration(seconds: 12), onReady);
+        final readyTimeout = oxStreamResumeSeek
+            ? oxplayerStreamMpvResumeReadyTimeout
+            : oxplayerStreamMpvDefaultReadyTimeout;
+        remuxReadyTimeout = Timer(readyTimeout, onReady);
 
         // A reload (audio switch / seek) re-opens the element after an async PlaybackInfo
         // call, so the browser drops the user-gesture and won't auto-resume. Nudge play a
@@ -403,8 +443,11 @@ class LibMPV extends BasePlayer {
       }
 
       subBuffering = _player?.stream.buffering.listen((event) {
-        if (event == false && (_player?.state.duration ?? Duration.zero) > Duration.zero) {
-          onReady();
+        if (event == false) {
+          final dur = _player?.state.duration ?? Duration.zero;
+          if (dur > Duration.zero || oxStreamDirectMkv) {
+            onReady();
+          }
         }
       });
       subDuration = _player?.stream.duration.listen((event) {

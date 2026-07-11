@@ -48,6 +48,8 @@ Future<bool> oxplayerOpenNativePlayerEarly(WidgetRef ref, BuildContext context) 
 
 const stuckPlaybackCheckDelay = Duration(seconds: 12);
 const midStreamResumeGrace = Duration(seconds: 45);
+/// CDN resume seek (large startPosition) can take 30–60s before ExoPlayer reports progress.
+const startResumeSeekGrace = Duration(seconds: 90);
 const _maxStuckRetries = 3;
 
 /// Consecutive mid-stream frozen samples required before auto-repair (avoids pause/resume false positives).
@@ -166,6 +168,9 @@ Timer? oxplayerScheduleStuckPlaybackWatch({
   var exhaustedReported = false;
   Timer? timer;
   final tracker = OxplayerStuckPlaybackTracker(startPosition: startPosition);
+  final startResumeGraceUntil = startPosition > const Duration(seconds: 30)
+      ? DateTime.now().add(startResumeSeekGrace)
+      : null;
 
   Future<void> runStuckCheck() async {
     final sessionRef = OxplayerStreamRepairBridge.ref;
@@ -197,6 +202,10 @@ Timer? oxplayerScheduleStuckPlaybackWatch({
       startPosition: startPosition,
     );
 
+    final inStartResumeGrace =
+        startResumeGraceUntil != null && now.isBefore(startResumeGraceUntil);
+    final startStuckEffective = startStuck && !inStartResumeGrace;
+
     final frozenSample = !tracker.inResumeGrace(now) &&
         oxplayerPlaybackLooksFrozenMidStream(
           playing: playback.playing,
@@ -212,7 +221,7 @@ Timer? oxplayerScheduleStuckPlaybackWatch({
 
     tracker.advanceSample(position: playback.position, buffer: playback.buffer);
 
-    final stuck = startStuck || midStreamFrozen;
+    final stuck = startStuckEffective || midStreamFrozen;
     if (!stuck) {
       retriesUsed = 0;
       telemetrySentForIncident = false;

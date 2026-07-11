@@ -8,6 +8,8 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/view_model.dart';
 import 'package:fladder/oxplayer/oxplayer_catalog_http.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_route.dart';
+import 'package:fladder/oxplayer/providers/ox_watchlist_dashboard.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 
@@ -22,23 +24,25 @@ class OxHomeFeedDashboard {
   final List<ItemBaseModel> resumeVideo;
 }
 
-/// Parsed home feed (views + shelves + slider rails).
+/// Parsed home feed (views + shelves + slider rails + watch later).
 class OxHomeFeedResult {
   const OxHomeFeedResult({
     required this.views,
     required this.dashboard,
+    required this.watchLater,
   });
 
   final List<ViewModel> views;
   final OxHomeFeedDashboard dashboard;
+  final OxWatchlistDashboardData watchLater;
 }
 
 abstract final class OxplayerHomeFeed {
   static const _feedLimit = 16;
 
-  /// One HTTP round-trip for views, latest shelves, next up, and continue watching.
+  /// One HTTP round-trip for views, latest shelves, next up, continue watching, and watch later.
   static Future<OxHomeFeedResult?> fetch(Ref ref) async {
-    final base = OxplayerEnv.apiBaseUrl?.trim();
+    final base = (OxplayerRoute.apiBaseUrl ?? OxplayerEnv.apiBaseUrl)?.trim();
     final userId = ref.read(userProvider)?.id;
     if (base == null || base.isEmpty || userId == null || userId.isEmpty) {
       return null;
@@ -95,11 +99,17 @@ abstract final class OxplayerHomeFeed {
 
     final nextUp = _itemsFromSection(body['NextUp'], ref);
     final resume = _itemsFromSection(body['Resume'], ref);
+    final watchLater = _watchLaterFromBody(body['WatchLater'], ref);
 
     return OxHomeFeedResult(
       views: views,
       dashboard: OxHomeFeedDashboard(nextUp: nextUp, resumeVideo: resume),
+      watchLater: watchLater,
     );
+  }
+
+  static void applyWatchLater(Ref ref, OxWatchlistDashboardData watchLater) {
+    oxApplyWatchlistFromHomeFeedRef(ref, watchLater);
   }
 
   static void applyDashboard(Ref ref, OxHomeFeedDashboard dashboard) {
@@ -114,5 +124,15 @@ abstract final class OxplayerHomeFeed {
         .whereType<Map<String, dynamic>>()
         .map((item) => ItemBaseModel.fromBaseDto(BaseItemDto.fromJson(item), ref))
         .toList();
+  }
+
+  static OxWatchlistDashboardData _watchLaterFromBody(Object? section, Ref ref) {
+    if (section is! Map<String, dynamic>) return OxWatchlistDashboardData.empty;
+    final playlistId = section['PlaylistId']?.toString();
+    final items = _itemsFromSection(section, ref);
+    if (items.isEmpty && (playlistId == null || playlistId.isEmpty)) {
+      return OxWatchlistDashboardData.empty;
+    }
+    return OxWatchlistDashboardData(playlistId: playlistId, items: items);
   }
 }

@@ -32,6 +32,7 @@ import 'package:fladder/models/syncing/sync_item.dart';
 import 'package:fladder/models/video_stream_model.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_media_source.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
 import 'package:fladder/profiles/default_profile.dart';
 import 'package:fladder/providers/api_provider.dart';
@@ -284,6 +285,13 @@ class PlaybackModelHelper {
 
       final actualStartPosition = startPosition ?? fullItem.userData.playBackPosition;
 
+      OxplayerStreamLog.event('playback_model', fields: {
+        'itemId': firstItemToPlay.id,
+        'resumeTicks': fullItem.userData.playbackPositionTicks,
+        'requestedStart': OxplayerStreamLog.formatDuration(startPosition),
+        'actualStart': OxplayerStreamLog.formatDuration(actualStartPosition),
+      });
+
       final options = {
         PlaybackType.directStream,
         PlaybackType.transcode,
@@ -449,6 +457,14 @@ class PlaybackModelHelper {
       final resolvedMediaPath = mediaPath != null && OxplayerEnv.isEnabled
           ? await oxplayerResolveStreamPlaybackUrl(ref, mediaPath)
           : mediaPath;
+
+      OxplayerStreamLog.event('playback_url', fields: {
+        'itemId': item.id,
+        'apiMediaPath': OxplayerStreamLog.describeUrl(mediaPath),
+        'resolvedUrl': OxplayerStreamLog.describeUrl(resolvedMediaPath),
+        'startPosition': OxplayerStreamLog.formatDuration(startPosition),
+        'startTimeTicks': startPosition?.toRuntimeTicks,
+      });
 
       if (type == PlaybackType.tv && resolvedMediaPath != null) {
         final tvModel = TvPlaybackModel(

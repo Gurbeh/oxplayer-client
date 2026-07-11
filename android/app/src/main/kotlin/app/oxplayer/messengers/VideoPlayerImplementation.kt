@@ -5,6 +5,7 @@ import PlayableData
 import SubtitleSettings
 import TVGuideModel
 import VideoPlayerApi
+import android.net.Uri
 import android.util.Log
 import android.os.Handler
 import android.os.Looper
@@ -33,6 +34,18 @@ import app.oxplayer.utility.setInternalSubtitleTrack
 import kotlin.time.Duration.Companion.seconds
 
 private const val OX_NATIVE_PLY_TAG = "OX_NATIVE_PLY"
+private const val OX_STREAM_TAG = "OX_STREAM"
+
+private fun oxStreamLog(message: String) {
+    Log.i(OX_STREAM_TAG, message)
+    Log.d(OX_NATIVE_PLY_TAG, message)
+}
+
+private fun redactStreamUrl(url: String): String {
+    val uri = Uri.parse(url)
+    val path = uri.encodedPath ?: uri.path ?: ""
+    return "${uri.scheme}://${uri.host}$path?…"
+}
 
 class VideoPlayerImplementation(
 ) : VideoPlayerApi {
@@ -49,6 +62,31 @@ class VideoPlayerImplementation(
 
     /** One-shot listener: Ox loopback + resume must load from t=0 first, then seek (see [open]). */
     private var loopbackResumeListener: Player.Listener? = null
+
+    private var initialPositionLogPosted = false
+
+    private fun scheduleInitialPositionLog(exo: ExoPlayer, requestedStartMs: Long) {
+        if (initialPositionLogPosted) return
+        initialPositionLogPosted = true
+        val checkpoints = longArrayOf(3_000L, 12_000L, 30_000L)
+        for (delayMs in checkpoints) {
+            Handler(Looper.getMainLooper()).postDelayed({
+                if (exo.mediaItemCount == 0) return@postDelayed
+                val state = when (exo.playbackState) {
+                    Player.STATE_IDLE -> "IDLE"
+                    Player.STATE_BUFFERING -> "BUFFERING"
+                    Player.STATE_READY -> "READY"
+                    Player.STATE_ENDED -> "ENDED"
+                    else -> "?"
+                }
+                oxStreamLog(
+                    "phase=native_position_check delayMs=$delayMs state=$state " +
+                        "requestedStartMs=$requestedStartMs actualMs=${exo.currentPosition} " +
+                        "bufferedMs=${exo.bufferedPosition} durationMs=${exo.duration}",
+                )
+            }, delayMs)
+        }
+    }
 
     /** When [open] runs before ExoPlayer is bound, retry with this URL after [init]. */
     private var pendingOpenUrl: String? = null
@@ -83,6 +121,7 @@ class VideoPlayerImplementation(
         savedPositionMs = 0L
         wasPlayingBeforeBackground = false
         pendingOpenUrl = null
+        initialPositionLogPosted = false
     }
 
     private fun publishPlaybackState(exo: ExoPlayer) {
@@ -116,6 +155,12 @@ class VideoPlayerImplementation(
                     "playbackType=${playableData.mediaInfo.playbackType} startMs=${playableData.startPosition} " +
                     "urlLen=${playableData.url.length} audioTracks=${playableData.audioTracks.size} " +
                     "subtitleTracks=${playableData.subtitleTracks.size}",
+            )
+            oxStreamLog(
+                "phase=native_playable itemId=${playableData.currentItem?.id} " +
+                    "startMs=${playableData.startPosition} " +
+                    "host=${Uri.parse(playableData.url).host} " +
+                    "url=${redactStreamUrl(playableData.url)}",
             )
             playbackData.value = playableData
             callback(Result.success(true))
@@ -197,6 +242,9 @@ class VideoPlayerImplementation(
                 )
                 val isOxLoopback =
                     url.contains("127.0.0.1", ignoreCase = true) && url.contains("/stream", ignoreCase = true)
+                val isOxStreamCdn = url.contains("/v/", ignoreCase = true) ||
+                    url.contains("oxstream", ignoreCase = true) ||
+                    url.contains("cdn.ir", ignoreCase = true)
                 val subTitles = playbackData.value?.subtitleTracks ?: listOf()
                 val externalSubs = subTitles.filter { it.external && !it.url.isNullOrEmpty() }
                 Log.d(
@@ -244,6 +292,10 @@ class VideoPlayerImplementation(
                         OX_NATIVE_PLY_TAG,
                         "open Ox loopback: resumeMs=$startPosition → prepare at 0 then seek on STATE_READY",
                     )
+                    oxStreamLog(
+                        "phase=native_open deferSeek=true resumeMs=$startPosition " +
+                            "host=${Uri.parse(url).host} isHls=$isHls isOxStreamCdn=$isOxStreamCdn",
+                    )
                     val resumeMs = startPosition
                     val shouldPlay = play
                     val listener = object : Player.Listener {
@@ -258,6 +310,10 @@ class VideoPlayerImplementation(
                                 Log.e(OX_NATIVE_PLY_TAG, "Ox loopback deferred seek failed", t)
                             }
                             exo.playWhenReady = shouldPlay
+                            oxStreamLog(
+                                "phase=native_seek_done resumeMs=$resumeMs " +
+                                    "actualMs=${exo.currentPosition} bufferedMs=${exo.bufferedPosition}",
+                            )
                             Log.d(OX_NATIVE_PLY_TAG, "open deferred seek done resumeMs=$resumeMs play=$shouldPlay")
                         }
 
@@ -276,10 +332,16 @@ class VideoPlayerImplementation(
                     exo.setMediaItem(mediaItem, startPosition)
                     exo.prepare()
                     exo.playWhenReady = play
+                    oxStreamLog(
+                        "phase=native_open deferSeek=false startMs=$startPosition " +
+                            "host=${Uri.parse(url).host} isHls=$isHls isOxStreamCdn=$isOxStreamCdn " +
+                            "url=${redactStreamUrl(url)}",
+                    )
                 }
                 Log.d(OX_NATIVE_PLY_TAG, "open prepared playWhenReady=$play startPositionMs=$startPosition deferSeek=$deferSeekForLoopbackResume")
                 callback(Result.success(true))
                 subsInitialized = false
+                scheduleInitialPositionLog(exo, startPosition)
                 return@postDelayed
             } catch (e: Exception) {
                 Log.e(OX_NATIVE_PLY_TAG, "open exception", e)

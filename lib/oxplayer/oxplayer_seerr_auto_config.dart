@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_route.dart';
+import 'package:fladder/oxplayer/oxplayer_session.dart';
 import 'package:fladder/providers/user_provider.dart';
 
 /// Retry on each home mount until configured (covers VIP upgrades + transient 503).
@@ -22,17 +24,19 @@ Future<void> oxplayerConfigureSeerrFromServer(WidgetRef ref) async {
   final token = account?.credentials.token.trim() ?? '';
   if (token.isEmpty) return;
 
-  final base = OxplayerEnv.apiBaseUrl;
+  final base = OxplayerRoute.apiBaseUrl ?? OxplayerEnv.apiBaseUrl;
   if (base == null) return;
 
   try {
-    final response = await http.get(
-      Uri.parse('$base/me/seerr'),
-      headers: {
-        'Authorization': 'MediaBrowser Token="$token"',
-        'Accept': 'application/json',
-      },
-    );
+    final response = await http
+        .get(
+          Uri.parse('$base/me/seerr'),
+          headers: {
+            'Authorization': 'MediaBrowser Token="$token"',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(kOxSessionRestoreTimeout);
 
     if (response.statusCode == 404) {
       ref.read(userProvider.notifier).logoutSeerr();
@@ -52,6 +56,8 @@ Future<void> oxplayerConfigureSeerrFromServer(WidgetRef ref) async {
 
     final proxyBase = proxyPath.startsWith('http') ? proxyPath : '$base$proxyPath';
     ref.read(userProvider.notifier).setSeerrProxyCredentials(proxyBase: proxyBase);
+  } on TimeoutException {
+    // Transient — [oxplayerMaybeConfigureSeerr] retries on next home mount.
   } catch (_) {
     // Transient failure — [oxplayerMaybeConfigureSeerr] will retry on next home mount.
   }
