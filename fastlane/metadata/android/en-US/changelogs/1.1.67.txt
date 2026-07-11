@@ -1,0 +1,1 @@
+Iran hybrid: Arvan API, CDN.ir stream, header auth, and resume grace.
