@@ -349,6 +349,10 @@ class SeerrService {
     return results.map(_posterFromDiscoverItem).whereType<SeerrDashboardPosterModel>().toList(growable: false);
   }
 
+  List<SeerrDashboardPosterModel> postersFromDiscoverResults(List<SeerrDiscoverItem> results) {
+    return results.map(_posterFromDiscoverItem).whereType<SeerrDashboardPosterModel>().toList(growable: false);
+  }
+
   /// OX: catalog titles in the OX database (prefer TMDB trending order when cached).
   Future<List<SeerrDashboardPosterModel>> discoverCatalogTrending({
     int? take,

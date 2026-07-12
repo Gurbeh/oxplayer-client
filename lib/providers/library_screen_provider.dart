@@ -12,6 +12,7 @@ import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/recommended_model.dart';
 import 'package:fladder/models/view_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_library_feed.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
@@ -146,6 +147,13 @@ class LibraryScreen extends _$LibraryScreen {
   }
 
   Future<List<RecommendedModel>> _fetchRecommendations(ViewModel viewModel) async {
+    if (OxplayerConfig.isEnabled) {
+      final feedShelves = await OxplayerLibraryFeed.fetchShelves(ref, viewModel);
+      if (feedShelves != null) {
+        return feedShelves;
+      }
+    }
+
     final collectionType = viewModel.collectionType;
     final fetchContinue = collectionType == CollectionType.movies ||
         collectionType == CollectionType.tvshows ||

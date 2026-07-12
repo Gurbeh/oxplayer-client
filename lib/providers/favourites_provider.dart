@@ -5,6 +5,8 @@ import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/favourites_model.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/view_model.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_favourites_feed.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/views_provider.dart';
 import 'package:fladder/util/item_base_model/item_base_model_extensions.dart';
@@ -24,6 +26,19 @@ class FavouritesNotifier extends StateNotifier<FavouritesModel> {
     if (state.loading) return;
 
     state = state.copyWith(loading: true);
+
+    if (OxplayerConfig.isEnabled) {
+      final feed = await OxplayerFavoritesFeed.fetch(ref);
+      if (feed != null) {
+        state = state.copyWith(
+          favourites: feed.favourites,
+          people: feed.people,
+          loading: false,
+        );
+        return;
+      }
+    }
+
     await _fetchMoviesAndSeries();
     await _fetchPeople();
     state = state.copyWith(loading: false);

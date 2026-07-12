@@ -22,6 +22,7 @@ import 'package:fladder/models/library_search/library_search_model.dart';
 import 'package:fladder/models/library_search/library_search_options.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/view_model.dart';
+import 'package:fladder/oxplayer/oxplayer_library_search.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/library_filters_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
@@ -48,7 +49,7 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
 
   final Ref ref;
 
-  int get pageSize => ref.read(clientSettingsProvider).libraryPageSize ?? 500;
+  int get pageSize => oxLibrarySearchPageSize(ref.read(clientSettingsProvider).libraryPageSize ?? 500);
 
   LibraryFiltersProvider get filterProvider => libraryFiltersProvider(state.views.included.map((e) => e.id).toList());
 
@@ -76,7 +77,11 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
       }
     }
 
-    await loadFilters();
+    if (!oxLibrarySearchDeferFilters(state)) {
+      await loadFilters();
+    } else {
+      state = oxLibrarySearchPrimeCollectionTypes(state);
+    }
 
     if (!wasInitialized) {
       wasInitialized = true;
@@ -181,6 +186,21 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
     String? viewModelId,
     LibraryFilterModel filters,
   ) async {
+    final cachedViews = oxLibrarySearchViewsFromCache(ref, viewModelId);
+    if (cachedViews != null) {
+      state = state.copyWith(views: cachedViews);
+      state = oxLibrarySearchPrimeCollectionTypes(state);
+      final findFavouriteFilter = ref
+          .read(libraryFiltersProvider(cachedViews.included.map((e) => e.id).toList()))
+          .firstWhereOrNull((element) => element.isFavourite);
+      if (findFavouriteFilter != null) {
+        loadModel(findFavouriteFilter.filter);
+      } else {
+        loadModel(filters);
+      }
+      return;
+    }
+
     final response = await api.usersUserIdViewsGet(includeHidden: false);
     final createdViews = response.body?.items?.map((e) => ViewModel.fromBodyDto(e, ref));
     Map<ViewModel, bool> mappedModels =
@@ -195,6 +215,7 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
     state = state.copyWith(
       views: views,
     );
+    state = oxLibrarySearchPrimeCollectionTypes(state);
 
     final findFavouriteFilter = ref
         .read(libraryFiltersProvider(views.included.map((e) => e.id).toList()))
@@ -223,6 +244,10 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
   Future<void> loadFilters() async {
     if (loadedFilters == true) return;
     loadedFilters = true;
+    if (oxLibrarySearchDeferFilters(state)) {
+      state = oxLibrarySearchPrimeCollectionTypes(state);
+      return;
+    }
     final enabledCollections = state.views.included.map((e) => e.collectionType.itemKinds).expand((element) => element);
     final mappedList = await Future.wait(state.views.included.map((viewModel) => _loadFilters(viewModel)));
     final studios = (await Future.wait(state.views.included.map((viewModel) => _loadStudios(viewModel))))
@@ -273,6 +298,8 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
       int? startIndex,
       String? searchTerm}) async {
     final searchString = searchTerm ?? (state.searchQuery.isNotEmpty ? state.searchQuery : null);
+    final collectionType = viewModel?.collectionType ?? state.views.included.firstOrNull?.collectionType;
+    final oxFields = oxLibrarySearchListFields(collectionType);
     final response = await api.itemsGet(
       parentId: viewModel?.id ?? id,
       searchTerm: searchString,
@@ -288,18 +315,20 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
       studioIds: state.filters.studios.included.map((e) => e.id).toList(),
       sortBy: shuffle == true ? [ItemSortBy.random] : state.filters.sortingOption.toSortBy,
       sortOrder: [state.filters.sortOrder.sortOrder],
-      fields: {
-        ItemFields.genres,
-        ItemFields.parentid,
-        ItemFields.tags,
-        ItemFields.datecreated,
-        ItemFields.datelastmediaadded,
-        ItemFields.overview,
-        ItemFields.originaltitle,
-        ItemFields.customrating,
-        ItemFields.primaryimageaspectratio,
-        if (viewModel?.collectionType == CollectionType.tvshows) ItemFields.childcount,
-      }.toList(),
+      fields: oxFields.isNotEmpty
+          ? oxFields
+          : {
+              ItemFields.genres,
+              ItemFields.parentid,
+              ItemFields.tags,
+              ItemFields.datecreated,
+              ItemFields.datelastmediaadded,
+              ItemFields.overview,
+              ItemFields.originaltitle,
+              ItemFields.customrating,
+              ItemFields.primaryimageaspectratio,
+              if (collectionType == CollectionType.tvshows) ItemFields.childcount,
+            }.toList(),
       filters: [
         ...state.filters.itemFilters.included,
         if (state.filters.favourites == true) ItemFilter.isfavorite,

@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
 import 'package:fladder/models/seerr/seerr_item_models.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_seerr_feed.dart';
 import 'package:fladder/providers/seerr_api_provider.dart';
 import 'package:fladder/providers/seerr_service_provider.dart';
 import 'package:fladder/providers/seerr_user_provider.dart';
@@ -22,6 +23,16 @@ class SeerrDashboard extends _$SeerrDashboard {
 
   Future<void> fetchDashboard() async {
     await ref.read(seerrUserProvider.notifier).refreshUser();
+
+    if (OxplayerEnv.isEnabled) {
+      final feed = await OxplayerSeerrFeed.fetch(ref);
+      if (feed != null) {
+        applyOxFeed(feed);
+        await fetchRecentRequests();
+        return;
+      }
+    }
+
     final fetches = <Future<void>>[
       fetchRecentlyAdded(),
       fetchRecentRequests(),
@@ -35,6 +46,19 @@ class SeerrDashboard extends _$SeerrDashboard {
       fetches.add(fetchCatalogAvailable());
     }
     await Future.wait(fetches);
+  }
+
+  void applyOxFeed(OxSeerrFeedResult feed) {
+    state = state.copyWith(
+      trending: feed.trending,
+      popularMovies: feed.popularMovies,
+      popularSeries: feed.popularSeries,
+      expectedMovies: feed.expectedMovies,
+      expectedSeries: feed.expectedSeries,
+      catalogAvailableMovies: feed.catalogAvailableMovies,
+      catalogAvailableSeries: feed.catalogAvailableSeries,
+      recentlyAdded: feed.recentlyAdded,
+    );
   }
 
   Future<void> fetchRecentlyAdded() async {
@@ -54,6 +78,14 @@ class SeerrDashboard extends _$SeerrDashboard {
 
       if (!response.isSuccessful || response.body == null) {
         return;
+      }
+
+      if (OxplayerEnv.isEnabled) {
+        final posters = await OxplayerSeerrFeed.fetchRecentlyAddedPosters(ref);
+        if (posters != null) {
+          state = state.copyWith(recentlyAdded: posters);
+          return;
+        }
       }
 
       final media = response.body?.results ?? const <SeerrMedia>[];
