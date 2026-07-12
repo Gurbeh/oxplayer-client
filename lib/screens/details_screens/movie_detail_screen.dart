@@ -12,6 +12,7 @@ import 'package:fladder/oxplayer/oxplayer_detail_loading.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/widgets/ox_movie_boxset_row.dart';
 import 'package:fladder/oxplayer/widgets/ox_movie_request_button.dart';
 import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
@@ -232,6 +233,11 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                       posters: details.related,
                       contentPadding: padding,
                       label: detailsContext.localized.related,
+                    ),
+                  if (OxplayerConfig.isEnabled)
+                    OxMovieBoxSetRow(
+                      itemId: widget.item.id,
+                      contentPadding: padding,
                     ),
                   if (details.seerrRecommended.isNotEmpty)
                     SeerrPosterRow(
