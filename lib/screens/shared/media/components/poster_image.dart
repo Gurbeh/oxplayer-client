@@ -14,6 +14,7 @@ import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/fladder_image.dart';
 import 'package:fladder/util/focus_provider.dart';
 import 'package:fladder/oxplayer/oxplayer_catalog_interest_status.dart';
+import 'package:fladder/oxplayer/ox_boxset_availability_overlay.dart';
 import 'package:fladder/util/item_base_model/item_base_model_extensions.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/refresh_state.dart';
@@ -95,6 +96,7 @@ class PosterImage extends ConsumerWidget {
           ),
         ),
         overlays: [
+          if (oxCatalogAvailabilityOverlay(poster) case final overlay?) overlay,
           if (showSyncStatus)
             Align(
               alignment: Alignment.topRight,
