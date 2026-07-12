@@ -1,0 +1,1 @@
+Android TV image caps and Sentry navigation breadcrumbs for faster browsing stability.
