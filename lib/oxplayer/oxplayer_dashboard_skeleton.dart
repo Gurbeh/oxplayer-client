@@ -35,8 +35,11 @@ bool oxShowHomeBannerSkeleton({
   required bool dashboardLoaded,
   required bool carouselHasItems,
   required bool homeFullyReady,
+  bool sliderCached = false,
+  bool homeCached = false,
 }) {
   if (!OxplayerConfig.isEnabled || !homeBanner) return false;
+  if (carouselHasItems || sliderCached || homeCached) return false;
   if (!homeFullyReady) return true;
   if (carouselHasItems) return false;
   return dashboardLoading || !dashboardLoaded;
@@ -60,9 +63,22 @@ bool oxHomeDashboardFullyReady({
   return ref.watch(oxWatchlistFeedHandledProvider);
 }
 
-bool oxShowHomeListSkeleton({required bool homeFullyReady}) {
+bool oxShowHomeListSkeleton({
+  required bool homeFullyReady,
+  bool homeCached = false,
+}) {
   if (!OxplayerConfig.isEnabled) return false;
+  if (homeCached) return false;
   return !homeFullyReady;
+}
+
+/// True when home shelves / slider may render (stale data OK while refreshing).
+bool oxHomeDashboardShowContent({
+  required bool homeFullyReady,
+  required bool homeCached,
+}) {
+  if (!OxplayerConfig.isEnabled) return homeFullyReady;
+  return homeFullyReady || homeCached;
 }
 
 /// Matches [HomeBannerWidget] / carousel / TV slider layout height to prevent home jump.

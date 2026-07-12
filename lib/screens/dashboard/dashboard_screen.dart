@@ -127,19 +127,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final sliderCached = oxHomeHasCachedSliderData(dashboardData);
     final homeFullyReady = !OxplayerConfig.isEnabled ||
         oxHomeDashboardFullyReady(ref: ref, views: views, dashboard: dashboardData);
+    final homeShowContent = oxHomeDashboardShowContent(
+      homeFullyReady: homeFullyReady,
+      homeCached: homeCached,
+    );
     final showBannerSkeleton = oxShowHomeBannerSkeleton(
       homeBanner: homeBanner,
       dashboardLoading: dashboardData.loading,
       dashboardLoaded: dashboardData.loaded,
       carouselHasItems: homeCarouselItems.isNotEmpty,
       homeFullyReady: homeFullyReady,
+      sliderCached: sliderCached,
+      homeCached: homeCached,
     );
     final showBanner = homeBanner &&
-        homeFullyReady &&
-        dashboardData.loaded &&
-        !dashboardData.loading &&
+        homeShowContent &&
+        (sliderCached || (dashboardData.loaded && !dashboardData.loading)) &&
         homeCarouselItems.isNotEmpty;
-    final showListSkeleton = oxShowHomeListSkeleton(homeFullyReady: homeFullyReady);
+    final showListSkeleton = oxShowHomeListSkeleton(
+      homeFullyReady: homeFullyReady,
+      homeCached: homeCached,
+    );
 
     return NestedScaffold(
       background: ValueListenableBuilder<ItemBaseModel?>(
@@ -220,7 +228,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   child: OxPosterRowSkeleton(contentPadding: padding),
                 ),
               ],
-              if (homeFullyReady)
+              if (homeShowContent)
                 ...[
                   if (tvChannels.isNotEmpty)
                     PosterRow(

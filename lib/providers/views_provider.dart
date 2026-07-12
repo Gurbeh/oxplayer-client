@@ -42,10 +42,13 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
 
   late final JellyService api = ref.read(jellyApiProvider);
 
-  Future<ViewsModel?> fetchViews() async {
+  Future<ViewsModel?> fetchViews({bool background = false}) async {
     Future<ViewsModel?> load() async {
       if (state.loading) return null;
-      state = state.copyWith(loading: true);
+      final staleRefresh = background && OxplayerConfig.isEnabled && state.loaded;
+      if (!staleRefresh) {
+        state = state.copyWith(loading: true);
+      }
       final showAllCollections = ref.read(clientSettingsProvider.select((value) => value.showAllCollectionTypes));
 
       if (OxplayerConfig.isEnabled) {

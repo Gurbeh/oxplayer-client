@@ -132,6 +132,29 @@ class OxplayerWatchLaterPosterRow extends ConsumerWidget {
       );
     }
 
+    final cachedFeed = ref.watch(oxWatchlistDashboardFeedProvider);
+    if (cachedFeed != null && cachedFeed.items.isNotEmpty) {
+      final playlistsView = views.dashboardViews.firstWhereOrNull(
+        (view) => view.collectionType == CollectionType.playlists,
+      );
+      return PosterRow(
+        tvMode: tvMode,
+        contentPadding: contentPadding,
+        label: context.localized.oxplayerWatchlist,
+        onLabelClick: cachedFeed.playlistId == null || playlistsView == null
+            ? null
+            : () {
+                context.router.push(
+                  LibrarySearchRoute(
+                    viewModelId: playlistsView.id,
+                    folderId: [cachedFeed.playlistId!],
+                  ),
+                );
+              },
+        posters: cachedFeed.items,
+      );
+    }
+
     final watchlistAsync = ref.watch(oxWatchlistDashboardProvider);
     return watchlistAsync.when(
       data: (data) {

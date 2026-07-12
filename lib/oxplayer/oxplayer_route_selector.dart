@@ -35,6 +35,14 @@ abstract final class OxplayerRouteSelector {
       return;
     }
 
+    final global = OxplayerRouteEnv.globalApiBaseUrl;
+
+    // Local dev API (localhost / LAN) — never dual-edge probe into production Iran.
+    if (global != null && _isLocalDevApiUrl(global)) {
+      OxplayerRoute.setActive(OxplayerEdge.global);
+      return;
+    }
+
     if (!OxplayerRouteEnv.hasIranRoute) {
       OxplayerRoute.setActive(OxplayerEdge.global);
       return;
@@ -43,8 +51,6 @@ abstract final class OxplayerRouteSelector {
     final prefs = await SharedPreferences.getInstance();
     final store = OxplayerRouteStore(prefs);
     final stored = store.readEdge();
-
-    final global = OxplayerRouteEnv.globalApiBaseUrl;
     final iran = OxplayerRouteEnv.iranApiBaseUrl;
     if (global == null && iran == null) return;
 
@@ -127,6 +133,24 @@ abstract final class OxplayerRouteSelector {
       default:
         return false;
     }
+  }
+
+  static bool _isLocalDevApiUrl(String raw) {
+    final uri = Uri.tryParse(raw.trim());
+    if (uri == null || uri.host.isEmpty) return false;
+    final h = uri.host.toLowerCase();
+    if (h == 'localhost' || h == '127.0.0.1' || h == '::1' || h == '10.0.2.2') {
+      return true;
+    }
+    final parts = h.split('.');
+    if (parts.length != 4) return false;
+    final octets = parts.map(int.tryParse).toList();
+    if (octets.any((n) => n == null)) return false;
+    final a = octets[0]!;
+    final b = octets[1]!;
+    if (a == 10) return true;
+    if (a == 192 && b == 168) return true;
+    return a == 172 && b >= 16 && b <= 31;
   }
 
   static bool _isOxplayerIranWebHost() {
