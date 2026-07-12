@@ -59,10 +59,21 @@ abstract final class OxplayerScreenTelemetry {
 /// Measures time from route push to first frame (navigation + initial paint).
 final class OxplayerRouteTelemetryObserver extends NavigatorObserver {
   final Map<Route<dynamic>, Stopwatch> _pending = {};
+  String? _lastRoute;
+  DateTime? _lastRouteAt;
 
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     final name = _routeName(route);
+    final from = previousRoute != null ? _routeName(previousRoute) : _lastRoute;
+    _recordNavigationBreadcrumb(
+      action: 'push',
+      route: name,
+      from: from,
+    );
+    _lastRoute = name;
+    _lastRouteAt = DateTime.now();
+
     final sw = Stopwatch()..start();
     _pending[route] = sw;
 
@@ -84,6 +95,16 @@ final class OxplayerRouteTelemetryObserver extends NavigatorObserver {
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
     _pending.remove(route)?.stop();
+    final name = _routeName(route);
+    _recordNavigationBreadcrumb(
+      action: 'pop',
+      route: name,
+      from: previousRoute != null ? _routeName(previousRoute) : null,
+    );
+    if (previousRoute != null) {
+      _lastRoute = _routeName(previousRoute);
+      _lastRouteAt = DateTime.now();
+    }
   }
 
   @override
@@ -105,5 +126,32 @@ final class OxplayerRouteTelemetryObserver extends NavigatorObserver {
     final name = route.settings.name;
     if (name != null && name.isNotEmpty) return name;
     return route.runtimeType.toString();
+  }
+
+  void _recordNavigationBreadcrumb({
+    required String action,
+    required String route,
+    String? from,
+  }) {
+    if (!Sentry.isEnabled) return;
+
+    final data = <String, dynamic>{
+      'action': action,
+      'route': route,
+      if (from != null && from.isNotEmpty) 'from': from,
+    };
+    final lastAt = _lastRouteAt;
+    if (lastAt != null) {
+      data['ms_since_last'] = DateTime.now().difference(lastAt).inMilliseconds;
+    }
+
+    Sentry.addBreadcrumb(
+      Breadcrumb(
+        message: 'nav:$action $route',
+        category: 'navigation',
+        level: SentryLevel.info,
+        data: data,
+      ),
+    );
   }
 }

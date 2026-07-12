@@ -10,6 +10,7 @@ import 'package:fladder/bootstrap/app_bootstrap.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/oxplayer/oxplayer_bootstrap.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_image_notifier.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_queue.dart';
 import 'package:fladder/oxplayer/services/ox_github_update_service.dart';
 import 'package:fladder/oxplayer/services/ox_update_service.dart';
@@ -20,6 +21,7 @@ import 'package:fladder/l10n/generated/app_localizations.dart';
 import 'package:fladder/localization_delegates.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/crash_log_provider.dart';
+import 'package:fladder/providers/image_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/shared_provider.dart';
 import 'package:fladder/providers/sync_provider.dart';
@@ -68,8 +70,10 @@ void main(List<String> args) async {
           crashLogProvider.overrideWith((ref) => bootstrap.crashProvider),
           argumentsStateProvider.overrideWith((ref) => bootstrap.argumentsModel),
           syncProvider.overrideWith((ref) => SyncNotifier(ref, bootstrap.applicationDirectory)),
-          if (OxplayerConfig.isEnabled)
+          if (OxplayerConfig.isEnabled) ...[
+            imageUtilityProvider.overrideWith((ref) => OxplayerImageNotifier(ref: ref)),
             playbackModelHelper.overrideWith((ref) => OxPlaybackModelHelper(ref: ref)),
+          ],
         ],
         child: OxplayerBootstrap.wrapRoot(
           AdaptiveLayoutBuilder(
