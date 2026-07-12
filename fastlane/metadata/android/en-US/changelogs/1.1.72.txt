@@ -1,0 +1,1 @@
+Customizable home dashboard, favorites shelf, and library views.
