@@ -17,7 +17,7 @@ import 'package:fladder/providers/user_provider.dart';
 abstract final class OxplayerLibraryFeed {
   static const _feedLimit = 9;
 
-  /// One HTTP round-trip for continue watching, next up, latest, and movie recommendations.
+  /// One HTTP round-trip for continue watching, next up, and latest.
   static Future<List<RecommendedModel>?> fetchShelves(Ref ref, ViewModel viewModel) async {
     final base = (OxplayerRoute.apiBaseUrl ?? OxplayerEnv.apiBaseUrl)?.trim();
     final userId = ref.read(userProvider)?.id;
@@ -53,7 +53,6 @@ abstract final class OxplayerLibraryFeed {
         collectionType == CollectionType.tvshows ||
         collectionType == CollectionType.homevideos;
     final fetchNextUp = collectionType == CollectionType.tvshows;
-    final fetchMovieRecs = collectionType == CollectionType.movies;
     final fetchLatest = collectionType != CollectionType.livetv;
 
     final shelves = <RecommendedModel>[];
@@ -77,27 +76,6 @@ abstract final class OxplayerLibraryFeed {
               .toList()
           : const <ItemBaseModel>[];
       shelves.add(RecommendedModel(name: const Latest(), posters: latest, type: null));
-    }
-
-    if (fetchMovieRecs) {
-      final recs = body['Recommendations'];
-      if (recs is List) {
-        for (final raw in recs) {
-          if (raw is! Map<String, dynamic>) continue;
-          final items = raw['Items'];
-          if (items is! List || items.isEmpty) continue;
-          shelves.add(
-            RecommendedModel(
-              name: Other(raw['CategoryId']?.toString() ?? 'granted'),
-              posters: items
-                  .whereType<Map<String, dynamic>>()
-                  .map((item) => ItemBaseModel.fromBaseDto(BaseItemDto.fromJson(item), ref))
-                  .toList(),
-              type: null,
-            ),
-          );
-        }
-      }
     }
 
     return shelves..removeWhere((element) => element.posters.isEmpty);

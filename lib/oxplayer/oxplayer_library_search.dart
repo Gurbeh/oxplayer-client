@@ -14,7 +14,17 @@ const oxLibrarySearchInitialPageSize = 48;
 /// OX: defer filter metadata until user opens filter UI.
 bool oxLibrarySearchDeferFilters(LibrarySearchModel state) {
   if (!OxplayerConfig.isEnabled) return false;
-  return !state.filters.hasActiveFilters && state.searchQuery.isEmpty;
+  if (state.searchQuery.isNotEmpty) return false;
+  final filters = state.filters;
+  // hideEmptyShows defaults true — not a user-applied filter; must not block defer.
+  return !(filters.genres.hasEnabled ||
+      filters.studios.hasEnabled ||
+      filters.tags.hasEnabled ||
+      filters.years.hasEnabled ||
+      filters.officialRatings.hasEnabled ||
+      filters.itemFilters.hasEnabled ||
+      filters.recursive == false ||
+      filters.favourites == true);
 }
 
 int oxLibrarySearchPageSize(int configuredSize) {
