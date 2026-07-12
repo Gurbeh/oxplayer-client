@@ -18,6 +18,7 @@ import 'package:fladder/screens/settings/settings_scaffold.dart';
 import 'package:fladder/screens/settings/widgets/settings_label_divider.dart';
 import 'package:fladder/screens/settings/widgets/settings_list_group.dart';
 import 'package:fladder/oxplayer/oxplayer_brand.dart';
+import 'package:fladder/oxplayer/oxplayer_settings_visibility.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/simple_duration_picker.dart';
@@ -96,7 +97,8 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
           ]),
           const SizedBox(height: 12),
         ],
-        ...buildClientSettingsAdvanced(context, ref),
+        if (OxplayerSettingsVisibility.showClientSettingsAdvanced)
+          ...buildClientSettingsAdvanced(context, ref),
         if (kDebugMode) ...[
           const SizedBox(height: 64),
           SettingsListTile(

@@ -4,6 +4,8 @@ import 'package:fladder/jellyfin/jellyfin_open_api.enums.swagger.dart' as enums;
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/api_result.dart';
 import 'package:fladder/models/home_preferences_model.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/ox_home_dashboard_order.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
@@ -24,13 +26,22 @@ class HomePreferencesNotifier extends StateNotifier<HomePreferencesModel> {
     if (state.loading) return;
     state = state.copyWith(loading: true);
 
-    final user = ref.read(userProvider);
+    var user = ref.read(userProvider);
+    if (user?.userConfiguration == null) {
+      await ref.read(userProvider.notifier).updateInformation();
+      user = ref.read(userProvider);
+    }
     final userConfig = user?.userConfiguration;
     final views = ref.read(viewsProvider).views;
 
+    final libraryIds = views.map((v) => v.id).toList();
+    final availableIds = OxplayerConfig.isEnabled
+        ? OxHomeDashboardOrder.allOrderableIds(libraryIds)
+        : libraryIds;
+
     final orderedLibraryIds = _buildOrderedLibraryIds(
       userConfig?.orderedViews ?? [],
-      views.map((v) => v.id).toList(),
+      availableIds,
     );
 
     final foldersResponse = await api.libraryMediaFolders();
@@ -88,18 +99,29 @@ class HomePreferencesNotifier extends StateNotifier<HomePreferencesModel> {
   Future<ApiResult<dynamic>> save() async {
     try {
       await _saveLibraryPreferences();
-      await ref.read(userProvider.notifier).updateInformation();
-      await ref.read(viewsProvider.notifier).fetchViews();
-      return ApiResult.success(null);
     } catch (e) {
       return ApiResult.failure(ApiError(message: e.toString()));
     }
+
+    try {
+      await ref.read(userProvider.notifier).updateInformation();
+      await load();
+      await ref.read(viewsProvider.notifier).fetchViews();
+    } catch (_) {
+      // POST already persisted; API may have restarted (air) during GET /Users/Me.
+      await load();
+    }
+    return ApiResult.success(null);
   }
 
   Future<void> _saveLibraryPreferences() async {
-    final user = ref.read(userProvider);
-    final currentConfig = user?.userConfiguration;
-    if (currentConfig == null) return;
+    var user = ref.read(userProvider);
+    var currentConfig = user?.userConfiguration;
+    if (currentConfig == null) {
+      await ref.read(userProvider.notifier).updateInformation();
+      user = ref.read(userProvider);
+      currentConfig = user?.userConfiguration ?? const UserConfiguration();
+    }
 
     final updated = currentConfig.copyWith(
       orderedViews: state.orderedLibraryIds,
@@ -107,7 +129,16 @@ class HomePreferencesNotifier extends StateNotifier<HomePreferencesModel> {
       hidePlayedInLatest: state.hidePlayedInLatest,
       groupedFolders: state.groupedFolders,
     );
-    await api.updateUserConfiguration(updated);
+    final saved = await api.updateUserConfiguration(updated);
+    if (saved == null) {
+      throw StateError('Failed to save home screen preferences');
+    }
+    if (user != null) {
+      ref.read(userProvider.notifier).userState = user.copyWith(
+        userConfiguration: saved,
+        latestItemsExcludes: state.latestItemsExcludes,
+      );
+    }
   }
 
   static const _groupableTypes = {

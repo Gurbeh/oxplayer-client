@@ -371,10 +371,13 @@ class _UserSettingsPageState extends ConsumerState<ProfileSettingsPage> with Wid
             ],
           ),
         ],
-        if (OxplayerSettingsVisibility.showProfileGroupedFolders) ...[
+        if (OxplayerSettingsVisibility.showProfileLibraryOrder ||
+            OxplayerSettingsVisibility.showProfileGroupedFolders) ...[
           const SizedBox(height: 16),
           LibraryOrderEditor(
-            groupedFoldersOnly: OxplayerSettingsVisibility.showProfileLibraryOrder == false,
+            groupedFoldersOnly: !OxplayerSettingsVisibility.showProfileLibraryOrder &&
+                OxplayerSettingsVisibility.showProfileGroupedFolders,
+            showGroupedFoldersSection: OxplayerSettingsVisibility.showProfileGroupedFolders,
           ),
         ],
         if (OxplayerSettingsVisibility.showProfileLocalUrl) ...[

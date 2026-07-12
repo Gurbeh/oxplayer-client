@@ -8,6 +8,8 @@ import 'package:fladder/models/view_model.dart';
 import 'package:fladder/models/views_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_home_feed.dart';
+import 'package:fladder/oxplayer/oxplayer_view_labels.dart';
+import 'package:fladder/oxplayer/providers/ox_favorites_dashboard.dart';
 import 'package:fladder/oxplayer/providers/ox_watchlist_dashboard.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/providers/api_provider.dart';
@@ -52,6 +54,10 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
       final showAllCollections = ref.read(clientSettingsProvider.select((value) => value.showAllCollectionTypes));
 
       if (OxplayerConfig.isEnabled) {
+        var user = ref.read(userProvider);
+        if (user?.userConfiguration == null) {
+          await ref.read(userProvider.notifier).updateInformation();
+        }
         final feed = await OxplayerHomeFeed.fetch(ref);
         if (feed != null) {
           final filtered = feed.views
@@ -59,6 +65,11 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
               .toList();
           final ordered = _applyLibraryOrdering(filtered);
           OxplayerHomeFeed.applyWatchLater(ref, feed.watchLater);
+          if (feed.favoritesInFeed) {
+            OxplayerHomeFeed.applyFavorites(ref, feed.favorites);
+          } else {
+            oxResetFavoritesHomeFeedRef(ref);
+          }
           OxplayerHomeFeed.applyDashboard(ref, feed.dashboard);
           state = state.copyWith(
             views: ordered,
@@ -162,7 +173,7 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
 
   List<ViewModel> _applyLibraryOrdering(List<ViewModel> views) {
     final orderedViews = ref.read(userProvider)?.userConfiguration?.orderedViews ?? [];
-    if (orderedViews.isEmpty) return views;
+    if (orderedViews.isEmpty) return OxplayerViewLabels.applyAll(views);
 
     final viewMap = {for (var v in views) v.id: v};
     final ordered = <ViewModel>[];
@@ -172,7 +183,7 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
       if (view != null) ordered.add(view);
     }
     ordered.addAll(viewMap.values);
-    return ordered;
+    return OxplayerViewLabels.applyAll(ordered);
   }
 
   void clear() {

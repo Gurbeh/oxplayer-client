@@ -9,7 +9,7 @@ import 'package:fladder/providers/views_provider.dart';
 abstract final class OxplayerHomeRefresh {
   /// Refetch home data without clearing visible shelves or showing skeletons.
   static Future<void> refresh(WidgetRef ref) async {
-    unawaited(ref.read(userProvider.notifier).updateInformation());
+    await ref.read(userProvider.notifier).updateInformation();
     await ref.read(viewsProvider.notifier).fetchViews(background: true);
   }
 }

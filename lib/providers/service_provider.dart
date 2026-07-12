@@ -1348,7 +1348,10 @@ class JellyService {
     if (response.isSuccessful) {
       return newUserConfiguration;
     }
-    return null;
+    final detail = response.error?.toString() ?? response.bodyString;
+    throw StateError(
+      'POST /Users/Configuration failed (${response.statusCode})${detail.isNotEmpty ? ': $detail' : ''}',
+    );
   }
 
   Future<UserConfiguration?> updateRememberAudioSelections() {

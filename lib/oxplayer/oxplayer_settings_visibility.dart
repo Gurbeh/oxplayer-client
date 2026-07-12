@@ -17,11 +17,14 @@ abstract final class OxplayerSettingsVisibility {
   static bool get showProfileLocalUrl => !isOxMode;
 
   /// Full library order editor (reorder + latest excludes + hide played).
-  static bool get showProfileLibraryOrder => !isOxMode;
+  static bool get showProfileLibraryOrder => true;
 
   /// Grouped libraries checkboxes (persisted via UserConfiguration on the server).
-  static bool get showProfileGroupedFolders => true;
+  static bool get showProfileGroupedFolders => !isOxMode;
 
   static bool get showProfileHomePreferencesSave =>
       showProfileLibraryOrder || (isOxMode && showProfileGroupedFolders);
+
+  /// Layout sizes, layout modes, system IME (OXPlayer client settings).
+  static bool get showClientSettingsAdvanced => !isOxMode;
 }

@@ -9,6 +9,8 @@ import 'package:fladder/models/view_model.dart';
 import 'package:fladder/oxplayer/oxplayer_catalog_http.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_route.dart';
+import 'package:fladder/oxplayer/oxplayer_view_labels.dart';
+import 'package:fladder/oxplayer/providers/ox_favorites_dashboard.dart';
 import 'package:fladder/oxplayer/providers/ox_watchlist_dashboard.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
@@ -30,11 +32,16 @@ class OxHomeFeedResult {
     required this.views,
     required this.dashboard,
     required this.watchLater,
+    required this.favorites,
+    required this.favoritesInFeed,
   });
 
   final List<ViewModel> views;
   final OxHomeFeedDashboard dashboard;
   final OxWatchlistDashboardData watchLater;
+  final OxFavoritesDashboardData favorites;
+  /// False when the API omits [Favorites] (older server) so the client can fall back.
+  final bool favoritesInFeed;
 }
 
 abstract final class OxplayerHomeFeed {
@@ -90,7 +97,9 @@ abstract final class OxplayerHomeFeed {
     if (rawViews is List) {
       for (final raw in rawViews) {
         if (raw is! Map<String, dynamic>) continue;
-        final view = ViewModel.fromBodyDto(BaseItemDto.fromJson(raw), ref);
+        final view = OxplayerViewLabels.apply(
+          ViewModel.fromBodyDto(BaseItemDto.fromJson(raw), ref),
+        );
         views.add(
           view.copyWith(recentlyAdded: shelfItemsByParent[view.id] ?? const []),
         );
@@ -100,16 +109,24 @@ abstract final class OxplayerHomeFeed {
     final nextUp = _itemsFromSection(body['NextUp'], ref);
     final resume = _itemsFromSection(body['Resume'], ref);
     final watchLater = _watchLaterFromBody(body['WatchLater'], ref);
+    final favoritesInFeed = body.containsKey('Favorites');
+    final favorites = favoritesInFeed ? _favoritesFromBody(body['Favorites'], ref) : OxFavoritesDashboardData.empty;
 
     return OxHomeFeedResult(
       views: views,
       dashboard: OxHomeFeedDashboard(nextUp: nextUp, resumeVideo: resume),
       watchLater: watchLater,
+      favorites: favorites,
+      favoritesInFeed: favoritesInFeed,
     );
   }
 
   static void applyWatchLater(Ref ref, OxWatchlistDashboardData watchLater) {
     oxApplyWatchlistFromHomeFeedRef(ref, watchLater);
+  }
+
+  static void applyFavorites(Ref ref, OxFavoritesDashboardData favorites) {
+    oxApplyFavoritesFromHomeFeedRef(ref, favorites);
   }
 
   static void applyDashboard(Ref ref, OxHomeFeedDashboard dashboard) {
@@ -134,5 +151,11 @@ abstract final class OxplayerHomeFeed {
       return OxWatchlistDashboardData.empty;
     }
     return OxWatchlistDashboardData(playlistId: playlistId, items: items);
+  }
+
+  static OxFavoritesDashboardData _favoritesFromBody(Object? section, Ref ref) {
+    final items = _itemsFromSection(section, ref);
+    if (items.isEmpty) return OxFavoritesDashboardData.empty;
+    return OxFavoritesDashboardData(items: items);
   }
 }
