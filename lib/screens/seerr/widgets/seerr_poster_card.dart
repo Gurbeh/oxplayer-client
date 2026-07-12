@@ -11,6 +11,7 @@ import 'package:fladder/providers/seerr_user_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/seerr/widgets/seerr_request_popup.dart';
 import 'package:fladder/seerr/seerr_models.dart';
+import 'package:fladder/oxplayer/ox_detail_poster_badges.dart';
 import 'package:fladder/theme.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/fladder_image.dart';
@@ -24,11 +25,13 @@ class SeerrPosterCard extends ConsumerWidget {
   final SeerrDashboardPosterModel poster;
   final double? aspectRatio;
   final Function(bool value)? onFocusChanged;
+  final bool oxDetailBadges;
 
   const SeerrPosterCard({
     required this.poster,
     this.aspectRatio,
     this.onFocusChanged,
+    this.oxDetailBadges = false,
     super.key,
   });
 
@@ -41,6 +44,7 @@ class SeerrPosterCard extends ConsumerWidget {
 
     final user = ref.watch(seerrUserProvider);
     final canRequest = user?.canRequestMedia(isTv: poster.type == SeerrMediaType.tvshow) ?? true;
+    final useOxDetailBadges = oxDetailPosterBadgesEnabled(oxDetailBadges);
 
     final baseItemModel = poster.itemBaseModel;
 
@@ -160,7 +164,8 @@ class SeerrPosterCard extends ConsumerWidget {
                 ),
             ],
             overlays: [
-              if (poster.hasDisplayStatus)
+              if (useOxDetailBadges) ...oxDetailSeerrPosterOverlays(context, poster),
+              if (!useOxDetailBadges && poster.hasDisplayStatus)
                 Align(
                   alignment: Alignment.topRight,
                   child: Padding(
@@ -183,27 +188,28 @@ class SeerrPosterCard extends ConsumerWidget {
                     ),
                   ),
                 ),
-              Align(
-                alignment: Alignment.topLeft,
-                child: Padding(
-                  padding: const EdgeInsets.all(6.0),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      poster.type == SeerrMediaType.movie
-                          ? context.localized.mediaTypeMovie(1)
-                          : context.localized.mediaTypeSeries(1),
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onPrimaryContainer,
-                          ),
+              if (!useOxDetailBadges)
+                Align(
+                  alignment: Alignment.topLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.all(6.0),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        poster.type == SeerrMediaType.movie
+                            ? context.localized.mediaTypeMovie(1)
+                            : context.localized.mediaTypeSeries(1),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            ),
+                      ),
                     ),
                   ),
-                ),
-              )
+                )
             ],
           ),
         ),

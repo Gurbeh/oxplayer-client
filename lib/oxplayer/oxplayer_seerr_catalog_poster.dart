@@ -17,6 +17,12 @@ int _tmdbIdFromProviderIds(Map<String, dynamic>? providerIds) {
   };
 }
 
+/// Browse-only TMDB rows from oxplayer-be use [EncodeSimilarItemID] (`OXSM` prefix).
+bool oxplayerIsBrowseSimilarItemId(String itemId) {
+  final normalized = itemId.trim().toLowerCase();
+  return normalized.startsWith('4f58534d-');
+}
+
 SeerrDashboardPosterModel? oxplayerPosterFromCatalogItem(ItemBaseModel item) {
   final id = item.id.trim();
   if (id.isEmpty) return null;
@@ -42,15 +48,20 @@ SeerrDashboardPosterModel? oxplayerPosterFromCatalogItem(ItemBaseModel item) {
     _ => item.overview.productionYear?.toString() ?? item.overview.yearAired?.toString(),
   };
 
+  final tmdbId = _tmdbIdFromProviderIds(providerIds);
+  final isBrowseOnly = oxplayerIsBrowseSimilarItemId(id);
+
   return SeerrDashboardPosterModel(
-    id: id,
+    id: isBrowseOnly ? '$tmdbId' : id,
     type: type,
-    tmdbId: _tmdbIdFromProviderIds(providerIds),
-    jellyfinItemId: id,
+    tmdbId: tmdbId,
+    jellyfinItemId: isBrowseOnly ? null : id,
     title: item.name,
     overview: item.overview.summary,
     images: item.images ?? ImagesData(),
-    mediaStatus: SeerrMediaStatus.available,
+    mediaStatus: isBrowseOnly ? SeerrMediaStatus.unknown : SeerrMediaStatus.available,
+    catalogChildCount: isBrowseOnly ? null : item.childCount,
+    catalogUnplayedCount: isBrowseOnly ? null : item.userData.unPlayedItemCount,
     releaseYear: releaseYear,
   );
 }

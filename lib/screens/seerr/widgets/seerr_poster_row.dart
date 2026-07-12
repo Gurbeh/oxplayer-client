@@ -17,6 +17,7 @@ class SeerrPosterRow extends ConsumerWidget {
   final void Function(SeerrDashboardPosterModel focused)? onFocused;
 
   final void Function()? onLabelClick;
+  final bool oxDetailBadges;
 
   const SeerrPosterRow({
     required this.posters,
@@ -24,6 +25,7 @@ class SeerrPosterRow extends ConsumerWidget {
     this.contentPadding = const EdgeInsets.symmetric(horizontal: 16),
     this.onFocused,
     this.onLabelClick,
+    this.oxDetailBadges = false,
     super.key,
   });
 
@@ -51,6 +53,7 @@ class SeerrPosterRow extends ConsumerWidget {
           key: Key(poster.id),
           poster: poster,
           aspectRatio: dominantRatio,
+          oxDetailBadges: oxDetailBadges,
         );
       },
     );

@@ -13,6 +13,7 @@ import 'package:fladder/theme.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/fladder_image.dart';
 import 'package:fladder/util/focus_provider.dart';
+import 'package:fladder/oxplayer/ox_detail_poster_badges.dart';
 import 'package:fladder/oxplayer/oxplayer_catalog_interest_status.dart';
 import 'package:fladder/oxplayer/ox_boxset_availability_overlay.dart';
 import 'package:fladder/util/item_base_model/item_base_model_extensions.dart';
@@ -37,6 +38,7 @@ class PosterImage extends ConsumerWidget {
   final bool primaryPosters;
   final Function(bool focus)? onFocusChanged;
   final bool showSyncStatus;
+  final bool oxDetailBadges;
 
   const PosterImage({
     required this.poster,
@@ -52,6 +54,7 @@ class PosterImage extends ConsumerWidget {
     this.primaryPosters = false,
     this.onFocusChanged,
     this.showSyncStatus = false,
+    this.oxDetailBadges = false,
     super.key,
   });
 
@@ -96,6 +99,9 @@ class PosterImage extends ConsumerWidget {
           ),
         ),
         overlays: [
+          if (oxDetailPosterBadgesEnabled(oxDetailBadges)) ...[
+            if (oxRelatedMediaTypeBadge(context, poster) case final badge?) badge,
+          ],
           if (oxCatalogAvailabilityOverlay(poster) case final overlay?) overlay,
           if (showSyncStatus)
             Align(

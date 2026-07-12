@@ -5,7 +5,7 @@ import 'package:fladder/oxplayer/ox_virtual_episode_images.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:http/http.dart' as http;
 
-/// Jellyfin-style series catalog load: seasons first, then parallel per-season episode lists.
+/// Series catalog: seasons + all episodes in parallel (two HTTP calls).
 class OxSeriesCatalogLoad {
   const OxSeriesCatalogLoad({
     required this.seasons,
@@ -26,41 +26,25 @@ List<ItemFields> _oxSeriesEpisodeListFields() {
 }
 
 Future<OxSeriesCatalogLoad> oxFetchSeriesCatalogBySeason(JellyService api, String seriesId) async {
-  final seasons = await api.showsSeriesIdSeasonsGet(
-    seriesId: seriesId,
-    enableUserData: false,
-  );
-  final seasonItems = seasons.body?.items ?? const <dto.BaseItemDto>[];
-  if (seasonItems.isEmpty) {
-    return OxSeriesCatalogLoad(seasons: seasons, episodeItems: const []);
-  }
-
   final fields = _oxSeriesEpisodeListFields();
-  final episodeResponses = await Future.wait(
-    seasonItems.map((season) {
-      final seasonId = season.id?.trim();
-      if (seasonId == null || seasonId.isEmpty) {
-        return Future<Response<BaseItemDtoQueryResult?>>.value(
-          Response<BaseItemDtoQueryResult?>(
-            http.Response('', 200),
-            BaseItemDtoQueryResult(items: const [], totalRecordCount: 0),
-          ),
-        );
-      }
-      return api.showsSeriesIdEpisodesGet(
-        seriesId: seriesId,
-        seasonId: seasonId,
-        enableUserData: true,
-        fields: fields,
-      );
-    }),
-  );
+  final results = await Future.wait([
+    api.showsSeriesIdSeasonsGet(
+      seriesId: seriesId,
+      enableUserData: false,
+    ),
+    api.showsSeriesIdEpisodesGet(
+      seriesId: seriesId,
+      enableUserData: true,
+      fields: fields,
+    ),
+  ]);
 
-  final episodeItems = <dto.BaseItemDto>[];
-  for (final response in episodeResponses) {
-    episodeItems.addAll(response.body?.items ?? const []);
-  }
-  return OxSeriesCatalogLoad(seasons: seasons, episodeItems: episodeItems);
+  final seasons = results[0];
+  final episodes = results[1];
+  return OxSeriesCatalogLoad(
+    seasons: seasons,
+    episodeItems: episodes.body?.items ?? const [],
+  );
 }
 
 /// Legacy wrapper — prefer [oxFetchSeriesCatalogBySeason].

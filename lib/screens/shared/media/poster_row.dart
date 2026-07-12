@@ -21,6 +21,7 @@ class PosterRow extends ConsumerWidget {
   final bool primaryPosters;
   final bool tvMode;
   final bool showSyncStatus;
+  final bool oxDetailBadges;
   const PosterRow({
     required this.posters,
     this.contentPadding = const EdgeInsets.symmetric(horizontal: 16),
@@ -31,6 +32,7 @@ class PosterRow extends ConsumerWidget {
     this.primaryPosters = false,
     this.tvMode = false,
     this.showSyncStatus = false,
+    this.oxDetailBadges = false,
     super.key,
   });
 
@@ -71,6 +73,7 @@ class PosterRow extends ConsumerWidget {
           aspectRatio: dominantRatio,
           primaryPosters: primaryPosters,
           showSyncStatus: showSyncStatus,
+          oxDetailBadges: oxDetailBadges,
         );
       },
     );

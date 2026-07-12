@@ -33,6 +33,7 @@ class PosterWidget extends ConsumerWidget {
   final bool primaryPosters;
   final Function(bool focus)? onFocusChanged;
   final bool showSyncStatus;
+  final bool oxDetailBadges;
 
   const PosterWidget({
     required this.poster,
@@ -51,6 +52,7 @@ class PosterWidget extends ConsumerWidget {
     this.primaryPosters = false,
     this.onFocusChanged,
     this.showSyncStatus = false,
+    this.oxDetailBadges = false,
     super.key,
   });
 
@@ -83,6 +85,7 @@ class PosterWidget extends ConsumerWidget {
               primaryPosters: primaryPosters,
               onFocusChanged: onFocusChanged,
               showSyncStatus: showSyncStatus,
+              oxDetailBadges: oxDetailBadges,
             ),
           ),
           if (!inlineTitle && underTitle)

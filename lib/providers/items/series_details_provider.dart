@@ -3,31 +3,18 @@ import 'dart:developer';
 
 import 'package:chopper/chopper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:logging/logging.dart' as logging;
 
-import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/episode_model.dart';
-import 'package:fladder/models/items/item_shared_models.dart';
-import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/models/items/series_model.dart';
-import 'package:fladder/models/items/special_feature_model.dart';
-import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
-import 'package:fladder/oxplayer/ox_item_recommendations.dart';
 import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
 import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
 import 'package:fladder/oxplayer/ox_series_details_loader.dart';
-import 'package:fladder/oxplayer/ox_season_user_data.dart';
-import 'package:fladder/oxplayer/ox_virtual_episode_images.dart';
+import 'package:fladder/oxplayer/ox_staged_detail_load.dart';
+import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/providers/api_provider.dart';
-import 'package:fladder/providers/related_provider.dart';
-import 'package:fladder/providers/seerr_api_provider.dart';
-import 'package:fladder/providers/service_provider.dart';
-import 'package:fladder/providers/user_provider.dart';
-import 'package:fladder/seerr/seerr_models.dart';
 import 'package:fladder/util/item_base_model/item_base_model_extensions.dart';
 
 final seriesDetailsProvider =
@@ -39,167 +26,66 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
   SeriesDetailViewNotifier(this.ref) : super(null);
 
   final Ref ref;
-
-  late final JellyService api = ref.read(jellyApiProvider);
+  int _loadGeneration = 0;
 
   Future<Response?> fetchDetails(ItemBaseModel seriesModel) async {
     Future<Response?> load() async {
       try {
-      if (seriesModel is SeriesModel) {
-        state = state ?? seriesModel;
-      }
-      SeriesModel? newState;
-      if (OxplayerEnv.isEnabled) {
-        final oxItem = await oxFetchLibraryItemDetails(ref, seriesModel.id);
-        if (oxItem != null && oxItem.model is SeriesModel) {
-          newState = (oxItem.model as SeriesModel).copyWith(
-            related: state?.related ?? const [],
-            seerrRelated: state?.seerrRelated ?? const [],
-            seerrRecommended: state?.seerrRecommended ?? const [],
-            availableEpisodes: state?.availableEpisodes ?? const [],
-            seasons: state?.seasons ?? const [],
-            canDownload: state?.canDownload ?? false,
+        final loadGen = ++_loadGeneration;
+        void apply(SeriesModel? next) {
+          if (loadGen != _loadGeneration) return;
+          state = next;
+        }
+
+        if (seriesModel is SeriesModel) {
+          apply(state ?? seriesModel);
+        }
+
+        if (OxplayerConfig.isEnabled) {
+          final catalogPrefetch = oxFetchSeriesCatalogBySeason(
+            ref.read(jellyApiProvider),
+            seriesModel.id,
           );
+          final core = await oxFetchSeriesCoreState(ref, seriesModel, state);
+          if (core == null) return null;
+          apply(core);
+
+          if (oxSeerrRatingsMissingRt(ref.read(oxLibraryItemRatingsProvider(seriesModel.id)))) {
+            oxPrefetchSeerrTvRatings(ref, seriesModel.id, core.tmdbId);
+          }
+
+          unawaited(_oxContinueSeriesLoad(seriesModel.id, loadGen, catalogPrefetch));
+          return null;
         }
-      }
-      if (newState == null) {
-        final response = await api.usersUserIdItemsItemIdGet(itemId: seriesModel.id);
-        if (response.body == null) return null;
-        newState = (response.bodyOrThrow as SeriesModel).copyWith(
-          related: state?.related ?? const [],
-          seerrRelated: state?.seerrRelated ?? const [],
-          seerrRecommended: state?.seerrRecommended ?? const [],
-          availableEpisodes: state?.availableEpisodes ?? const [],
-          seasons: state?.seasons ?? const [],
-          canDownload: state?.canDownload ?? false,
-        );
-        if (OxplayerEnv.isEnabled) {
-          final raw = await oxFetchLibraryItemJson(ref, seriesModel.id);
-          oxApplyLibraryItemRatings(ref, seriesModel.id, raw != null ? oxRatingsFromItemJson(raw) : null);
+
+        final newState = await oxFetchSeriesCoreState(ref, seriesModel, state);
+        if (newState == null) return null;
+        apply(newState);
+
+        if (OxplayerEnv.isEnabled &&
+            oxSeerrRatingsMissingRt(ref.read(oxLibraryItemRatingsProvider(seriesModel.id)))) {
+          oxPrefetchSeerrTvRatings(ref, seriesModel.id, newState.tmdbId);
         }
-      }
 
-      state = newState;
+        final withCatalog = await oxLoadSeriesCatalogPhase(ref, newState, seriesModel.id);
+        apply(withCatalog);
 
-      if (OxplayerEnv.isEnabled && oxSeerrRatingsMissingRt(ref.read(oxLibraryItemRatingsProvider(seriesModel.id)))) {
-        oxPrefetchSeerrTvRatings(ref, seriesModel.id, newState.tmdbId);
-      }
-
-      final Response<BaseItemDtoQueryResult?> seasons;
-      List<BaseItemDto> episodeItems;
-      if (OxplayerEnv.isEnabled) {
-        final catalog = await oxFetchSeriesCatalogBySeason(api, seriesModel.id);
-        seasons = catalog.seasons;
-        episodeItems = catalog.episodeItems;
-      } else {
-        seasons = await api.showsSeriesIdSeasonsGet(
-          seriesId: seriesModel.id,
-          enableUserData: false,
+        final supplementary = await oxLoadSeriesSupplementaryPhase(ref, seriesModel.id, withCatalog);
+        apply(
+          oxMergeSeriesSupplementary(
+            withCatalog,
+            related: supplementary.related,
+            seerrRelated: supplementary.seerrRelated,
+            seerrRecommended: supplementary.seerrRecommended,
+            seerrUrl: supplementary.seerrUrl,
+            specialFeatures: supplementary.specialFeatures,
+          ),
         );
-        final episodes = await api.showsSeriesIdEpisodesGet(
-          seriesId: seriesModel.id,
-          enableUserData: true,
-          fields: oxEpisodeListFields([
-            ItemFields.mediastreams,
-            ItemFields.mediasources,
-            ItemFields.overview,
-            ItemFields.candownload,
-          ]),
-        );
-        episodeItems = episodes.body?.items ?? const [];
+        return null;
+      } catch (e) {
+        log("Error fetching series details: $e");
+        return null;
       }
-
-      final newEpisodes = oxApplyVirtualEpisodeImages(
-        EpisodeModel.episodesFromDto(
-          episodeItems,
-          ref,
-        ),
-        episodeItems,
-        ref,
-      );
-
-      List<BaseItemDto> specialFeatures;
-      try {
-        specialFeatures = (await api.itemsItemIdSpecialFeaturesGet(itemId: seriesModel.id)).body ?? [];
-      } on Exception catch (e, s) {
-        specialFeatures = [];
-        log("Failed to get special features for series id ${seriesModel.id} due to $e",
-            level: logging.Level.WARNING.value, error: e, stackTrace: s);
-      }
-
-      final episodesCanDownload = newEpisodes.any((episode) => episode.canDownload == true);
-
-      newState = newState.copyWith(
-          seasons: SeasonModel.seasonsFromDto(seasons.body?.items, ref).map(
-            (element) {
-              final seasonEpisodes = newEpisodes.where((episode) => episode.season == element.season);
-              final userData = OxplayerEnv.isEnabled
-                  ? oxSeasonUserDataFromEpisodes(seasonEpisodes)
-                  : () {
-                      final unPlayedCount = seasonEpisodes
-                          .where((episode) =>
-                              episode.status == EpisodeStatus.available && episode.userData.played == false)
-                          .length;
-                      return UserData(
-                        unPlayedItemCount: unPlayedCount,
-                        played: unPlayedCount == 0,
-                      );
-                    }();
-              return element.copyWith(
-                canDownload: true,
-                episodes: seasonEpisodes.toList(),
-                userData: userData,
-              );
-            },
-          ).toList(),
-          specialFeatures: SpecialFeatureModel.specialFeaturesFromDto(specialFeatures, ref));
-
-      newState = newState.copyWith(
-        canDownload: episodesCanDownload,
-        availableEpisodes: newEpisodes,
-      );
-
-      final related = await ref.read(relatedUtilityProvider).relatedContent(seriesModel.id);
-      List<SeerrDashboardPosterModel> seerrRelated = const [];
-      List<SeerrDashboardPosterModel> seerrRecommended = const [];
-
-      String? seerrUrl;
-
-      final seerrCreds = ref.read(userProvider)?.seerrCredentials;
-      final tmdbId = newState.tmdbId;
-      if (OxplayerEnv.isEnabled) {
-        if (seerrCreds?.isConfigured == true && tmdbId != null) {
-          seerrUrl = 'ox';
-        }
-        seerrRecommended = await oxFetchItemRecommendations(ref, seriesModel.id);
-      } else if (seerrCreds?.isConfigured == true && tmdbId != null) {
-        final seerr = ref.read(seerrApiProvider);
-        seerrRelated = await seerr.discoverRelatedSeries(tmdbId: tmdbId);
-        seerrRecommended = await seerr.discoverRecommendedSeries(tmdbId: tmdbId);
-        final seerrPoster = await seerr.fetchDashboardPosterFromIds(
-          tmdbId: tmdbId,
-          mediaType: SeerrMediaType.tvshow,
-        );
-        final status = seerrPoster?.mediaInfo?.mediaStatus;
-        if (status != SeerrMediaStatus.unknown) {
-          final seerrServerUrl = ref.read(userProvider.select((value) => value?.seerrCredentials?.serverUrl));
-          seerrUrl = '${seerrServerUrl}tv/$tmdbId';
-        }
-      }
-
-      state = newState.copyWith(
-        related: related.body,
-        seerrRelated: seerrRelated,
-        seerrRecommended: seerrRecommended,
-        overview: state?.overview.copyWith(
-          seerrUrl: seerrUrl,
-        ),
-      );
-      return null;
-    } catch (e) {
-      log("Error fetching series details: $e");
-      return null;
-    }
     }
 
     if (OxplayerConfig.isEnabled) {
@@ -210,6 +96,40 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
       );
     }
     return load();
+  }
+
+  Future<void> _oxContinueSeriesLoad(
+    String seriesId,
+    int loadGen,
+    Future<OxSeriesCatalogLoad> catalogPrefetch,
+  ) async {
+    try {
+      final base = state;
+      if (base == null || loadGen != _loadGeneration) return;
+
+      final supplementaryFuture = oxLoadSeriesSupplementaryPhase(ref, seriesId, base);
+      final withCatalog = await oxLoadSeriesCatalogPhase(
+        ref,
+        base,
+        seriesId,
+        prefetchCatalog: catalogPrefetch,
+      );
+      if (loadGen != _loadGeneration) return;
+      state = withCatalog;
+
+      final supplementary = await supplementaryFuture;
+      if (loadGen != _loadGeneration) return;
+      state = oxMergeSeriesSupplementary(
+        withCatalog,
+        related: supplementary.related,
+        seerrRelated: supplementary.seerrRelated,
+        seerrRecommended: supplementary.seerrRecommended,
+        seerrUrl: supplementary.seerrUrl,
+        specialFeatures: supplementary.specialFeatures,
+      );
+    } catch (e) {
+      log("Error loading staged series details: $e");
+    }
   }
 
   void updateEpisodeInfo(EpisodeModel episode) {

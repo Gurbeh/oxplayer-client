@@ -256,6 +256,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                       posters: details.related,
                       contentPadding: padding,
                       label: detailsContext.localized.related,
+                      oxDetailBadges: OxplayerConfig.isEnabled,
                     ),
                   if (details.seerrRecommended.isNotEmpty)
                     SeerrPosterRow(
@@ -263,12 +264,14 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                       label:
                           "${detailsContext.localized.discover} ${detailsContext.localized.recommended.toLowerCase()}",
                       contentPadding: padding,
+                      oxDetailBadges: OxplayerConfig.isEnabled,
                     ),
                   if (details.seerrRelated.isNotEmpty)
                     SeerrPosterRow(
                       posters: details.seerrRelated,
                       label: "${detailsContext.localized.discover} ${detailsContext.localized.related.toLowerCase()}",
                       contentPadding: padding,
+                      oxDetailBadges: OxplayerConfig.isEnabled,
                     ),
                   if (details.overview.externalUrls?.isNotEmpty == true)
                     Padding(

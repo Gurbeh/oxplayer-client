@@ -130,6 +130,8 @@ class SeerrDashboardPosterModel {
   final String? releaseYear;
   final dynamic requestedBy;
   final List<int>? requestedSeasons;
+  final int? catalogChildCount;
+  final int? catalogUnplayedCount;
 
   const SeerrDashboardPosterModel({
     required this.id,
@@ -147,6 +149,8 @@ class SeerrDashboardPosterModel {
     this.releaseYear,
     this.requestedBy,
     this.requestedSeasons,
+    this.catalogChildCount,
+    this.catalogUnplayedCount,
   });
 
   SeerrDashboardPosterModel copyWith({
@@ -165,6 +169,8 @@ class SeerrDashboardPosterModel {
     String? releaseYear,
     dynamic requestedBy,
     List<int>? requestedSeasons,
+    int? catalogChildCount,
+    int? catalogUnplayedCount,
   }) {
     return SeerrDashboardPosterModel(
       id: id ?? this.id,
@@ -182,6 +188,8 @@ class SeerrDashboardPosterModel {
       releaseYear: releaseYear ?? this.releaseYear,
       requestedBy: requestedBy ?? this.requestedBy,
       requestedSeasons: requestedSeasons ?? this.requestedSeasons,
+      catalogChildCount: catalogChildCount ?? this.catalogChildCount,
+      catalogUnplayedCount: catalogUnplayedCount ?? this.catalogUnplayedCount,
     );
   }
 
