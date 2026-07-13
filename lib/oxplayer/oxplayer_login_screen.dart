@@ -10,6 +10,7 @@ import 'package:fladder/oxplayer/oxplayer_claim_code_login_panel.dart';
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_route.dart';
+import 'package:fladder/oxplayer/oxplayer_route_selector.dart';
 import 'package:fladder/oxplayer/oxplayer_pending_route.dart';
 import 'package:fladder/oxplayer/oxplayer_telegram_login_panel.dart';
 import 'package:fladder/providers/auth_provider.dart';
@@ -49,14 +50,16 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
     });
 
     await OxplayerDotenv.ensureLoaded();
+    await OxplayerRouteSelector.resolveAtStartup();
+    OxplayerRouteSelector.syncFladderMediaBaseUrl();
     final media = OxplayerRoute.connectBaseUrl ??
         OxplayerRoute.apiBaseUrl ??
         OxplayerEnv.effectiveMediaServerUrl;
     if (media == null) {
+      if (!mounted) return;
       setState(() {
         _bootstrapping = false;
-        _bootstrapError =
-            'Set OXPLAYER_API_BASE_URL in assets/env/default.env (e.g. http://192.168.1.10:3004).';
+        _bootstrapError = context.localized.oxplayerLoginBootstrapEnvError;
       });
       return;
     }
@@ -208,7 +211,7 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
                               const SizedBox(height: 16),
                               FilledButton(
                                 onPressed: _bootstrap,
-                                child: const Text('Retry'),
+                                child: Text(context.localized.retry),
                               ),
                             ],
                           )

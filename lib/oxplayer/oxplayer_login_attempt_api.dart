@@ -4,7 +4,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
-import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_auth_http.dart';
 
 class OxplayerLoginAttemptCreated {
   const OxplayerLoginAttemptCreated({required this.attemptId, required this.expiresInSeconds});
@@ -34,20 +34,17 @@ class OxplayerLoginAttemptApi {
 
   final http.Client _client;
 
-  Uri _uri(String path, [Map<String, String>? query]) {
-    final base = OxplayerEnv.apiBaseUrl;
-    if (base == null) {
-      throw StateError('OXPLAYER_API_BASE_URL is not configured');
-    }
-    return Uri.parse('$base$path').replace(queryParameters: query);
-  }
+  Uri _uri(String path, [Map<String, String>? query]) => OxplayerAuthHttp.uri(path, query);
+
+  Map<String, String> _headers({Map<String, String>? extra}) =>
+      OxplayerAuthHttp.headers(extra: extra);
 
   Future<OxplayerLoginAttemptCreated> createAttempt({required String deviceId}) async {
-    final response = await _client.post(
-      _uri('/auth/login-attempt'),
-      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-      body: jsonEncode({'deviceId': deviceId}),
-    );
+    final response = await OxplayerAuthHttp.send(() => _client.post(
+          _uri('/auth/login-attempt'),
+          headers: _headers(extra: {'Content-Type': 'application/json', 'Accept': 'application/json'}),
+          body: jsonEncode({'deviceId': deviceId}),
+        ));
     if (response.statusCode != 201) {
       throw OxplayerLoginAttemptException(_errorMessage(response));
     }
@@ -121,12 +118,12 @@ class OxplayerLoginAttemptApi {
       'deviceId': deviceId,
       'wait': '$waitSeconds',
     });
-    final response = await _client
+    final response = await OxplayerAuthHttp.send(() => _client
         .get(
           uri,
-          headers: {'Accept': 'application/json'},
+          headers: _headers(extra: {'Accept': 'application/json'}),
         )
-        .timeout(Duration(seconds: waitSeconds + 20));
+        .timeout(Duration(seconds: waitSeconds + 20)));
 
     if (response.statusCode == 200) {
       final map = jsonDecode(response.body) as Map<String, dynamic>;

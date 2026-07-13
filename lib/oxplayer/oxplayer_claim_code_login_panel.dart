@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/oxplayer/oxplayer_jellyfin_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_login_bot_actions.dart';
+import 'package:fladder/util/localization_helper.dart';
 
 class OxplayerClaimCodeLoginPanel extends ConsumerStatefulWidget {
   const OxplayerClaimCodeLoginPanel({
@@ -30,9 +31,10 @@ class _OxplayerClaimCodeLoginPanelState extends ConsumerState<OxplayerClaimCodeL
   }
 
   Future<void> _submit() async {
+    final l10n = context.localized;
     final code = _controller.text.trim();
     if (code.length != 6) {
-      setState(() => _error = 'Enter the 6-character code from the bot.');
+      setState(() => _error = l10n.oxplayerLoginCodeInvalid);
       return;
     }
     setState(() {
@@ -43,7 +45,7 @@ class _OxplayerClaimCodeLoginPanelState extends ConsumerState<OxplayerClaimCodeL
       final response = await oxplayerAuthenticateWithClaimCode(ref, code);
       if (!mounted) return;
       if (response?.isSuccessful != true || response?.body == null) {
-        setState(() => _error = 'Login failed. Check the code and try again.');
+        setState(() => _error = context.localized.oxplayerLoginCodeFailed);
         return;
       }
       await widget.onSuccess();
@@ -56,6 +58,7 @@ class _OxplayerClaimCodeLoginPanelState extends ConsumerState<OxplayerClaimCodeL
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.localized;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -65,18 +68,18 @@ class _OxplayerClaimCodeLoginPanelState extends ConsumerState<OxplayerClaimCodeL
             child: TextButton.icon(
               onPressed: _loading ? null : widget.onBack,
               icon: const Icon(Icons.arrow_back),
-              label: const Text('Back'),
+              label: Text(l10n.oxplayerLoginBack),
             ),
           ),
           const SizedBox(height: 4),
         ],
         Text(
-          'Login code',
+          l10n.oxplayerLoginCodeTitle,
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 8),
         Text(
-          'Get a 6-character code from the Telegram bot, then enter it here.',
+          l10n.oxplayerLoginCodeHint,
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 12),
@@ -84,7 +87,7 @@ class _OxplayerClaimCodeLoginPanelState extends ConsumerState<OxplayerClaimCodeL
           controller: _controller,
           maxLength: 6,
           textCapitalization: TextCapitalization.characters,
-          decoration: const InputDecoration(labelText: 'Code', counterText: ''),
+          decoration: InputDecoration(labelText: l10n.oxplayerLoginCodeLabel, counterText: ''),
           onSubmitted: (_) => _loading ? null : _submit(),
         ),
         if (_error != null) ...[
@@ -100,7 +103,7 @@ class _OxplayerClaimCodeLoginPanelState extends ConsumerState<OxplayerClaimCodeL
                   width: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Continue'),
+              : Text(l10n.oxplayerLoginContinue),
         ),
         const SizedBox(height: 12),
         const OxplayerLoginBotActions(),

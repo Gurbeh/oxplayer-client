@@ -12,6 +12,12 @@ external void _oxPlaybackDiagUninstall();
 @JS('window.__oxPlaybackDiagSnapshotJson')
 external String? _oxPlaybackDiagSnapshotJson();
 
+@JS('window.__oxPlaybackDiagFetchRange')
+external JSPromise<JSString?> _oxPlaybackDiagFetchRange(JSString url);
+
+@JS('window.__oxPlaybackDiagProbeVideo')
+external JSPromise<JSString?> _oxPlaybackDiagProbeVideo(JSString url);
+
 /// Web-only DOM hooks for stream / video diagnostics.
 abstract final class OxplayerPlaybackDiagHooks {
   static bool _installed = false;
@@ -37,6 +43,34 @@ abstract final class OxplayerPlaybackDiagHooks {
     if (!_installed) return const {};
     final raw = _oxPlaybackDiagSnapshotJson();
     if (raw == null || raw.isEmpty) return const {};
+    return _decodeMap(raw);
+  }
+
+  static bool get isInstalled => _installed;
+
+  static Future<Map<String, Object?>> probeCdnRange(String url) async {
+    install();
+    try {
+      final raw = await _oxPlaybackDiagFetchRange(url.toJS).toDart;
+      if (raw == null) return {'url': url, 'ok': false, 'error': 'empty_response'};
+      return _decodeMap(raw.toDart);
+    } catch (e) {
+      return {'url': url, 'ok': false, 'error': e.runtimeType.toString()};
+    }
+  }
+
+  static Future<Map<String, Object?>> probeVideoLoad(String url) async {
+    install();
+    try {
+      final raw = await _oxPlaybackDiagProbeVideo(url.toJS).toDart;
+      if (raw == null) return {'url': url, 'ok': false, 'error': 'empty_response'};
+      return _decodeMap(raw.toDart);
+    } catch (e) {
+      return {'url': url, 'ok': false, 'error': e.runtimeType.toString()};
+    }
+  }
+
+  static Map<String, Object?> _decodeMap(String raw) {
     try {
       final decoded = jsonDecode(raw);
       if (decoded is Map<String, dynamic>) {
@@ -45,8 +79,6 @@ abstract final class OxplayerPlaybackDiagHooks {
     } catch (_) {}
     return {'raw': raw};
   }
-
-  static bool get isInstalled => _installed;
 }
 
 const _hookScript = r'''
@@ -133,6 +165,82 @@ const _hookScript = r'''
       window.fetch = state._fetch;
       state.fetchPatched = false;
     }
+  };
+
+  window.__oxPlaybackDiagFetchRange = async function (url) {
+    const t0 = Date.now();
+    push('cdn_range_start', { url: redact(url) });
+    try {
+      const res = await fetch(url, { headers: { Range: 'bytes=0-1023' }, credentials: 'omit' });
+      const out = {
+        url: redact(url),
+        ok: res.ok || res.status === 206,
+        status: res.status,
+        acao: res.headers.get('access-control-allow-origin'),
+        elapsedMs: Date.now() - t0,
+      };
+      push('cdn_range_res', out);
+      return JSON.stringify(out);
+    } catch (e) {
+      const out = {
+        url: redact(url),
+        ok: false,
+        error: String(e),
+        elapsedMs: Date.now() - t0,
+      };
+      push('cdn_range_err', out);
+      return JSON.stringify(out);
+    }
+  };
+
+  window.__oxPlaybackDiagProbeVideo = function (url) {
+    return new Promise((resolve) => {
+      const t0 = Date.now();
+      push('probe_video_start', { url: redact(url) });
+      const v = document.createElement('video');
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = 'auto';
+      const finish = (out) => {
+        try { v.removeAttribute('src'); v.load(); } catch (_) {}
+        push('probe_video_done', out);
+        resolve(JSON.stringify(out));
+      };
+      const timer = setTimeout(() => finish({
+        url: redact(url),
+        ok: false,
+        error: 'timeout',
+        readyState: v.readyState,
+        networkState: v.networkState,
+        elapsedMs: Date.now() - t0,
+      }), 15000);
+      v.addEventListener('loadedmetadata', () => {
+        clearTimeout(timer);
+        finish({
+          url: redact(v.currentSrc || url),
+          ok: true,
+          readyState: v.readyState,
+          networkState: v.networkState,
+          duration: v.duration,
+          elapsedMs: Date.now() - t0,
+        });
+      });
+      v.addEventListener('error', () => {
+        clearTimeout(timer);
+        const err = v.error;
+        finish({
+          url: redact(v.currentSrc || url),
+          ok: false,
+          error: 'media_error',
+          code: err ? err.code : null,
+          message: err ? err.message : null,
+          readyState: v.readyState,
+          networkState: v.networkState,
+          elapsedMs: Date.now() - t0,
+        });
+      });
+      v.src = url;
+    });
   };
 
   window.__oxPlaybackDiagSnapshotJson = function () {

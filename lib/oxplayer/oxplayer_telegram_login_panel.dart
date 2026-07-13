@@ -72,9 +72,10 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
   }
 
   Future<void> _startAttempt() async {
+    final l10n = context.localized;
     final deviceId = _deviceId();
     if (deviceId == null || deviceId.isEmpty) {
-      setState(() => _error = 'Device not ready. Pull to retry.');
+      setState(() => _error = l10n.oxplayerLoginDeviceNotReady);
       return;
     }
     _cancelPoll = true;
@@ -93,14 +94,13 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
       if (!mounted) return;
       final link = OxplayerEnv.telegramBotLoginAttemptLink(created.attemptId);
       if (link == null) {
-        setState(() => _error = 'Telegram bot is not configured.');
+        setState(() => _error = context.localized.oxplayerLoginBotNotConfigured);
         return;
       }
       setState(() {
         _attemptId = created.attemptId;
         _telegramLink = link;
       });
-      // Poll in background so scanning the QR on another phone still signs in here.
       unawaited(_pollForCompletion(userOpenedTelegram: false));
     } on OxplayerLoginAttemptException catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -175,7 +175,7 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
         if (!mounted) return;
         setState(() {
           _waiting = false;
-          _error = 'Timed out. Approve in Telegram, then tap Try again.';
+          _error = context.localized.oxplayerLoginTimedOutTryAgain;
         });
         return;
       }
@@ -193,7 +193,7 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
       if (!mounted) return;
       setState(() {
         _waiting = false;
-        _error = 'Sign-in failed. Try again or use a login code.';
+        _error = context.localized.oxplayerLoginFailedTryCode;
       });
     } on OxplayerLoginAttemptException catch (e) {
       if (mounted) {
@@ -206,7 +206,7 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
       if (mounted) {
         setState(() {
           _waiting = false;
-          _error = 'Connection error. Stay on this screen after approving, or tap Try again.';
+          _error = context.localized.oxplayerLoginConnectionError;
         });
       }
     } finally {
@@ -216,6 +216,7 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.localized;
     final theme = Theme.of(context);
     final link = _telegramLink;
     final bot = OxplayerEnv.botUsername;
@@ -226,28 +227,24 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
     final showDeviceButton = !isTv;
     final showWaitingOnDevice = _waiting && showDeviceButton;
     final deviceButtonLabel = showWaitingOnDevice
-        ? 'Waiting for Telegram\u2026'
+        ? l10n.oxplayerLoginWaitingTelegram
         : kIsWeb
-            ? 'Login with Telegram'
-            : 'Open Telegram on this device';
+            ? l10n.oxplayerLoginWithTelegramWeb
+            : l10n.oxplayerLoginOpenTelegramDevice;
 
     final subtitle = showWaitingOnDevice
-        ? 'Waiting for approval in Telegram\u2026 This screen will sign you in automatically.'
+        ? l10n.oxplayerLoginWaitingApprovalTitle
         : isTv
-            ? 'Scan the QR code with Telegram on your phone. This TV will sign you in automatically.'
+            ? l10n.oxplayerLoginTvSubtitle
             : kIsWeb
-                ? (isPhone
-                    ? 'Tap the button to open Telegram, then approve the login request.'
-                    : 'Scan the QR with your phone, or tap the button to open Telegram in a new tab.')
-                : isPhone
-                    ? 'Tap the button to open Telegram, or use the QR icon to sign in from another device.'
-                    : 'Scan the QR with another device, or tap the button to open Telegram on this device.';
+                ? (isPhone ? l10n.oxplayerLoginWebPhoneSubtitle : l10n.oxplayerLoginWebDesktopSubtitle)
+                : (isPhone ? l10n.oxplayerLoginMobilePhoneSubtitle : l10n.oxplayerLoginMobileDesktopSubtitle);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Sign in with Telegram',
+          l10n.oxplayerLoginTelegramTitle,
           style: theme.textTheme.titleMedium,
           textAlign: TextAlign.center,
         ),
@@ -307,7 +304,7 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
                 ),
                 if (link != null)
                   IconButton(
-                    tooltip: context.localized.oxplayerHelpQrCaption,
+                    tooltip: l10n.oxplayerHelpQrCaption,
                     onPressed: showWaitingOnDevice
                         ? null
                         : () => showOxplayerBotQrSheet(
@@ -356,14 +353,14 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
                       await _startAttempt();
                     }
                   },
-            child: const Text('Try again'),
+            child: Text(l10n.oxplayerLoginTryAgain),
           ),
         ],
         const SizedBox(height: 16),
         TextButton(
           onPressed: showWaitingOnDevice ? null : widget.onManualCode,
           child: Text(
-            "Couldn't sign in this way? Enter a login code manually",
+            l10n.oxplayerLoginManualCodePrompt,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.primary,
             ),

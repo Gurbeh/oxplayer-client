@@ -11,6 +11,7 @@ import 'package:fladder/oxplayer/oxplayer_route_env.dart';
 import 'package:fladder/oxplayer/oxplayer_route_hints.dart';
 import 'package:fladder/oxplayer/oxplayer_route_store.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
+import 'package:fladder/util/fladder_config.dart';
 
 /// Startup edge resolution: global outside Iran; Iran .ir API + stream inside Iran.
 abstract final class OxplayerRouteSelector {
@@ -25,6 +26,7 @@ abstract final class OxplayerRouteSelector {
       final edge = OxplayerEdge.tryParse(forced);
       if (edge != null) {
         OxplayerRoute.setActive(edge);
+        syncFladderMediaBaseUrl();
         return;
       }
     }
@@ -34,6 +36,7 @@ abstract final class OxplayerRouteSelector {
       OxplayerRoute.setActive(OxplayerEdge.iran);
       final prefs = await SharedPreferences.getInstance();
       await OxplayerRouteStore(prefs).saveEdge(OxplayerEdge.iran);
+      syncFladderMediaBaseUrl();
       return;
     }
 
@@ -94,6 +97,7 @@ abstract final class OxplayerRouteSelector {
 
     OxplayerRoute.setActive(chosen);
     await store.saveEdge(chosen);
+    syncFladderMediaBaseUrl();
     OxplayerStreamLog.event('route_resolve', fields: {
       'edge': chosen.name,
       'api': OxplayerRoute.apiBaseUrl,
@@ -138,6 +142,16 @@ abstract final class OxplayerRouteSelector {
     OxplayerRoute.setActive(edge);
     final prefs = await SharedPreferences.getInstance();
     await OxplayerRouteStore(prefs).saveEdge(edge);
+    syncFladderMediaBaseUrl();
+  }
+
+  /// Keep Jellyfin client URL aligned with active edge (login + post-451 flip).
+  static void syncFladderMediaBaseUrl() {
+    if (!OxplayerConfig.isEnabled) return;
+    final media = OxplayerRoute.connectBaseUrl ?? OxplayerRoute.apiBaseUrl;
+    if (media != null && media.isNotEmpty) {
+      FladderConfig.baseUrl = media;
+    }
   }
 
   /// True when Iran enforce returns 451 on global CDN (/health is exempt).

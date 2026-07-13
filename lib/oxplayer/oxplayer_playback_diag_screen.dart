@@ -83,6 +83,7 @@ class _OxplayerPlaybackDiagScreenState extends ConsumerState<OxplayerPlaybackDia
       'oxplayerPlaybackDiagStatusStarting' => l10n.oxplayerPlaybackDiagStatusStarting,
       'oxplayerPlaybackDiagStatusCollecting' => l10n.oxplayerPlaybackDiagStatusCollecting,
       'oxplayerPlaybackDiagStatusProbing' => l10n.oxplayerPlaybackDiagStatusProbing,
+      'oxplayerPlaybackDiagStatusPlayback' => l10n.oxplayerPlaybackDiagStatusPlayback,
       'oxplayerPlaybackDiagStatusWatching' => l10n.oxplayerPlaybackDiagStatusWatching,
       'oxplayerPlaybackDiagStatusDone' => l10n.oxplayerPlaybackDiagStatusDone,
       'oxplayerPlaybackDiagStatusFailed' => l10n.oxplayerPlaybackDiagStatusFailed,
@@ -176,6 +177,7 @@ class _OxplayerPlaybackDiagScreenState extends ConsumerState<OxplayerPlaybackDia
   String _phaseToStatusKey(String phase) => switch (phase) {
         'collecting_context' => 'oxplayerPlaybackDiagStatusCollecting',
         'probing_api' => 'oxplayerPlaybackDiagStatusProbing',
+        'probing_playback' => 'oxplayerPlaybackDiagStatusPlayback',
         'watching_playback' => 'oxplayerPlaybackDiagStatusWatching',
         _ => 'oxplayerPlaybackDiagStatusStarting',
       };

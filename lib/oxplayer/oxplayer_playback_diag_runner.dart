@@ -6,13 +6,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
+import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_iran_stream_edge.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_diag_hooks.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_media_source.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_route.dart';
 import 'package:fladder/oxplayer/oxplayer_route_env.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_nodes_api.dart';
+import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
@@ -51,10 +55,18 @@ class OxplayerPlaybackDiagRunner {
       return _encode(report);
     }
 
+    onPhase?.call('probing_playback');
+    report['playbackProbe'] = await _runPlaybackProbe();
+
+    if (_cancelled) {
+      if (kIsWeb) OxplayerPlaybackDiagHooks.uninstall();
+      return _encode(report);
+    }
+
     if (kIsWeb) {
       onPhase?.call('watching_playback');
       OxplayerPlaybackDiagHooks.install();
-      await _watchWeb(const Duration(seconds: 30));
+      await _watchWeb(const Duration(seconds: 5));
       if (!_cancelled) {
         report['webHooks'] = OxplayerPlaybackDiagHooks.snapshot();
       }
@@ -154,12 +166,138 @@ class OxplayerPlaybackDiagRunner {
       out['streamNodes'] = {'skipped': true, 'reason': 'no_token'};
     }
 
+    out['cdnRange'] = await _probeCdnRangeEndpoints();
+
     final playbackUrl = _ref.read(playBackModel)?.media?.url;
     if (playbackUrl != null && playbackUrl.isNotEmpty) {
       out['playbackHead'] = await _probeHead(playbackUrl);
     }
 
     return out;
+  }
+
+  Future<Map<String, Object?>> _probeCdnRangeEndpoints() async {
+    final vanity = (OxplayerRoute.streamBaseUrl ?? '').trim().replaceAll(RegExp(r'/$'), '');
+    final targets = <String>{
+      'https://${OxplayerIranStreamEdge.iranStreamOriginHost}/cdn-probe/range',
+      if (vanity.isNotEmpty) '$vanity/cdn-probe/range',
+    };
+    final results = <String, Object?>{};
+    for (final url in targets) {
+      results[Uri.parse(url).host] = kIsWeb
+          ? await OxplayerPlaybackDiagHooks.probeCdnRange(url)
+          : await _probeHead(url);
+    }
+    return results;
+  }
+
+  Future<Map<String, Object?>> _runPlaybackProbe() async {
+    final out = <String, Object?>{};
+    final user = _ref.read(userProvider);
+    if (user == null) {
+      return {'skipped': true, 'reason': 'no_user'};
+    }
+
+    var itemId = _ref.read(playBackModel)?.item.id;
+    var itemName = _ref.read(playBackModel)?.item.name;
+    var apiMinted = _ref.read(playBackModel)?.media?.url;
+    apiMinted = apiMinted?.trim();
+
+    if (apiMinted == null || apiMinted.isEmpty) {
+      out['source'] = 'resume';
+      final resume = await _fetchResumePlaybackUrl(user.id);
+      out.addAll(resume);
+      if (resume['apiMinted'] is String) {
+        apiMinted = resume['apiMinted'] as String;
+      }
+      itemId ??= resume['itemId'] as String?;
+      itemName ??= resume['itemName'] as String?;
+    } else {
+      out['source'] = 'active_playback';
+    }
+
+    out['itemId'] = itemId;
+    out['itemName'] = itemName;
+
+    if (apiMinted == null || apiMinted.isEmpty) {
+      out['skipped'] = true;
+      out['reason'] = out['reason'] ?? 'no_playable_url';
+      return out;
+    }
+
+    out['apiMinted'] = OxplayerStreamLog.describeUrl(apiMinted);
+    out['apiMintedHost'] = OxplayerStreamLog.describeHost(apiMinted);
+
+    if (!oxplayerIsOxStreamUrl(apiMinted)) {
+      out['skipped'] = true;
+      out['reason'] = 'not_ox_stream';
+      return out;
+    }
+
+    final resolved = await oxplayerResolveStreamPlaybackUrl(
+      _ref as Ref,
+      apiMinted,
+      forceRefreshNodes: true,
+    );
+    final finalUrl = resolved ?? apiMinted;
+    out['resolved'] = OxplayerStreamLog.describeUrl(finalUrl);
+    out['resolvedHost'] = OxplayerStreamLog.describeHost(finalUrl);
+    out['isStreamOxplayerIr'] = finalUrl.contains('stream.oxplayer.ir');
+    out['isRemuxTs'] = finalUrl.contains('stream.ts');
+    out['isIranVanity'] = finalUrl.contains('.ir.cdn.ir');
+    out['isMkv'] = finalUrl.contains('.mkv');
+
+    out['rangeProbe'] = kIsWeb
+        ? await OxplayerPlaybackDiagHooks.probeCdnRange(finalUrl)
+        : await _probeHead(finalUrl);
+
+    if (kIsWeb) {
+      out['videoProbe'] = await OxplayerPlaybackDiagHooks.probeVideoLoad(finalUrl);
+    }
+
+    return out;
+  }
+
+  Future<Map<String, Object?>> _fetchResumePlaybackUrl(String userId) async {
+    final api = _ref.read(jellyApiProvider);
+    try {
+      final resume = await api.usersUserIdItemsResumeGet(
+        limit: 8,
+        mediaTypes: [MediaType.video],
+        fields: [ItemFields.mediasources],
+      );
+      final items = resume.body?.items;
+      if (items == null || items.isEmpty) {
+        return {'reason': 'no_resume_items'};
+      }
+
+      for (final item in items) {
+        final itemId = item.id;
+        if (itemId == null || itemId.isEmpty) continue;
+        final playback = await api.itemsItemIdPlaybackInfoPost(
+          itemId: itemId,
+          body: PlaybackInfoDto(
+            userId: userId,
+            enableDirectPlay: true,
+            enableDirectStream: true,
+            enableTranscoding: false,
+            autoOpenLiveStream: true,
+          ),
+        );
+        final source = oxplayerResolvePlaybackMediaSource(playback.body);
+        final path = source?.path?.trim();
+        if (path != null && path.isNotEmpty && oxplayerIsOxStreamUrl(path)) {
+          return {
+            'itemId': itemId,
+            'itemName': item.name,
+            'apiMinted': path,
+          };
+        }
+      }
+      return {'reason': 'resume_items_without_ox_stream'};
+    } catch (e) {
+      return {'error': e.runtimeType.toString()};
+    }
   }
 
   Future<Map<String, Object?>> _probeStreamNodes(String base, String token) async {
@@ -246,6 +384,7 @@ class OxplayerPlaybackDiagRunner {
 
   Map<String, Object?> _deriveChecks(Map<String, Object?> report) {
     final playback = report['playback'];
+    final playbackProbe = report['playbackProbe'];
     final webHooks = report['webHooks'];
     final probes = report['probes'];
 
@@ -254,10 +393,33 @@ class OxplayerPlaybackDiagRunner {
       'streamNodesOk': _nodesOk(probes),
     };
 
+    final cdnRange = probes is Map ? probes['cdnRange'] : null;
+    if (cdnRange is Map) {
+      final streamProbe = cdnRange[OxplayerIranStreamEdge.iranStreamOriginHost];
+      if (streamProbe is Map) {
+        checks['cdnRangeStreamOxplayerIrOk'] = streamProbe['ok'] == true;
+      }
+    }
+
     if (playback is Map<String, Object?>) {
       checks['playbackUsesStreamOxplayerIr'] = playback['isStreamOxplayerIr'] == true;
       checks['playbackUsesIranVanity'] = playback['isIranVanity'] == true;
       checks['playbackUsesRemuxTs'] = playback['isRemuxTs'] == true;
+    }
+
+    if (playbackProbe is Map<String, Object?>) {
+      checks['playbackProbeResolvedStreamOxplayerIr'] = playbackProbe['isStreamOxplayerIr'] == true;
+      checks['playbackProbeUsesRemuxTs'] = playbackProbe['isRemuxTs'] == true;
+      checks['playbackProbeAvoidsIranVanity'] = playbackProbe['isIranVanity'] != true;
+      checks['playbackProbeAvoidsMkv'] = playbackProbe['isMkv'] != true;
+      final rangeProbe = playbackProbe['rangeProbe'];
+      if (rangeProbe is Map) {
+        checks['playbackProbeRangeOk'] = rangeProbe['ok'] == true;
+      }
+      final videoProbe = playbackProbe['videoProbe'];
+      if (videoProbe is Map) {
+        checks['playbackProbeVideoOk'] = videoProbe['ok'] == true;
+      }
     }
 
     if (webHooks is Map<String, Object?>) {

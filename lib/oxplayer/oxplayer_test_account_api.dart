@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/account_model.dart';
-import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_auth_http.dart';
 import 'package:fladder/oxplayer/oxplayer_session.dart';
 import 'package:fladder/providers/auth_provider.dart';
 
@@ -15,23 +15,17 @@ class OxplayerTestAccountApi {
 
   final http.Client _client;
 
-  Uri _uri(String path) {
-    final base = OxplayerEnv.apiBaseUrl;
-    if (base == null) {
-      throw StateError('OXPLAYER_API_BASE_URL is not configured');
-    }
-    return Uri.parse('$base$path');
-  }
-
   Future<Response<AccountModel>?> signIn({
     required WidgetRef ref,
     required String deviceId,
   }) async {
-    final response = await _client.post(
-      _uri('/auth/test-account'),
-      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-      body: jsonEncode({'deviceId': deviceId}),
-    );
+    final response = await OxplayerAuthHttp.send(() => _client.post(
+          OxplayerAuthHttp.uri('/auth/test-account'),
+          headers: OxplayerAuthHttp.headers(
+            extra: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+          ),
+          body: jsonEncode({'deviceId': deviceId}),
+        ));
 
     if (response.statusCode != 200) {
       throw OxplayerTestAccountException(_errorMessage(response));
