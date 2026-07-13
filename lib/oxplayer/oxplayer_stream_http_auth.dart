@@ -1,8 +1,8 @@
 import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_cdn_ir_edge.dart';
+import 'package:fladder/oxplayer/oxplayer_iran_stream_edge.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 
-/// Bearer auth for ox-stream when edge caches by path only (not CDN.ir vanity redirect).
+/// Bearer auth for ox-stream when edge caches by path only (not Iran vanity redirect).
 abstract final class OxplayerStreamHttpAuth {
   static final Map<String, String> _bearerByKey = {};
 
@@ -22,10 +22,10 @@ abstract final class OxplayerStreamHttpAuth {
     return d == '1' || d == 'true' || d == 'yes';
   }
 
-  /// CDN.ir uses ?token= — vanity 302 to edge drops Authorization headers.
+  /// Iran vanity stream uses ?token= — vanity 302 to edge drops Authorization headers.
   static bool needsHeaderAuthForUrl(String url) {
     if (!OxplayerEnv.isEnabled || !oxplayerIsOxStreamUrl(url)) return false;
-    if (OxplayerCdnIrEdge.isCdnIrUrl(url)) return false;
+    if (OxplayerIranStreamEdge.isIranVanityStreamUrl(url)) return false;
     return _explicitHeaderAuth;
   }
 

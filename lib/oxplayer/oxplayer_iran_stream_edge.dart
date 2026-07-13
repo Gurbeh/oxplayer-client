@@ -4,34 +4,34 @@ import 'package:http/http.dart' as http;
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 
-/// CDN.ir vanity (`oxstream.*.ir.cdn.ir`) 302 → `edgeNN.*.ir.cdn.ir` and drops
-/// Authorization on redirect. Resolve edge host and keep JWT in ?token=.
-abstract final class OxplayerCdnIrEdge {
-  /// Arvan stream origin — bypass when CDN.ir vanity probe fails.
-  static const arvanStreamHost = 'stream.oxplayer.ir';
+/// Iran stream vanity host 302 → edge shard; Authorization dropped on redirect.
+/// Resolve edge host and keep JWT in ?token=.
+abstract final class OxplayerIranStreamEdge {
+  /// Direct Iran stream origin when vanity probe fails or web cannot follow redirect.
+  static const iranStreamOriginHost = 'stream.oxplayer.ir';
 
   static final Map<String, String> _resolveCache = {};
 
-  static bool isCdnIrHost(String? host) {
+  static bool isIranVanityStreamHost(String? host) {
     if (host == null || host.isEmpty) return false;
     return host.toLowerCase().endsWith('.ir.cdn.ir');
   }
 
-  static bool isCdnIrUrl(String? url) {
+  static bool isIranVanityStreamUrl(String? url) {
     if (url == null || url.isEmpty) return false;
-    return isCdnIrHost(Uri.tryParse(url)?.host);
+    return isIranVanityStreamHost(Uri.tryParse(url)?.host);
   }
 
   static bool _isVanityHost(String host) {
     final h = host.toLowerCase();
-    return isCdnIrHost(h) && !h.startsWith('edge');
+    return isIranVanityStreamHost(h) && !h.startsWith('edge');
   }
 
   static String _cacheKey(Uri uri) => '${uri.scheme}://${uri.host}${uri.path}';
 
-  /// Vanity → edge redirect; re-attaches stream JWT. Falls back to [arvanStreamHost].
+  /// Vanity → edge redirect; re-attaches stream JWT. Falls back to [iranStreamOriginHost].
   static Future<String> resolvePlaybackUrl(String url) async {
-    if (!oxplayerIsOxStreamUrl(url) || !isCdnIrUrl(url)) return url;
+    if (!oxplayerIsOxStreamUrl(url) || !isIranVanityStreamUrl(url)) return url;
 
     final uri = Uri.tryParse(url);
     if (uri == null || !uri.hasAuthority) return url;
@@ -39,22 +39,22 @@ abstract final class OxplayerCdnIrEdge {
     final host = uri.host.toLowerCase();
     if (!_isVanityHost(host)) return url;
 
-    // Browser cannot read CDN.ir vanity Location (CORS); use Arvan stream (CORS-enabled).
+    // Web cannot read vanity Location (CORS); use direct Iran stream origin.
     if (kIsWeb) {
       final token = uri.queryParameters['token']?.trim();
-      return _fallbackArvanOrigin(uri, token);
+      return _fallbackIranOrigin(uri, token);
     }
 
     final cached = _resolveCache[_cacheKey(uri)];
     if (cached != null && cached.isNotEmpty) return cached;
 
     final token = uri.queryParameters['token']?.trim();
-    final resolved = await _probeVanityRedirect(uri, token) ?? _fallbackArvanOrigin(uri, token);
+    final resolved = await _probeVanityRedirect(uri, token) ?? _fallbackIranOrigin(uri, token);
     _resolveCache[_cacheKey(uri)] = resolved;
     return resolved;
   }
 
-  /// GET + Range (HEAD hangs on CDN.ir vanity); do not follow redirect to edge.
+  /// GET + Range (HEAD hangs on vanity); do not follow redirect to edge.
   static Future<String?> _probeVanityRedirect(Uri uri, String? token) async {
     final client = http.Client();
     try {
@@ -62,7 +62,7 @@ abstract final class OxplayerCdnIrEdge {
       final res = await client.send(req).timeout(const Duration(seconds: 5));
       try {
         final status = res.statusCode;
-        OxplayerStreamLog.event('cdn_ir_edge_probe', fields: {
+        OxplayerStreamLog.event('iran_stream_edge_probe', fields: {
           'fromHost': uri.host,
           'status': status,
         });
@@ -72,7 +72,7 @@ abstract final class OxplayerCdnIrEdge {
         if (loc == null || loc.trim().isEmpty) return null;
 
         final edge = Uri.parse(loc.trim());
-        if (!isCdnIrHost(edge.host) || edge.host.toLowerCase() == uri.host.toLowerCase()) {
+        if (!isIranVanityStreamHost(edge.host) || edge.host.toLowerCase() == uri.host.toLowerCase()) {
           return null;
         }
 
@@ -81,7 +81,7 @@ abstract final class OxplayerCdnIrEdge {
           params['token'] = token;
         }
         final out = edge.replace(queryParameters: params).toString();
-        OxplayerStreamLog.event('cdn_ir_edge_resolve', fields: {
+        OxplayerStreamLog.event('iran_stream_edge_resolve', fields: {
           'fromHost': uri.host,
           'toHost': edge.host,
           'hasToken': token != null && token.isNotEmpty,
@@ -92,7 +92,7 @@ abstract final class OxplayerCdnIrEdge {
         await res.stream.drain();
       }
     } catch (e) {
-      OxplayerStreamLog.event('cdn_ir_edge_resolve', fields: {
+      OxplayerStreamLog.event('iran_stream_edge_resolve', fields: {
         'fromHost': uri.host,
         'error': e.runtimeType.toString(),
       });
@@ -102,19 +102,19 @@ abstract final class OxplayerCdnIrEdge {
     }
   }
 
-  static String _fallbackArvanOrigin(Uri vanity, String? token) {
+  static String _fallbackIranOrigin(Uri vanity, String? token) {
     final params = Map<String, String>.from(vanity.queryParameters);
     if (token != null && token.isNotEmpty) {
       params['token'] = token;
     }
     final out = vanity.replace(
       scheme: 'https',
-      host: arvanStreamHost,
+      host: iranStreamOriginHost,
       queryParameters: params.isEmpty ? null : params,
     ).toString();
-    OxplayerStreamLog.event('cdn_ir_arvan_fallback', fields: {
+    OxplayerStreamLog.event('iran_stream_origin_fallback', fields: {
       'fromHost': vanity.host,
-      'toHost': arvanStreamHost,
+      'toHost': iranStreamOriginHost,
       'finalUrl': OxplayerStreamLog.describeUrl(out),
     });
     return out;

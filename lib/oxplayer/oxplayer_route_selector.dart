@@ -12,7 +12,7 @@ import 'package:fladder/oxplayer/oxplayer_route_hints.dart';
 import 'package:fladder/oxplayer/oxplayer_route_store.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 
-/// Startup edge resolution: global (Cloudflare) outside Iran; Arvan API + CDN.ir stream inside Iran.
+/// Startup edge resolution: global outside Iran; Iran .ir API + stream inside Iran.
 abstract final class OxplayerRouteSelector {
   static const _probeTimeout = Duration(seconds: 2);
 

@@ -10,7 +10,7 @@ import 'package:fladder/oxplayer/oxplayer_route.dart';
 /// Stream playback tracing — visible in `pnpm dev:android:logs --stream`.
 ///
 /// Chopper only logs Jellyfin API (`api.oxplayer.*`). Video bytes go direct to
-/// ox-stream / CDN.ir and never hit the HTTP client interceptor.
+/// ox-stream / Iran vanity stream and never hit the HTTP client interceptor.
 abstract final class OxplayerStreamLog {
   static const _logName = 'OX_STREAM';
 

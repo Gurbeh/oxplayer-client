@@ -1,6 +1,6 @@
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 
-/// Env keys for dual-edge routing (global Cloudflare vs Iran CDN.ir / .ir).
+/// Env keys for dual-edge routing (global vs Iran .ir cohort).
 abstract final class OxplayerRouteEnv {
   static const String _cGlobalApi = String.fromEnvironment('OXPLAYER_API_BASE_URL', defaultValue: '');
   static const String _cIranApi = String.fromEnvironment('OXPLAYER_API_BASE_IRAN', defaultValue: '');
@@ -58,8 +58,8 @@ abstract final class OxplayerRouteEnv {
 
   static bool get hasIranRoute => iranApiBaseUrl != null;
 
-  /// True when Iran stream vanity is a CDN.ir distribution (*.ir.cdn.ir).
-  static bool get usesIranCdnStream {
+  /// True when Iran stream vanity uses a domestic distribution host (*.ir.cdn.ir).
+  static bool get usesIranStreamVanity {
     final vanity = iranStreamBaseUrl?.toLowerCase() ?? '';
     return vanity.contains('.cdn.ir');
   }

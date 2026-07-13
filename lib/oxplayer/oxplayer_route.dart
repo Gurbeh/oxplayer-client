@@ -100,7 +100,7 @@ abstract final class OxplayerRoute {
           scheme: vanityUri.scheme,
           host: vanityUri.host,
         );
-        rewriteKind = 'iran_cdn_vanity';
+        rewriteKind = 'iran_stream_vanity';
       }
     }
 

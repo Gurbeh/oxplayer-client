@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:fladder/oxplayer/oxplayer_cdn_ir_edge.dart';
+import 'package:fladder/oxplayer/oxplayer_iran_stream_edge.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_route.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
@@ -32,11 +32,11 @@ class OxplayerStreamNodeSession {
 
 final _streamNodesApiProvider = Provider<OxplayerStreamNodesApi>((ref) => OxplayerStreamNodesApi());
 
-/// Applies Iran CDN vanity / edge pin — independent of stream-node discovery.
+/// Applies Iran stream vanity / edge pin — independent of stream-node discovery.
 Future<String> _finalizeStreamPlaybackUrl(String url, {required String via}) async {
   var out = OxplayerRoute.rewriteStreamUri(url);
-  if (OxplayerCdnIrEdge.isCdnIrUrl(out)) {
-    out = await OxplayerCdnIrEdge.resolvePlaybackUrl(out);
+  if (OxplayerIranStreamEdge.isIranVanityStreamUrl(out)) {
+    out = await OxplayerIranStreamEdge.resolvePlaybackUrl(out);
   }
   if (out != url) {
     OxplayerStreamLog.event('resolve_finalize', fields: {
@@ -57,7 +57,7 @@ Future<String> _finalizeStreamPlaybackUrl(String url, {required String via}) asy
   return OxplayerStreamHttpAuth.stripAndRegister(out);
 }
 
-/// Iran cohort: rewrite global stream host → CDN.ir before node discovery.
+/// Iran cohort: rewrite global stream host → Iran vanity before node discovery.
 String _iranVanityEarly(String url) {
   if (OxplayerRoute.active != OxplayerEdge.iran) return url;
   final out = OxplayerRoute.rewriteStreamUri(url);
@@ -91,7 +91,7 @@ Future<String?> oxplayerResolveStreamPlaybackUrl(
   });
 
   OxplayerStreamHttpAuth.clear();
-  OxplayerCdnIrEdge.clearCache();
+  OxplayerIranStreamEdge.clearCache();
 
   var workingUrl = _iranVanityEarly(apiMintedUrl);
 

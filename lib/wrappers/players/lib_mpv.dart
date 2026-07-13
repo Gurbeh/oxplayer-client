@@ -19,7 +19,7 @@ import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/settings/subtitle_settings_model.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
-import 'package:fladder/oxplayer/oxplayer_cdn_ir_edge.dart';
+import 'package:fladder/oxplayer/oxplayer_iran_stream_edge.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
@@ -328,8 +328,8 @@ class LibMPV extends BasePlayer {
 
     await setStartPosition(serverSeek ? Duration.zero : startPosition);
 
-    if (OxplayerCdnIrEdge.isCdnIrUrl(url)) {
-      url = await OxplayerCdnIrEdge.resolvePlaybackUrl(url);
+    if (OxplayerIranStreamEdge.isIranVanityStreamUrl(url)) {
+      url = await OxplayerIranStreamEdge.resolvePlaybackUrl(url);
     }
 
     url = OxplayerStreamHttpAuth.stripAndRegister(url);

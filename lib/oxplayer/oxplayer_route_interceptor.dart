@@ -13,7 +13,7 @@ import 'package:fladder/oxplayer/oxplayer_route_selector.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_nodes_api.dart';
 import 'package:fladder/providers/api_provider.dart';
 
-/// On HTTP 451 from global API (Iran enforce), flips to Arvan edge and retries once.
+/// On HTTP 451 from global API (Iran enforce), flips to Iran edge and retries once.
 class OxplayerRouteInterceptor implements Interceptor {
   OxplayerRouteInterceptor(this.ref);
 
