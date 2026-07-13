@@ -1,0 +1,1 @@
+Fix release CI when Hetzner deploy token is missing.

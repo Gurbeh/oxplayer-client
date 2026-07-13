@@ -1099,8 +1099,8 @@ jobs:
     needs: [fetch-info, create_release]
     if: |
       needs.fetch-info.outputs.build_type == 'release' &&
-      needs.create_release.result == 'success' &&
-      secrets.OXPLAYER_BE_DISPATCH_TOKEN != ''
+      needs.create_release.result == 'success'
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -1111,6 +1111,10 @@ jobs:
           BE_REPO: Aryan-mor/oxplayer-be
         run: |
           set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::Skip Hetzner deploy: set secret OXPLAYER_BE_DISPATCH_TOKEN (PAT with repo + workflow on oxplayer-be)"
+            exit 0
+          fi
           echo "Dispatch deploy-client-web v${VERSION} → ${BE_REPO}"
           gh api "repos/${BE_REPO}/dispatches" \
             -f event_type=deploy-client-web \
