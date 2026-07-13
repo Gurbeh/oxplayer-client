@@ -3,6 +3,15 @@ import 'dart:js_interop';
 
 import 'package:web/web.dart' as web;
 
+@JS('window.__oxPlaybackDiagInstall')
+external void _oxPlaybackDiagInstall();
+
+@JS('window.__oxPlaybackDiagUninstall')
+external void _oxPlaybackDiagUninstall();
+
+@JS('window.__oxPlaybackDiagSnapshotJson')
+external String? _oxPlaybackDiagSnapshotJson();
+
 /// Web-only DOM hooks for stream / video diagnostics.
 abstract final class OxplayerPlaybackDiagHooks {
   static bool _installed = false;
@@ -15,18 +24,18 @@ abstract final class OxplayerPlaybackDiagHooks {
       ..type = 'text/javascript'
       ..text = _hookScript;
     web.document.head?.append(script);
-    _callInstall();
+    _oxPlaybackDiagInstall();
   }
 
   static void uninstall() {
     if (!_installed) return;
-    _callUninstall();
+    _oxPlaybackDiagUninstall();
     _installed = false;
   }
 
   static Map<String, Object?> snapshot() {
     if (!_installed) return const {};
-    final raw = _callSnapshot();
+    final raw = _oxPlaybackDiagSnapshotJson();
     if (raw == null || raw.isEmpty) return const {};
     try {
       final decoded = jsonDecode(raw);
@@ -38,15 +47,6 @@ abstract final class OxplayerPlaybackDiagHooks {
   }
 
   static bool get isInstalled => _installed;
-
-  @JS('window.__oxPlaybackDiagInstall')
-  external static void _callInstall();
-
-  @JS('window.__oxPlaybackDiagUninstall')
-  external static void _callUninstall();
-
-  @JS('window.__oxPlaybackDiagSnapshotJson')
-  external static String? _callSnapshot();
 }
 
 const _hookScript = r'''
