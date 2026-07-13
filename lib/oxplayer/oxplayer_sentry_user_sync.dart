@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fladder/models/account_model.dart';
+import 'package:fladder/oxplayer/oxplayer_crashlytics.dart';
 import 'package:fladder/oxplayer/oxplayer_sentry.dart';
 import 'package:fladder/providers/user_provider.dart';
 
-/// Keeps Sentry user context in sync with the signed-in Jellyfin account.
+/// Keeps Sentry + Crashlytics user context in sync with the signed-in Jellyfin account.
 class OxplayerSentryUserSync extends ConsumerStatefulWidget {
   const OxplayerSentryUserSync({required this.child, super.key});
 
@@ -21,13 +22,18 @@ class _OxplayerSentryUserSyncState extends ConsumerState<OxplayerSentryUserSync>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) OxplayerSentry.syncUser(ref.read(userProvider));
+      if (mounted) {
+        final account = ref.read(userProvider);
+        OxplayerSentry.syncUser(account);
+        OxplayerCrashlytics.syncUser(account);
+      }
     });
     _userSub = ref.listenManual<AccountModel?>(userProvider, (prev, next) {
       final prevId = prev?.id;
       final nextId = next?.id;
       if (prevId == nextId) return;
       OxplayerSentry.syncUser(next);
+      OxplayerCrashlytics.syncUser(next);
     });
   }
 

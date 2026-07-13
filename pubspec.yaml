@@ -150,6 +150,8 @@ dependencies:
   qr_flutter: ^4.1.0
   flutter_dotenv: ^5.2.1
   in_app_update: ^4.2.5
+  firebase_core: 3.15.2
+  firebase_crashlytics: 4.3.10
 
 dependency_overrides:
   # Upstream includes web subtitle fix (oncuechange .toJS); DonutWare fork still broken on web.

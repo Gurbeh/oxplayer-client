@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+
+import 'package:fladder/oxplayer/oxplayer_crashlytics.dart';
 
 /// RSS above this on phone/tablet triggers a Sentry warning event.
 const kOxHighMemoryRssMbPhone = 512;
@@ -51,6 +54,7 @@ abstract final class OxplayerMemoryTelemetry {
   /// Called from app root when [ArgumentsModel.leanBackMode] is known.
   static void syncDeviceProfile({required bool leanBack}) {
     _leanBack = leanBack;
+    OxplayerCrashlytics.syncDeviceProfile(leanBack: leanBack);
   }
 
   static OxplayerMemorySnapshot sample() {
@@ -76,6 +80,11 @@ abstract final class OxplayerMemoryTelemetry {
       action: action,
       route: route,
     );
+    OxplayerCrashlytics.setScreen(route);
+    final rssMb = snapshot.rssMb;
+    if (rssMb != null) {
+      unawaited(OxplayerCrashlytics.log('nav:$action $route rss=${rssMb}MB cache=${snapshot.imageCacheBytes}'));
+    }
     _addNavigationBreadcrumb(
       snapshot: snapshot,
       action: action,

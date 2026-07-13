@@ -16,6 +16,12 @@
 -keep class io.sentry.** { *; }
 -dontwarn io.sentry.**
 
+# Firebase Crashlytics
+-keepattributes SourceFile,LineNumberTable
+-keep public class * extends java.lang.Exception
+-keep class com.google.firebase.crashlytics.** { *; }
+-dontwarn com.google.firebase.crashlytics.**
+
 # Jellyfin / Media3 / ExoPlayer (native player stack)
 -keep class androidx.media3.** { *; }
 -dontwarn androidx.media3.**

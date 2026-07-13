@@ -185,6 +185,29 @@ jobs:
 
       - uses: ./.github/actions/oxplayer-flutter-env
 
+      - name: Materialize Firebase client config (CONSOLE_FIREBASE)
+        shell: bash
+        run: |
+          if [ -z "${CONSOLE_FIREBASE:-}" ]; then
+            echo "CONSOLE_FIREBASE not set — skipping Firebase client config sync"
+          else
+            node scripts/sync-firebase-client-config.mjs
+          fi
+
+      - name: Materialize Firebase google-services.json (legacy fallback)
+        shell: bash
+        run: |
+          if [ -n "${CONSOLE_FIREBASE:-}" ]; then
+            echo "google-services.json already synced from CONSOLE_FIREBASE"
+            exit 0
+          fi
+          if [ -n "${FIREBASE_GOOGLE_SERVICES_JSON:-}" ]; then
+            printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON" > android/app/google-services.json
+            echo "Wrote android/app/google-services.json (${#FIREBASE_GOOGLE_SERVICES_JSON} bytes from Infisical)"
+          else
+            echo "No CONSOLE_FIREBASE or FIREBASE_GOOGLE_SERVICES_JSON — Crashlytics native config skipped"
+          fi
+
       - name: Cache libmpv Android JARs
         uses: actions/cache@v4
         with:

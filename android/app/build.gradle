@@ -185,3 +185,15 @@ def stripFvpFromPluginRegistrant = tasks.register("stripFvpFromPluginRegistrant"
 tasks.named("preBuild").configure {
     dependsOn stripFvpFromPluginRegistrant
 }
+
+def oxGoogleServicesCandidates = [
+        file("google-services.json"),
+        file("src/development/google-services.json"),
+        file("src/production/google-services.json"),
+]
+def oxGoogleServicesFile = oxGoogleServicesCandidates.find { it.isFile() }
+if (oxGoogleServicesFile != null) {
+    apply plugin: "com.google.gms.google-services"
+    apply plugin: "com.google.firebase.crashlytics"
+    logger.lifecycle("OXPlayer: Firebase google-services from ${oxGoogleServicesFile.name}")
+}

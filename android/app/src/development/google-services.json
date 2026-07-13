@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "637937620157",
+    "project_id": "oxplayer-f5353",
+    "storage_bucket": "oxplayer-f5353.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:637937620157:android:f31d26e7666f120ecf53d4",
+        "android_client_info": {
+          "package_name": "app.oxplayer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD_YxfcRDxwXa0hMRzBhaGzqNtZ1GdtAEI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:637937620157:android:3005e8a957fd5310cf53d4",
+        "android_client_info": {
+          "package_name": "app.oxplayer.dev"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD_YxfcRDxwXa0hMRzBhaGzqNtZ1GdtAEI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

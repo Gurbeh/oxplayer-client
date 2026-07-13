@@ -86,6 +86,10 @@ dart_defines.ngrok.json
 dart_defines.dev.json
 dart_defines.prod.json
 
+# Firebase Admin SDK service account (Infisical CONSOLE_FIREBASE only)
+*firebase-adminsdk*.json
+**/oxplayer-*-firebase-adminsdk-*.json
+
 # Cursor — local-only agent rules
 .cursor/rules/*.local.mdc
 

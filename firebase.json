@@ -1,0 +1,21 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "oxplayer-f5353",
+          "appId": "1:637937620157:android:f31d26e7666f120ecf53d4",
+          "fileOutput": "android/app/src/production/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "oxplayer-f5353",
+          "configurations": {
+            "android": "1:637937620157:android:f31d26e7666f120ecf53d4"
+          }
+        }
+      }
+    }
+  }
+}

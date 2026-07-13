@@ -10,6 +10,7 @@ import 'package:fladder/bootstrap/app_bootstrap.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/oxplayer/oxplayer_bootstrap.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_crashlytics.dart';
 import 'package:fladder/oxplayer/oxplayer_image_notifier.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_queue.dart';
 import 'package:fladder/oxplayer/services/ox_github_update_service.dart';
@@ -53,12 +54,16 @@ void main(List<String> args) async {
 
   Future<void> runOxApp() async {
     await OxplayerBootstrap.beforeAppBootstrap(args);
+    if (!kIsWeb) {
+      await OxplayerCrashlytics.init();
+    }
 
     final bootstrap = await bootstrapApplication(args);
 
     await OxplayerBootstrap.afterAppBootstrap(bootstrap);
     if (!kIsWeb) {
       OxplayerSentry.chainErrorHandlers();
+      OxplayerCrashlytics.chainErrorHandlers();
       await bootstrap.crashProvider.ready;
       await bootstrap.crashProvider.flushUnreportedToSentry();
     }
