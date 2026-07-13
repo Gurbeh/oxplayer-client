@@ -1111,8 +1111,8 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${GH_TOKEN:-}" ]; then
-            echo "::error::Set secret OXPLAYER_BE_DISPATCH_TOKEN (PAT with repo + workflow on oxplayer-be)"
-            exit 1
+            echo "::warning::Skip Hetzner deploy: set secret OXPLAYER_BE_DISPATCH_TOKEN (PAT with repo + workflow on oxplayer-be)"
+            exit 0
           fi
           echo "Dispatch deploy-client-web v${VERSION} → ${BE_REPO}"
           gh api "repos/${BE_REPO}/dispatches" \
