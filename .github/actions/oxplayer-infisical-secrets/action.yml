@@ -62,6 +62,24 @@ runs:
         authkey: ${{ inputs.tailscale-authkey }}
         version: 1.78.1
 
+    - name: Wait for Infisical API
+      if: inputs.connect-tailscale == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        status_url="${{ inputs.infisical-domain }}"
+        status_url="${status_url%/}/api/status"
+        for attempt in $(seq 1 36); do
+          if curl -fsS --max-time 5 "${status_url}" >/dev/null 2>&1; then
+            echo "Infisical healthy (${status_url})"
+            exit 0
+          fi
+          echo "Attempt ${attempt}/36: Infisical not reachable yet..."
+          sleep 5
+        done
+        echo "::error::Infisical unreachable at ${status_url} after 180s"
+        exit 1
+
     - name: Fetch secrets from Infisical
       uses: Infisical/secrets-action@v1.0.12
       with:

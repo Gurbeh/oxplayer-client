@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
@@ -37,6 +38,12 @@ abstract final class OxplayerCdnIrEdge {
 
     final host = uri.host.toLowerCase();
     if (!_isVanityHost(host)) return url;
+
+    // Browser cannot read CDN.ir vanity Location (CORS); use Arvan stream (CORS-enabled).
+    if (kIsWeb) {
+      final token = uri.queryParameters['token']?.trim();
+      return _fallbackArvanOrigin(uri, token);
+    }
 
     final cached = _resolveCache[_cacheKey(uri)];
     if (cached != null && cached.isNotEmpty) return cached;
