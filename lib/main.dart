@@ -14,6 +14,7 @@ import 'package:fladder/oxplayer/oxplayer_image_notifier.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_queue.dart';
 import 'package:fladder/oxplayer/services/ox_github_update_service.dart';
 import 'package:fladder/oxplayer/services/ox_update_service.dart';
+import 'package:fladder/oxplayer/oxplayer_memory_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_sentry.dart';
 import 'package:fladder/bootstrap/platform/platform_app_wrapper.dart';
@@ -131,6 +132,11 @@ class _FladderApp extends ConsumerWidget {
     final language = ref.watch(clientSettingsProvider
         .select((value) => value.selectedLocale ?? WidgetsBinding.instance.platformDispatcher.locale));
     final scrollBehaviour = const MaterialScrollBehavior();
+    if (OxplayerConfig.isEnabled) {
+      OxplayerMemoryTelemetry.syncDeviceProfile(
+        leanBack: ref.watch(argumentsStateProvider.select((value) => value.leanBackMode)),
+      );
+    }
     return DynamicColorBuilder(
       builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
         final baseLightTheme = themeColor == null

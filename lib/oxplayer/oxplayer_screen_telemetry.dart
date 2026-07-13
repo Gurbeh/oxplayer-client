@@ -2,6 +2,8 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
+import 'package:fladder/oxplayer/oxplayer_memory_telemetry.dart';
+
 /// Reports screens whose first frame after navigation exceeds this threshold.
 const kOxSlowScreenFirstFrameMs = 2500;
 
@@ -88,6 +90,11 @@ final class OxplayerRouteTelemetryObserver extends NavigatorObserver {
           ms: active.elapsedMilliseconds,
           thresholdMs: kOxSlowScreenFirstFrameMs,
         );
+        OxplayerMemoryTelemetry.onNavigation(
+          action: 'push',
+          route: name,
+          from: from,
+        );
       });
     });
   }
@@ -96,10 +103,16 @@ final class OxplayerRouteTelemetryObserver extends NavigatorObserver {
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
     _pending.remove(route)?.stop();
     final name = _routeName(route);
+    final to = previousRoute != null ? _routeName(previousRoute) : null;
     _recordNavigationBreadcrumb(
       action: 'pop',
       route: name,
-      from: previousRoute != null ? _routeName(previousRoute) : null,
+      from: to,
+    );
+    OxplayerMemoryTelemetry.onNavigation(
+      action: 'pop',
+      route: to ?? name,
+      from: name,
     );
     if (previousRoute != null) {
       _lastRoute = _routeName(previousRoute);

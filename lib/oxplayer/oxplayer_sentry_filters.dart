@@ -13,7 +13,11 @@ abstract final class OxplayerSentryFilters {
 
     final tags = event.tags ?? {};
     if (tags['transient'] == 'true') return null;
-    if (tags['perf'] == 'slow_screen' || tags['perf'] == 'slow_splash') return null;
+    if (tags['perf'] == 'slow_screen' ||
+        tags['perf'] == 'slow_splash' ||
+        tags['perf'] == 'high_memory') {
+      return null;
+    }
     if (message != null && message.contains('playback volume anomaly:')) return null;
 
     if (_stackContainsAny(event, const [
