@@ -1,0 +1,1 @@
+CI: skip Hetzner deploy without dispatch token.
