@@ -329,7 +329,7 @@ class LibMPV extends BasePlayer {
 
     url = OxplayerStreamHttpAuth.stripAndRegister(url);
 
-    if (OxplayerStreamHttpAuth.headerAuthEnabled) {
+    if (OxplayerStreamHttpAuth.needsHeaderAuthForUrl(url)) {
       final bearer = OxplayerStreamHttpAuth.bearerFor(url);
       if (bearer != null && bearer.isNotEmpty && _player?.platform is mpv.NativePlayer) {
         await (_player?.platform as dynamic).setProperty(

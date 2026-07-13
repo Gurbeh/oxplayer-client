@@ -135,6 +135,8 @@ abstract final class OxplayerRoute {
 
   static bool _isStreamHost(String host) {
     final h = host.toLowerCase();
-    return h == 'stream.oxplayer.app' || _isGlobalStreamNodeHost(h);
+    return h == 'stream.oxplayer.app' ||
+        h == 'stream.oxplayer.ir' ||
+        _isGlobalStreamNodeHost(h);
   }
 }

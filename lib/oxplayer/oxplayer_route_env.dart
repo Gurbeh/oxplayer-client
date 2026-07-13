@@ -57,4 +57,10 @@ abstract final class OxplayerRouteEnv {
   }
 
   static bool get hasIranRoute => iranApiBaseUrl != null;
+
+  /// True when Iran stream vanity is a CDN.ir distribution (*.ir.cdn.ir).
+  static bool get usesIranCdnStream {
+    final vanity = iranStreamBaseUrl?.toLowerCase() ?? '';
+    return vanity.contains('.cdn.ir');
+  }
 }

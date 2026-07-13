@@ -10,7 +10,7 @@ import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/oxplayer/ox_staged_detail_load.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
-import 'package:fladder/oxplayer/oxplayer_share.dart';
+import 'package:fladder/oxplayer/oxplayer_media_variant.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/util/item_base_model/item_base_model_extensions.dart';
@@ -42,7 +42,7 @@ class MovieDetails extends _$MovieDetails {
         if (OxplayerConfig.isEnabled) {
           final core = await oxFetchMovieCoreState(ref, item, state);
           if (core == null) return null;
-          var playable = oxplayerApplyShareMediaSourceToMovie(core, ref) ?? core;
+          var playable = oxplayerPrepareMovieMediaStreams(core, ref) ?? core;
           apply(playable);
 
           oxPrefetchMovieSeerrRatings(ref, item.id, core.tmdbId);
@@ -67,7 +67,7 @@ class MovieDetails extends _$MovieDetails {
           specialFeatures: supplementary.specialFeatures,
         );
         if (OxplayerConfig.isEnabled) {
-          merged = oxplayerApplyShareMediaSourceToMovie(merged, ref) ?? merged;
+          merged = oxplayerPrepareMovieMediaStreams(merged, ref) ?? merged;
         }
         apply(merged);
         return null;
@@ -102,7 +102,7 @@ class MovieDetails extends _$MovieDetails {
         seerrUrl: supplementary.seerrUrl,
         specialFeatures: supplementary.specialFeatures,
       );
-      merged = oxplayerApplyShareMediaSourceToMovie(merged, ref) ?? merged;
+      merged = oxplayerPrepareMovieMediaStreams(merged, ref) ?? merged;
       state = merged;
     } catch (e) {
       log("Error loading staged movie details: $e");

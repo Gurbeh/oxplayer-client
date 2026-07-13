@@ -12,6 +12,7 @@ import 'package:fladder/oxplayer/ox_library_detail_labels.dart';
 import 'package:fladder/oxplayer/oxplayer_detail_loading.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
+import 'package:fladder/oxplayer/oxplayer_media_variant.dart';
 import 'package:fladder/oxplayer/ox_series_episode_actions.dart';
 import 'package:fladder/oxplayer/ox_series_selected_episode.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
@@ -184,6 +185,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                         ? MediaStreamHelper(
                             mediaStream: currentEpisode.mediaStreams,
                             onItemChanged: (changed) {
+                              oxplayerOnUserMediaStreamsChanged(ref, changed);
                               final updateEpisode = currentEpisode.copyWith(
                                 mediaStreams: changed,
                               );

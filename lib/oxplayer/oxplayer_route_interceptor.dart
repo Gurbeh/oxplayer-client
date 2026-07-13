@@ -8,11 +8,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_route.dart';
 import 'package:fladder/oxplayer/oxplayer_route_env.dart';
+import 'package:fladder/oxplayer/oxplayer_route_hints.dart';
 import 'package:fladder/oxplayer/oxplayer_route_selector.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_nodes_api.dart';
 import 'package:fladder/providers/api_provider.dart';
 
-/// On HTTP 451 or connection failure to global CDN, flips to Iran edge and retries once.
+/// On HTTP 451 from global API (Iran enforce), flips to Arvan edge and retries once.
 class OxplayerRouteInterceptor implements Interceptor {
   OxplayerRouteInterceptor(this.ref);
 
@@ -73,8 +74,7 @@ class OxplayerRouteInterceptor implements Interceptor {
   }
 
   bool _isOxRouteRequired(Response<dynamic> response) {
-    final header = response.headers['x-ox-route-required'] ?? response.headers['X-Ox-Route-Required'];
-    if (header != null && _isIranRouteHeader(header)) {
+    if (OxplayerRouteHints.headersRequireIranRoute(response.headers)) {
       return true;
     }
 
@@ -92,15 +92,5 @@ class OxplayerRouteInterceptor implements Interceptor {
       }
     } catch (_) {}
     return false;
-  }
-
-  bool _isIranRouteHeader(String header) {
-    switch (header.trim().toLowerCase()) {
-      case 'iran':
-      case 'arvan':
-        return true;
-      default:
-        return false;
-    }
   }
 }

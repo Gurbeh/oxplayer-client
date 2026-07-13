@@ -8,9 +8,11 @@ import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 import 'package:fladder/oxplayer/oxplayer_route.dart';
 import 'package:fladder/oxplayer/oxplayer_route_env.dart';
+import 'package:fladder/oxplayer/oxplayer_route_hints.dart';
 import 'package:fladder/oxplayer/oxplayer_route_store.dart';
+import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 
-/// Startup edge resolution: global (Cloudflare → Hetzner) unless Iran enforce blocks it.
+/// Startup edge resolution: global (Cloudflare) outside Iran; Arvan API + CDN.ir stream inside Iran.
 abstract final class OxplayerRouteSelector {
   static const _probeTimeout = Duration(seconds: 2);
 
@@ -63,12 +65,22 @@ abstract final class OxplayerRouteSelector {
       for (final p in probes) p.edge: p.ok,
     };
 
+    ({OxplayerEdge edge, bool ok, bool iranRouteHint})? globalProbe;
+    for (final p in probes) {
+      if (p.edge == OxplayerEdge.global) {
+        globalProbe = p;
+        break;
+      }
+    }
     final globalOk = healthy[OxplayerEdge.global] == true;
     final iranOk = healthy[OxplayerEdge.iran] == true;
     final globalBlocked = global != null && globalOk && await _globalPathBlocked(global);
+    final iranRouteRequired = globalBlocked || (globalProbe?.iranRouteHint ?? false);
 
     final OxplayerEdge chosen;
-    if (globalOk && !globalBlocked) {
+    if (iranRouteRequired && iranOk) {
+      chosen = OxplayerEdge.iran;
+    } else if (globalOk && !iranRouteRequired) {
       chosen = OxplayerEdge.global;
     } else if (iranOk) {
       chosen = OxplayerEdge.iran;
@@ -82,9 +94,21 @@ abstract final class OxplayerRouteSelector {
 
     OxplayerRoute.setActive(chosen);
     await store.saveEdge(chosen);
+    OxplayerStreamLog.event('route_resolve', fields: {
+      'edge': chosen.name,
+      'api': OxplayerRoute.apiBaseUrl,
+      'streamVanity': OxplayerRoute.streamBaseUrl,
+      'iranRouteRequired': iranRouteRequired,
+      'globalOk': globalOk,
+      'iranOk': iranOk,
+      'globalBlocked': globalBlocked,
+    });
   }
 
-  static Future<({OxplayerEdge edge, bool ok})> _probeHealth(String baseUrl, {required OxplayerEdge edge}) async {
+  static Future<({OxplayerEdge edge, bool ok, bool iranRouteHint})> _probeHealth(
+    String baseUrl, {
+    required OxplayerEdge edge,
+  }) async {
     try {
       final pin = edge == OxplayerEdge.iran ? OxplayerRouteEnv.iranEdgeAddr : null;
       var uri = Uri.parse('$baseUrl/health');
@@ -98,10 +122,16 @@ abstract final class OxplayerRouteSelector {
       }
 
       final response = await http.get(uri, headers: headers).timeout(_probeTimeout);
-      return (edge: edge, ok: response.statusCode >= 200 && response.statusCode < 500);
+      final ok = response.statusCode >= 200 && response.statusCode < 500;
+      final iranRouteHint = edge == OxplayerEdge.global && ok && _responseIndicatesIranRoute(response);
+      return (edge: edge, ok: ok, iranRouteHint: iranRouteHint);
     } catch (_) {
-      return (edge: edge, ok: false);
+      return (edge: edge, ok: false, iranRouteHint: false);
     }
+  }
+
+  static bool _responseIndicatesIranRoute(http.Response response) {
+    return OxplayerRouteHints.headersRequireIranRoute(response.headers);
   }
 
   static Future<void> switchTo(OxplayerEdge edge) async {
@@ -118,20 +148,10 @@ abstract final class OxplayerRouteSelector {
           .timeout(_probeTimeout);
       if (response.statusCode != 451) return false;
       final header = response.headers['x-ox-route-required'];
-      if (header != null && _isIranRouteRequired(header)) return true;
+      if (header != null && OxplayerRouteHints.isIranRouteRequiredHeader(header)) return true;
       return response.body.contains('ox_route_required');
     } catch (_) {
       return false;
-    }
-  }
-
-  static bool _isIranRouteRequired(String header) {
-    switch (header.trim().toLowerCase()) {
-      case 'iran':
-      case 'arvan':
-        return true;
-      default:
-        return false;
     }
   }
 

@@ -19,6 +19,7 @@ import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
 import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
 import 'package:fladder/oxplayer/ox_season_user_data.dart';
 import 'package:fladder/oxplayer/ox_series_details_loader.dart';
+import 'package:fladder/oxplayer/oxplayer_media_variant.dart';
 import 'package:fladder/oxplayer/ox_virtual_episode_images.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/providers/api_provider.dart';
@@ -173,10 +174,13 @@ Future<SeriesModel> oxLoadSeriesCatalogPhase(
     episodeItems = episodes.body?.items ?? const [];
   }
 
-  final newEpisodes = oxApplyVirtualEpisodeImages(
-    EpisodeModel.episodesFromDto(episodeItems, ref),
-    episodeItems,
+  final newEpisodes = oxplayerPrepareEpisodeListMediaStreams(
     ref,
+    oxApplyVirtualEpisodeImages(
+      EpisodeModel.episodesFromDto(episodeItems, ref),
+      episodeItems,
+      ref,
+    ),
   );
 
   final episodesCanDownload = newEpisodes.any((episode) => episode.canDownload == true);

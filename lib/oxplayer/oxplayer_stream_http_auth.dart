@@ -1,5 +1,6 @@
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
+import 'package:fladder/oxplayer/oxplayer_route_env.dart';
 
 /// Bearer auth for ox-stream when [headerAuthEnabled] — strips ?token= for CDN uri cache.
 abstract final class OxplayerStreamHttpAuth {
@@ -13,9 +14,22 @@ abstract final class OxplayerStreamHttpAuth {
   /// True when stream JWT should move from query string to Authorization header.
   static bool get headerAuthEnabled {
     if (!OxplayerEnv.isEnabled) return false;
+    if (_explicitHeaderAuth) return true;
+    // CDN.ir caches by path — JWT must not stay in ?token=.
+    return OxplayerRouteEnv.usesIranCdnStream;
+  }
+
+  static bool get _explicitHeaderAuth {
     final d = _cHeaderAuth.trim().toLowerCase();
-    if (d == '1' || d == 'true' || d == 'yes') return true;
-    return false;
+    return d == '1' || d == 'true' || d == 'yes';
+  }
+
+  /// Per-URL check — header-auth only for CDN.ir hosts (path-keyed edge cache).
+  static bool needsHeaderAuthForUrl(String url) {
+    if (!OxplayerEnv.isEnabled || !oxplayerIsOxStreamUrl(url)) return false;
+    if (_explicitHeaderAuth) return true;
+    final host = Uri.tryParse(url)?.host.toLowerCase() ?? '';
+    return host.endsWith('.ir.cdn.ir');
   }
 
   static String _key(Uri uri) => '${uri.scheme}://${uri.host}${uri.path}';
@@ -28,7 +42,7 @@ abstract final class OxplayerStreamHttpAuth {
 
   /// Removes ?token= from playback URL and stores bearer for the player HTTP stack.
   static String stripAndRegister(String url) {
-    if (!headerAuthEnabled || !oxplayerIsOxStreamUrl(url)) return url;
+    if (!needsHeaderAuthForUrl(url)) return url;
     final uri = Uri.tryParse(url);
     if (uri == null) return url;
     final token = uri.queryParameters['token']?.trim();

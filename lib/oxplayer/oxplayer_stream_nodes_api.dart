@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_route.dart';
-import 'package:fladder/oxplayer/oxplayer_route_env.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 
 class OxplayerStreamNode {
@@ -72,14 +71,12 @@ class OxplayerStreamNodesApi {
     }
 
     final uri = Uri.parse('$base/api/v1/stream/nodes');
-    final iranStreamVanity = OxplayerRouteEnv.iranStreamBaseUrl ?? '';
-    final iranCdnStream = iranStreamVanity.toLowerCase().contains('.cdn.ir');
     final response = await _client.get(
       uri,
       headers: {
         'Authorization': 'MediaBrowser Token="${accessToken.trim()}"',
         'Accept': 'application/json',
-        if (OxplayerRoute.active == OxplayerEdge.iran && iranCdnStream) 'X-Ox-Edge': 'iran',
+        if (OxplayerRoute.active == OxplayerEdge.iran) 'X-Ox-Edge': 'iran',
         ...OxplayerRoute.connectHeaders,
       },
     );

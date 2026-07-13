@@ -11,6 +11,7 @@ import 'package:fladder/oxplayer/ox_library_detail_labels.dart';
 import 'package:fladder/oxplayer/oxplayer_detail_loading.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
+import 'package:fladder/oxplayer/oxplayer_media_variant.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/widgets/ox_movie_boxset_row.dart';
 import 'package:fladder/oxplayer/widgets/ox_movie_request_button.dart';
@@ -188,6 +189,7 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                             ? MediaStreamHelper(
                                 mediaStream: details.mediaStreams,
                                 onItemChanged: (changed) {
+                                  oxplayerOnUserMediaStreamsChanged(ref, changed);
                                   ref
                                       .read(providerInstance.notifier)
                                       .setMediaStreamHelper(changed);
