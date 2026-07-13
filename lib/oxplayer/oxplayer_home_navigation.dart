@@ -5,6 +5,19 @@ import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 
+/// True when [seriesId] is already open anywhere on the details stack (not only top).
+bool oxRouterStackHasSeriesDetail(StackRouter router, String seriesId) {
+  for (final page in router.stack) {
+    if (page.name != DetailsRoute.name) continue;
+    final routeData = page.routeData;
+    final queryId = routeData.queryParams.getString('id', '');
+    if (queryId == seriesId) return true;
+    final args = routeData.args;
+    if (args is DetailsRouteArgs && args.id == seriesId) return true;
+  }
+  return false;
+}
+
 /// When opening an episode from home (Next Up / Continue Watching), land on the
 /// series page so Follow, seasons, and request actions are available.
 ///
@@ -20,11 +33,7 @@ Future<bool> oxplayerMaybeNavigateEpisodeToSeries(
   final seriesId = episode.parentId;
   if (seriesId == null || seriesId.isEmpty) return false;
 
-  final top = context.router.topRoute;
-  if (top.name == DetailsRoute.name) {
-    final currentId = top.queryParams.getString('id', '');
-    if (currentId == seriesId) return false;
-  }
+  if (oxRouterStackHasSeriesDetail(context.router, seriesId)) return false;
 
   await context.router.push(DetailsRoute(id: seriesId, tag: tag));
   return true;

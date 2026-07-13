@@ -12,7 +12,8 @@ import 'package:fladder/oxplayer/ox_library_detail_labels.dart';
 import 'package:fladder/oxplayer/oxplayer_detail_loading.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
-import 'package:fladder/oxplayer/ox_series_next_up.dart';
+import 'package:fladder/oxplayer/ox_series_episode_actions.dart';
+import 'package:fladder/oxplayer/ox_series_selected_episode.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/widgets/ox_series_request_button.dart';
 import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
@@ -57,7 +58,8 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
     final wrapAlignment =
         AdaptiveLayout.viewSizeOf(context) != ViewSize.phone ? WrapAlignment.start : WrapAlignment.center;
 
-    final currentEpisode = oxSeriesPlayableNextUp(details);
+    final selectedEpisode = oxSeriesSelectedEpisode(ref, details);
+    final currentEpisode = oxSeriesDetailPlayTarget(details, selectedEpisode: selectedEpisode);
 
     return DetailScaffold(
       label: details?.name ?? "",
@@ -214,9 +216,11 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                             AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad ? null : VerticalDirection.down,
                         label: context.localized.episode(details.availableEpisodes?.length ?? 2),
                         onFocused: (episode) {
+                          oxSetSeriesSelectedEpisode(ref, widget.item.id, episode);
                           context.ensureVisible(alignment: 0.8);
                         },
                         onEpisodeTap: (action, episode) async {
+                          oxSetSeriesSelectedEpisode(ref, widget.item.id, episode);
                           action();
                         },
                         playEpisode: (episode) async {
