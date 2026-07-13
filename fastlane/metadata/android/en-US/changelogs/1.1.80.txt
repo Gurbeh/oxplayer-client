@@ -1,0 +1,1 @@
+In-app playback diagnostic on About screen; copy report for support.

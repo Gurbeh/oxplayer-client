@@ -1,9 +1,11 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/oxplayer/oxplayer_about_error_logs_button.dart';
+import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/crash_screen/crash_screen.dart';
 import 'package:fladder/screens/settings/settings_scaffold.dart';
 import 'package:fladder/screens/shared/fladder_icon.dart';
@@ -89,6 +91,15 @@ class OxplayerAboutSettingsPage extends ConsumerWidget {
                 context: context,
                 builder: (context) => const CrashScreen(),
               ),
+            ),
+          ],
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            FilledButton.tonal(
+              onPressed: () => context.router.push(const OxplayerPlaybackDiagRoute()),
+              child: Text(context.localized.oxplayerPlaybackDiagTitle),
             ),
           ],
         ),

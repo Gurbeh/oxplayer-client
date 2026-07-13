@@ -111,6 +111,7 @@ final List<AutoRoute> _settingsChildren = [
   AutoRoute(page: ProfileSettingsRoute.page, path: 'security', maintainState: false),
   AutoRoute(page: PlayerSettingsRoute.page, path: 'player', maintainState: false),
   AutoRoute(page: AboutSettingsRoute.page, path: 'about'),
+  AutoRoute(page: OxplayerPlaybackDiagRoute.page, path: 'playback-diag'),
 ];
 
 final List<AutoRoute> _controlPanelRoutes = [

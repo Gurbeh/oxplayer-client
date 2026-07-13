@@ -2094,5 +2094,21 @@
     "oxplayerWatchlistAdded": "به لیست تماشای آینده اضافه شد",
     "oxplayerWatchlistRemoved": "از لیست تماشای آینده حذف شد",
     "oxplayerFollowFailed": "به‌روزرسانی دنبال‌کردن ناموفق بود",
-    "oxplayerWatchlistFailed": "به‌روزرسانی لیست تماشای آینده ناموفق بود"
+    "oxplayerWatchlistFailed": "به‌روزرسانی لیست تماشای آینده ناموفق بود",
+    "oxplayerPlaybackDiagTitle": "تست پخش",
+    "oxplayerPlaybackDiagIntro": "تست کوتاه اجرا کن و گزارش را کپی کن برای پشتیبانی. روی وب، در ۳۰ ثانیه تماشا یک ویدیو پخش کن تا آدرس استریم ثبت شود.",
+    "oxplayerPlaybackDiagPlaceholder": "گزارش بعد از اتمام تست اینجا نمایش داده می‌شود.",
+    "oxplayerPlaybackDiagStart": "شروع تست",
+    "oxplayerPlaybackDiagRestart": "اجرای دوباره",
+    "oxplayerPlaybackDiagCancel": "لغو",
+    "oxplayerPlaybackDiagCopy": "کپی گزارش",
+    "oxplayerPlaybackDiagCopied": "گزارش در کلیپ‌بورد کپی شد",
+    "oxplayerPlaybackDiagStatusIdle": "آماده — روی شروع تست بزن",
+    "oxplayerPlaybackDiagStatusStarting": "در حال شروع…",
+    "oxplayerPlaybackDiagStatusCollecting": "جمع‌آوری اطلاعات برنامه و حساب…",
+    "oxplayerPlaybackDiagStatusProbing": "بررسی API و استریم…",
+    "oxplayerPlaybackDiagStatusWatching": "تماشای پخش (۳۰ ثانیه) — الان یک عنوان پخش کن",
+    "oxplayerPlaybackDiagStatusDone": "تمام — گزارش را کپی کن",
+    "oxplayerPlaybackDiagStatusFailed": "تست ناموفق — گزارش جزئی پایین",
+    "oxplayerPlaybackDiagStatusCancelled": "لغو شد"
 }
