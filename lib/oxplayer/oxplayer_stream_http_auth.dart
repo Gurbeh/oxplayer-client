@@ -1,8 +1,8 @@
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_cdn_ir_edge.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
-import 'package:fladder/oxplayer/oxplayer_route_env.dart';
 
-/// Bearer auth for ox-stream when [headerAuthEnabled] — strips ?token= for CDN uri cache.
+/// Bearer auth for ox-stream when edge caches by path only (not CDN.ir vanity redirect).
 abstract final class OxplayerStreamHttpAuth {
   static final Map<String, String> _bearerByKey = {};
 
@@ -14,9 +14,7 @@ abstract final class OxplayerStreamHttpAuth {
   /// True when stream JWT should move from query string to Authorization header.
   static bool get headerAuthEnabled {
     if (!OxplayerEnv.isEnabled) return false;
-    if (_explicitHeaderAuth) return true;
-    // CDN.ir caches by path — JWT must not stay in ?token=.
-    return OxplayerRouteEnv.usesIranCdnStream;
+    return _explicitHeaderAuth;
   }
 
   static bool get _explicitHeaderAuth {
@@ -24,12 +22,11 @@ abstract final class OxplayerStreamHttpAuth {
     return d == '1' || d == 'true' || d == 'yes';
   }
 
-  /// Per-URL check — header-auth only for CDN.ir hosts (path-keyed edge cache).
+  /// CDN.ir uses ?token= — vanity 302 to edge drops Authorization headers.
   static bool needsHeaderAuthForUrl(String url) {
     if (!OxplayerEnv.isEnabled || !oxplayerIsOxStreamUrl(url)) return false;
-    if (_explicitHeaderAuth) return true;
-    final host = Uri.tryParse(url)?.host.toLowerCase() ?? '';
-    return host.endsWith('.ir.cdn.ir');
+    if (OxplayerCdnIrEdge.isCdnIrUrl(url)) return false;
+    return _explicitHeaderAuth;
   }
 
   static String _key(Uri uri) => '${uri.scheme}://${uri.host}${uri.path}';

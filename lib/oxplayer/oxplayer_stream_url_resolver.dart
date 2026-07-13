@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:fladder/oxplayer/oxplayer_cdn_ir_edge.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_route.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
@@ -32,8 +33,11 @@ class OxplayerStreamNodeSession {
 final _streamNodesApiProvider = Provider<OxplayerStreamNodesApi>((ref) => OxplayerStreamNodesApi());
 
 /// Applies Iran CDN vanity / edge pin — independent of stream-node discovery.
-String _finalizeStreamPlaybackUrl(String url, {required String via}) {
-  final out = OxplayerRoute.rewriteStreamUri(url);
+Future<String> _finalizeStreamPlaybackUrl(String url, {required String via}) async {
+  var out = OxplayerRoute.rewriteStreamUri(url);
+  if (OxplayerCdnIrEdge.isCdnIrUrl(out)) {
+    out = await OxplayerCdnIrEdge.resolvePlaybackUrl(out);
+  }
   if (out != url) {
     OxplayerStreamLog.event('resolve_finalize', fields: {
       'via': via,
@@ -87,22 +91,23 @@ Future<String?> oxplayerResolveStreamPlaybackUrl(
   });
 
   OxplayerStreamHttpAuth.clear();
+  OxplayerCdnIrEdge.clearCache();
 
   var workingUrl = _iranVanityEarly(apiMintedUrl);
 
   final uri = Uri.tryParse(workingUrl);
   if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
-    return _finalizeStreamPlaybackUrl(workingUrl, via: 'invalid_uri');
+    return await _finalizeStreamPlaybackUrl(workingUrl, via: 'invalid_uri');
   }
 
   final token = ref.read(userProvider)?.credentials.token.trim() ?? '';
   if (token.isEmpty) {
-    return _finalizeStreamPlaybackUrl(workingUrl, via: 'no_token');
+    return await _finalizeStreamPlaybackUrl(workingUrl, via: 'no_token');
   }
 
   final base = ref.read(serverUrlProvider)?.trim() ?? '';
   if (base.isEmpty) {
-    return _finalizeStreamPlaybackUrl(workingUrl, via: 'no_api_base');
+    return await _finalizeStreamPlaybackUrl(workingUrl, via: 'no_api_base');
   }
 
   final api = ref.read(_streamNodesApiProvider);
@@ -122,7 +127,7 @@ Future<String?> oxplayerResolveStreamPlaybackUrl(
       streamUrl: apiMintedUrl,
       transient: true,
     ));
-    return _finalizeStreamPlaybackUrl(workingUrl, via: 'no_nodes');
+    return await _finalizeStreamPlaybackUrl(workingUrl, via: 'no_nodes');
   }
 
   OxplayerStreamNodeSession.nodes = nodes;
@@ -130,7 +135,7 @@ Future<String?> oxplayerResolveStreamPlaybackUrl(
     nodes.where((n) => !OxplayerStreamNodeSession.failedNodeIds.contains(n.id)).toList(),
   );
   if (pick == null) {
-    return _finalizeStreamPlaybackUrl(workingUrl, via: 'no_pick');
+    return await _finalizeStreamPlaybackUrl(workingUrl, via: 'no_pick');
   }
 
   OxplayerStreamNodeSession.activeNodeId = pick.id;
@@ -138,7 +143,7 @@ Future<String?> oxplayerResolveStreamPlaybackUrl(
   final rewritten = uri
       .replace(scheme: nodeBase.scheme, host: nodeBase.host, port: nodeBase.port)
       .toString();
-  final finalUrl = _finalizeStreamPlaybackUrl(rewritten, via: 'node_${pick.id}');
+  final finalUrl = await _finalizeStreamPlaybackUrl(rewritten, via: 'node_${pick.id}');
   OxplayerStreamLog.event('resolve_ok', fields: {
     'nodeId': pick.id,
     'nodeUrl': OxplayerStreamLog.describeUrl(pick.url),
@@ -190,7 +195,10 @@ Future<String?> oxplayerFailoverStreamUrl(
     final rewritten = uri
         .replace(scheme: nodeBase.scheme, host: nodeBase.host, port: nodeBase.port)
         .toString();
-    final out = OxplayerRoute.rewriteStreamUri(rewritten);
+    final out = await _finalizeStreamPlaybackUrl(
+      OxplayerRoute.rewriteStreamUri(rewritten),
+      via: 'failover_${next.id}',
+    );
     if (out == currentUrl) {
       OxplayerStreamLog.event('failover_skip_same_url', fields: {
         'nodeId': next.id,
@@ -206,9 +214,9 @@ Future<String?> oxplayerFailoverStreamUrl(
       'nodeId': next.id,
       'finalUrl': OxplayerStreamLog.describeUrl(out),
     });
-    return OxplayerStreamHttpAuth.stripAndRegister(out);
+    return out;
   }
-  final fallback = _finalizeStreamPlaybackUrl(currentUrl, via: 'failover_vanity');
+  final fallback = await _finalizeStreamPlaybackUrl(currentUrl, via: 'failover_vanity');
   if (fallback != currentUrl) {
     if (active != null) {
       OxplayerStreamNodeSession.markFailed(active);
