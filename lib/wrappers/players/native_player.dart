@@ -10,7 +10,9 @@ import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/transcode_playback_model.dart';
 import 'package:fladder/models/playback/tv_playback_model.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
+import 'package:fladder/oxplayer/oxplayer_audio_log.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_audio.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/src/video_player_helper.g.dart';
 import 'package:fladder/wrappers/players/base_player.dart';
@@ -107,7 +109,15 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
 
   @override
   Future<void> setVolume(double volume) async {
-    return player.setVolume(volume);
+    // Pigeon/ExoPlayer expect 0.0–1.0; settings store 0–100.
+    final normalized = (volume / 100).clamp(0.0, 1.0);
+    OxplayerAudioLog.event('native_set_volume', fields: {
+      'backend': 'exo',
+      'requested': volume,
+      'exoVolume': normalized,
+      'activityStarted': nativeActivityStarted,
+    });
+    return player.setVolume(normalized);
   }
 
   @override
@@ -147,6 +157,12 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
     List<NativeMuxedAudioRow> audio,
     List<NativeMuxedSubtitleRow> subtitles,
   ) {
+    OxplayerAudioLog.event('native_muxed_tracks', fields: {
+      'backend': 'exo',
+      'exoAudioCount': audio.length,
+      'exoSubCount': subtitles.length,
+      'exoAudio': audio.map((t) => '${t.trackId}:${t.codec}').join(';'),
+    });
     // Native ExoPlayer applies muxed tracks in onTracksChanged (properlySetSubAndAudioTracks).
     // Re-calling refreshDefaultTrackSelection here caused a select/deselect loop on TV Home resume.
   }
@@ -169,7 +185,9 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
       currentItem: model.item.toSimpleItem(context),
       startPosition: startPosition.inMilliseconds,
       description: model.item.overview.summary,
-      defaultAudioTrack: model.mediaStreams?.defaultAudioStreamIndex ?? 1,
+      defaultAudioTrack: oxplayerResolvePlaybackAudioStream(model)?.index ??
+          model.mediaStreams?.defaultAudioStreamIndex ??
+          1,
       nextVideo: model.nextVideo?.toSimpleItem(context),
       previousVideo: model.previousVideo?.toSimpleItem(context),
       audioTracks: model.audioStreams
@@ -236,5 +254,15 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
       url: model.media?.url ?? "",
     );
     await player.sendPlayableModel(playableData);
+    OxplayerAudioLog.event('native_playable_sent', fields: {
+      'backend': 'exo',
+      'defaultAudioIndex': playableData.defaultAudioTrack,
+      'defaultSubIndex': playableData.defaultSubtrack,
+      'audioTrackCount': playableData.audioTracks.length,
+      'audioIndexes': playableData.audioTracks.map((t) => t.index).join(','),
+      'audioCodecs': playableData.audioTracks.map((t) => t.codec).join(','),
+      'startMs': playableData.startPosition,
+      'urlLen': playableData.url.length,
+    });
   }
 }

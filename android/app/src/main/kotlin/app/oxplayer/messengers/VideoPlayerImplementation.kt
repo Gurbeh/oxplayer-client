@@ -35,6 +35,12 @@ import kotlin.time.Duration.Companion.seconds
 
 private const val OX_NATIVE_PLY_TAG = "OX_NATIVE_PLY"
 private const val OX_STREAM_TAG = "OX_STREAM"
+private const val OX_AUDIO_TAG = "OX_AUDIO"
+
+private fun oxAudioLog(message: String) {
+    Log.i(OX_AUDIO_TAG, message)
+    Log.d(OX_NATIVE_PLY_TAG, message)
+}
 
 private fun oxStreamLog(message: String) {
     Log.i(OX_STREAM_TAG, message)
@@ -356,7 +362,12 @@ class VideoPlayerImplementation(
     }
 
     override fun setVolume(volume: Double) {
-        player?.volume = volume.toFloat()
+        val exo = player
+        val applied = volume.toFloat().coerceIn(0f, 1f)
+        oxAudioLog(
+            "phase=audio_set_volume requested=$volume applied=$applied exoNull=${exo == null}",
+        )
+        exo?.volume = applied
     }
 
     override fun setPlaybackSpeed(speed: Double) {
@@ -496,6 +507,19 @@ fun ExoPlayer.properlySetSubAndAudioTracks(playableData: PlayableData) {
                 VideoPlayerObject.setAudioTrackIndex(it.toInt(), true)
             }
         }
+        val action = when {
+            internalAudioTracks.isEmpty() -> "clear_empty_exo_tracks"
+            currentAudioIndex < 0 -> "disable_audio_negative_index"
+            wantedAudioIndex < 0 -> "fallback_first_exo_track"
+            wantedAudioIndex >= internalAudioTracks.size -> "fallback_last_exo_track"
+            else -> "select_mapped_exo_track"
+        }
+        oxAudioLog(
+            "phase=audio_track_apply action=$action currentAudioIndex=$currentAudioIndex " +
+                "wantedAudioIndex=$wantedAudioIndex exoAudioCount=${internalAudioTracks.size} " +
+                "pigeonAudioCount=${playableData.audioTracks.size} defaultAudio=${playableData.defaultAudioTrack} " +
+                "exoCodecs=${internalAudioTracks.joinToString { it.codec ?: "?" }}",
+        )
         if (internalAudioTracks.isEmpty()) {
             clearAudioTrack()
         } else if (currentAudioIndex < 0) {

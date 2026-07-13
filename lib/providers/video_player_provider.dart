@@ -11,6 +11,8 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/media_playback_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/playback_queue_state.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_audio.dart';
+import 'package:fladder/oxplayer/oxplayer_audio_log.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_native_playback.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
@@ -170,9 +172,21 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
       }
       ref.read(playBackModel.notifier).update((state) => newPlaybackModel);
       await state.loadVideo(model, effectiveStartPosition, true);
-      await state.setVolume(ref.read(videoPlayerSettingsProvider).volume);
+      final settingsVolume = ref.read(videoPlayerSettingsProvider).volume;
+      final backend = ref.read(videoPlayerSettingsProvider).wantedPlayer;
+      OxplayerAudioLog.event('playback_load_volume', fields: {
+        'backend': backend.name,
+        'settingsVolume': settingsVolume,
+        'defaultAudioIndex': model.mediaStreams?.defaultAudioStreamIndex,
+        'audioStreamCount': model.audioStreams?.length,
+        'audioIndexes': model.audioStreams?.map((s) => s.index).join(','),
+        'resolvedAudioIndex': oxplayerResolvePlaybackAudioStream(model)?.index,
+        'enablePlayPauseFade': ref.read(videoPlayerSettingsProvider).enablePlayPauseFade,
+      });
+      await state.setVolume(settingsVolume);
 
-      await state.setAudioTrack(null, model);
+      final resolvedAudio = oxplayerResolvePlaybackAudioStream(model);
+      await state.setAudioTrack(resolvedAudio, model);
       await state.setSubtitleTrack(null, model);
 
       final runtime = model.item.overview.runTime;

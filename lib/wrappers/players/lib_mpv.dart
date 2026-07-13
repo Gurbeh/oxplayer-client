@@ -25,6 +25,7 @@ import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_mpv.dart';
+import 'package:fladder/oxplayer/oxplayer_audio_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_http_auth.dart';
 import 'package:fladder/oxplayer/playback/ox_subtitle_font.dart';
@@ -59,6 +60,19 @@ class LibMPV extends BasePlayer {
   double _preferredVolume = 100;
   int _fadeGeneration = 0;
   bool _isFading = false;
+
+  void _logAudio(String phase, {Map<String, Object?> fields = const {}}) {
+    OxplayerAudioLog.event(phase, fields: {
+      'backend': 'mpv',
+      'preferredVolume': _preferredVolume,
+      'playerVolume': _player?.state.volume,
+      'isFading': _isFading,
+      'fadeGen': _fadeGeneration,
+      'playPauseFade': _settings.enablePlayPauseFade,
+      'replayGain': _settings.enableReplayGain,
+      ...fields,
+    });
+  }
 
   void _reportVolumeAnomaly(
     String reason, {
@@ -116,9 +130,14 @@ class LibMPV extends BasePlayer {
         // Use audiotrack as it is generally more stable on modern Android
         await nativePlayer.setProperty('ao', 'audiotrack');
       }
+      _logAudio('mpv_init', fields: {
+        'ao': defaultTargetPlatform == TargetPlatform.android ? 'audiotrack' : 'default',
+        'hardwareAccel': settings.hardwareAccel,
+      });
     }
 
     await _applyReplayGainSettings();
+    _logAudio('mpv_replaygain_applied');
   }
 
   @override
@@ -156,6 +175,7 @@ class LibMPV extends BasePlayer {
     _playerStreamSubs.addAll([
       player.stream.playing.listen((value) {
         if (value && _player?.state.volume == 0 && _preferredVolume > 0) {
+          _logAudio('volume_restore_on_play', fields: {'reason': 'playing_event'});
           _reportVolumeAnomaly(
             'volume_restored_on_play_event',
             playerVolume: 0,
@@ -176,6 +196,7 @@ class LibMPV extends BasePlayer {
           final clamped = value.clamp(0.0, 100.0);
           final paused = !player.state.playing;
           if (clamped == 0 && paused && _preferredVolume > 0) {
+            _logAudio('volume_zero_while_paused', fields: {'playerVolume': clamped});
             _reportVolumeAnomaly(
               'preferred_volume_zeroed_while_paused',
               playerVolume: clamped,
@@ -328,6 +349,21 @@ class LibMPV extends BasePlayer {
     }
 
     await _player?.open(mpv.Media(url), play: play);
+    final openedVolume = _player?.state.volume ?? -1;
+    if (_preferredVolume > 0 && openedVolume <= 0.5) {
+      _logAudio('load_open_volume_fix', fields: {
+        'openedVolume': openedVolume,
+        'play': play,
+        'urlHost': OxplayerStreamLog.describeHost(url),
+      });
+      await _player?.setVolume(_preferredVolume);
+    } else {
+      _logAudio('load_open', fields: {
+        'openedVolume': openedVolume,
+        'play': play,
+        'urlHost': OxplayerStreamLog.describeHost(url),
+      });
+    }
 
     _retryTimer?.cancel();
     _retryTimer = null;
@@ -567,6 +603,17 @@ class LibMPV extends BasePlayer {
       return;
     }
 
+    if (fadingIn && _preferredVolume > 0 && (player.state.volume - _preferredVolume).abs() < 1) {
+      _logAudio('fade_skip_already_at_target');
+      await player.play();
+      return;
+    }
+
+    _logAudio(fadingIn ? 'fade_in_start' : 'fade_out_start', fields: {
+      'from': fadingIn ? 0.0 : player.state.volume,
+      'to': fadingIn ? _preferredVolume : 0.0,
+    });
+
     final generation = ++_fadeGeneration;
     _isFading = true;
     final from = fadingIn ? 0.0 : player.state.volume.clamp(0.0, 100.0);
@@ -583,12 +630,14 @@ class LibMPV extends BasePlayer {
       if (generation != _fadeGeneration || _player == null) {
         _isFading = false;
         if (fadingIn && player.state.playing && player.state.volume <= 0.5 && _preferredVolume > 0) {
+          _logAudio('fade_aborted_restore', fields: {'playerVolume': player.state.volume});
           _reportVolumeAnomaly(
             'play_fade_aborted_while_muted',
             playerVolume: player.state.volume,
             preferredVolume: _preferredVolume,
             fadeAborted: true,
           );
+          await player.setVolume(_preferredVolume);
         }
         return;
       }
@@ -602,6 +651,7 @@ class LibMPV extends BasePlayer {
     }
     _isFading = false;
     if (fadingIn && generation == _fadeGeneration && player.state.volume <= 0.5 && _preferredVolume > 0) {
+      _logAudio('fade_done_still_muted_restore', fields: {'playerVolume': player.state.volume});
       _reportVolumeAnomaly(
         'stuck_muted_after_play_fade',
         playerVolume: player.state.volume,
@@ -635,11 +685,26 @@ class LibMPV extends BasePlayer {
     final wantedAudioStream = model ?? playbackModel.defaultAudioStream;
     if (wantedAudioStream == null) return -1;
     if (wantedAudioStream.index == AudioStreamModel.no().index) {
+      final muxedAvailable = playbackModel.audioStreams?.any((s) => s.index >= 0) ?? false;
+      if (OxplayerConfig.isEnabled && !playbackModel.isAudioPlayback && muxedAvailable) {
+        _logAudio('audio_track_skip_off_muxed', fields: {
+          'defaultAudioIndex': playbackModel.mediaStreams?.defaultAudioStreamIndex,
+        });
+        return -1;
+      }
+      _logAudio('audio_track_off');
       await _player?.setAudioTrack(mpv.AudioTrack.no());
     } else {
       final internalTracks = audioTracks.getRange(2, audioTracks.length).toList();
-      final audioTrack =
-          internalTracks.elementAtOrNull((playbackModel.audioStreams?.indexOf(wantedAudioStream) ?? -1) - 1);
+      final listIndex = (playbackModel.audioStreams?.indexOf(wantedAudioStream) ?? -1) - 1;
+      final audioTrack = internalTracks.elementAtOrNull(listIndex);
+      _logAudio('audio_track_select', fields: {
+        'wantedIndex': wantedAudioStream.index,
+        'wantedCodec': wantedAudioStream.codec,
+        'listIndex': listIndex,
+        'mpvTrackCount': internalTracks.length,
+        'applied': audioTrack != null,
+      });
       if (audioTrack != null) {
         await _player?.setAudioTrack(audioTrack);
       }
@@ -750,6 +815,7 @@ class LibMPV extends BasePlayer {
     _isFading = false;
     _preferredVolume = volume.clamp(0.0, 100.0);
     _fadeGeneration++;
+    _logAudio('set_volume', fields: {'requested': volume, 'applied': _preferredVolume});
     await _player?.setVolume(_preferredVolume);
   }
 

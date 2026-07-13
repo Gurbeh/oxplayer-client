@@ -206,12 +206,20 @@ internal fun ExoPlayer(
                 val subTracks = exoPlayer.getSubtitleTracks()
                 val audioTracks = exoPlayer.getAudioTracks()
 
+                Log.i(
+                    "OX_AUDIO",
+                    "phase=audio_tracks_changed exoAudio=${audioTracks.size} exoSub=${subTracks.size} " +
+                        "exoVolume=${exoPlayer.volume} playing=${exoPlayer.isPlaying} " +
+                        "audioCodecs=${audioTracks.joinToString { it.codec ?: "?" }}",
+                )
+
                 if (subTracks.isEmpty() && audioTracks.isEmpty()) return
 
                 // Always publish Exo track lists so UI (e.g. hasSubtracks) matches the player.
                 // Exo can fire onTracksChanged first with audio-only, then again when embedded
                 // text tracks appear; the old logic set subsInitialized on the first callback and
                 // never refreshed exoSubTracks, so subtitles stayed hidden until a later session.
+                val hadNoExoAudioTracks = VideoPlayerObject.exoAudioTracks.value.isEmpty()
                 val hadNoExoSubtitleTracks = VideoPlayerObject.exoSubTracks.value.isEmpty()
                 VideoPlayerObject.exoSubTracks.value = subTracks
                 VideoPlayerObject.exoAudioTracks.value = audioTracks
@@ -233,8 +241,10 @@ internal fun ExoPlayer(
                 if (!impl.subsInitialized) {
                     impl.subsInitialized = true
                     scheduleApplyDefaults()
-                } else if (hadNoExoSubtitleTracks && subTracks.isNotEmpty()) {
-                    // Late-mapped text tracks after the initial audio-only snapshot.
+                } else if ((hadNoExoSubtitleTracks && subTracks.isNotEmpty()) ||
+                    (hadNoExoAudioTracks && audioTracks.isNotEmpty())
+                ) {
+                    // Late-mapped text or audio tracks after the initial snapshot.
                     scheduleApplyDefaults()
                 }
             }
