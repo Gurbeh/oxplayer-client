@@ -1,0 +1,1 @@
+Web playback on oxplayer.ir uses stream.oxplayer.ir and remux TS instead of CDN.ir MKV.

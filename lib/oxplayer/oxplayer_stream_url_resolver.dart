@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/oxplayer/oxplayer_iran_stream_edge.dart';
@@ -34,9 +35,12 @@ final _streamNodesApiProvider = Provider<OxplayerStreamNodesApi>((ref) => Oxplay
 
 /// Applies Iran stream vanity / edge pin — independent of stream-node discovery.
 Future<String> _finalizeStreamPlaybackUrl(String url, {required String via}) async {
-  var out = OxplayerRoute.rewriteStreamUri(url);
+  var out = kIsWeb ? url : OxplayerRoute.rewriteStreamUri(url);
   if (OxplayerIranStreamEdge.isIranVanityStreamUrl(out)) {
     out = await OxplayerIranStreamEdge.resolvePlaybackUrl(out);
+  }
+  if (kIsWeb && oxplayerIsOxStreamUrl(out)) {
+    out = OxplayerIranStreamEdge.rewriteWebPlaybackUrl(out);
   }
   if (out != url) {
     OxplayerStreamLog.event('resolve_finalize', fields: {
@@ -94,6 +98,11 @@ Future<String?> oxplayerResolveStreamPlaybackUrl(
   OxplayerIranStreamEdge.clearCache();
 
   var workingUrl = _iranVanityEarly(apiMintedUrl);
+
+  // Web: skip CDN.ir node discovery — browser needs stream.oxplayer.ir (CORS + no vanity redirect).
+  if (kIsWeb) {
+    return await _finalizeStreamPlaybackUrl(workingUrl, via: 'web_direct');
+  }
 
   final uri = Uri.tryParse(workingUrl);
   if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
@@ -161,6 +170,7 @@ Future<String?> oxplayerFailoverStreamUrl(
   Duration budget = const Duration(milliseconds: 1500),
 }) async {
   if (!OxplayerEnv.isEnabled || !oxplayerIsOxStreamUrl(currentUrl)) return null;
+  if (kIsWeb) return null;
 
   final deadline = DateTime.now().add(budget);
   final uri = Uri.tryParse(currentUrl);

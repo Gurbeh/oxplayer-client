@@ -1093,3 +1093,28 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-web-hetzner:
+    name: Deploy Web · Hetzner
+    needs: [fetch-info, create_release]
+    if: |
+      needs.fetch-info.outputs.build_type == 'release' &&
+      needs.create_release.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger oxplayer-be static web deploy
+        env:
+          GH_TOKEN: ${{ secrets.OXPLAYER_BE_DISPATCH_TOKEN }}
+          VERSION: ${{ needs.fetch-info.outputs.version_name }}
+          BE_REPO: Aryan-mor/oxplayer-be
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::Set secret OXPLAYER_BE_DISPATCH_TOKEN (PAT with repo + workflow on oxplayer-be)"
+            exit 1
+          fi
+          echo "Dispatch deploy-client-web v${VERSION} → ${BE_REPO}"
+          gh api "repos/${BE_REPO}/dispatches" \
+            -f event_type=deploy-client-web \
+            -f "client_payload[version]=${VERSION}"

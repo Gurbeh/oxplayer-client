@@ -328,8 +328,13 @@ class LibMPV extends BasePlayer {
 
     await setStartPosition(serverSeek ? Duration.zero : startPosition);
 
-    if (OxplayerIranStreamEdge.isIranVanityStreamUrl(url)) {
-      url = await OxplayerIranStreamEdge.resolvePlaybackUrl(url);
+    if (OxplayerEnv.isEnabled && oxplayerIsOxStreamUrl(url)) {
+      if (OxplayerIranStreamEdge.isIranVanityStreamUrl(url)) {
+        url = await OxplayerIranStreamEdge.resolvePlaybackUrl(url);
+      }
+      if (kIsWeb) {
+        url = OxplayerIranStreamEdge.rewriteWebPlaybackUrl(url);
+      }
     }
 
     url = OxplayerStreamHttpAuth.stripAndRegister(url);

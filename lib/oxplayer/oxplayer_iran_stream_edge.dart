@@ -37,18 +37,18 @@ abstract final class OxplayerIranStreamEdge {
     if (uri == null || !uri.hasAuthority) return url;
 
     final host = uri.host.toLowerCase();
-    if (!_isVanityHost(host)) return url;
+    final token = uri.queryParameters['token']?.trim();
 
-    // Web cannot read vanity Location (CORS); use direct Iran stream origin.
-    if (kIsWeb) {
-      final token = uri.queryParameters['token']?.trim();
-      return _fallbackIranOrigin(uri, token);
+    // Web cannot read vanity Location (CORS); bypass edge shards and node vanity hosts.
+    if (kIsWeb && isIranVanityStreamHost(host)) {
+      return rewriteWebPlaybackUrl(_fallbackIranOrigin(uri, token));
     }
+
+    if (!_isVanityHost(host)) return url;
 
     final cached = _resolveCache[_cacheKey(uri)];
     if (cached != null && cached.isNotEmpty) return cached;
 
-    final token = uri.queryParameters['token']?.trim();
     final resolved = await _probeVanityRedirect(uri, token) ?? _fallbackIranOrigin(uri, token);
     _resolveCache[_cacheKey(uri)] = resolved;
     return resolved;
@@ -117,6 +117,27 @@ abstract final class OxplayerIranStreamEdge {
       'toHost': iranStreamOriginHost,
       'finalUrl': OxplayerStreamLog.describeUrl(out),
     });
+    return out;
+  }
+
+  /// Web progressive playback: MKV is not a native <video> codec — use remux TS path.
+  static String rewriteWebPlaybackUrl(String url) {
+    if (!kIsWeb || !oxplayerIsOxStreamUrl(url)) return url;
+    if (url.contains('/stream.ts') || url.contains('stream.ts?')) return url;
+
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasAuthority) return url;
+
+    final match = RegExp(r'^/v/(\d+)\.[^/]+$').firstMatch(uri.path);
+    if (match == null) return url;
+
+    final out = uri.replace(path: '/v/${match.group(1)}.stream.ts').toString();
+    if (out != url) {
+      OxplayerStreamLog.event('web_stream_remux_path', fields: {
+        'before': OxplayerStreamLog.describeUrl(url),
+        'after': OxplayerStreamLog.describeUrl(out),
+      });
+    }
     return out;
   }
 
