@@ -14,6 +14,7 @@ import 'package:fladder/models/playback/playback_queue_state.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_audio.dart';
 import 'package:fladder/oxplayer/oxplayer_audio_log.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_memory_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_native_playback.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
@@ -143,6 +144,10 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     ref.read(playBackModel)?.dispose();
     await state.stop();
     ref.read(playbackRateProvider.notifier).state = 1.0;
+
+    if (OxplayerEnv.isEnabled && oxplayerUsesNativePlayerRead(ref)) {
+      OxplayerMemoryTelemetry.trimBeforeNativePlayback();
+    }
 
     final useMinimizedPlayer =
         model.item.type == FladderItemType.audio || model.mediaStreams?.videoStreams.isEmpty == true;

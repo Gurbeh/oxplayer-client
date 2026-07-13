@@ -230,6 +230,25 @@ Timer? oxplayerScheduleStuckPlaybackWatch({
       return;
     }
 
+    // Native ExoPlayer runs in VideoPlayerActivity while MainActivity keeps the Flutter
+    // engine alive. Full reload from Dart mid-playback spikes RAM and causes TV kills.
+    if (oxplayerUsesNativePlayerRead(sessionRef)) {
+      if (!telemetrySentForIncident) {
+        telemetrySentForIncident = true;
+        unawaited(OxplayerPlaybackTelemetry.reportStuckPlayback(
+          itemId: itemId,
+          streamUrl: streamUrl,
+          position: playback.position,
+          catalogDuration: catalogDuration,
+          nativePlayer: true,
+          stuckKind: midStreamFrozen ? 'mid_stream' : 'start',
+          transient: false,
+        ));
+      }
+      timer = Timer(stuckPlaybackCheckDelay, () => unawaited(runStuckCheck()));
+      return;
+    }
+
     if (retriesUsed >= _maxStuckRetries) {
       if (!exhaustedReported) {
         exhaustedReported = true;

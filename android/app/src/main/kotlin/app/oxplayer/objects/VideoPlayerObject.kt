@@ -4,6 +4,7 @@ import PlaybackState
 import TVGuideModel
 import VideoPlayerControlsCallback
 import VideoPlayerListenerCallback
+import androidx.media3.common.PlaybackException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -97,6 +98,15 @@ object VideoPlayerObject {
         _currentState.value = state
         videoPlayerListener?.onPlaybackStateChanged(
             state, callback = {}
+        )
+    }
+
+    fun reportPlaybackError(error: PlaybackException) {
+        videoPlayerListener?.onPlaybackError(
+            error.errorCode.toLong(),
+            error.errorCodeName,
+            error.message,
+            callback = {},
         )
     }
 

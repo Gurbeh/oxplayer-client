@@ -13,6 +13,13 @@ const kOxHighMemoryRssMbPhone = 512;
 /// Leanback / Android TV devices often have less headroom.
 const kOxHighMemoryRssMbTv = 384;
 
+/// Cap Flutter image cache on TV while native ExoPlayer activity holds process RAM.
+const kOxTvImageCacheMaxCount = 50;
+const kOxTvImageCacheMaxBytes = 32 * 1024 * 1024;
+
+/// Interval for RSS sampling while native player activity is foreground.
+const kOxNativePlaybackMemorySampleInterval = Duration(seconds: 45);
+
 /// Single navigation RSS jump that triggers a warning (possible leak / retained images).
 const kOxHighMemoryNavDeltaMb = 64;
 
@@ -55,6 +62,75 @@ abstract final class OxplayerMemoryTelemetry {
   static void syncDeviceProfile({required bool leanBack}) {
     _leanBack = leanBack;
     OxplayerCrashlytics.syncDeviceProfile(leanBack: leanBack);
+    if (leanBack) {
+      final cache = PaintingBinding.instance.imageCache;
+      cache.maximumSize = kOxTvImageCacheMaxCount;
+      cache.maximumSizeBytes = kOxTvImageCacheMaxBytes;
+    }
+  }
+
+  /// Drops decoded posters/backdrops before native ExoPlayer opens on TV.
+  /// MainActivity keeps the Flutter engine alive — dual heap is the main TV OOM vector.
+  static void trimBeforeNativePlayback() {
+    final cache = PaintingBinding.instance.imageCache;
+    cache.clear();
+    cache.clearLiveImages();
+    if (_leanBack) {
+      cache.maximumSize = kOxTvImageCacheMaxCount;
+      cache.maximumSizeBytes = kOxTvImageCacheMaxBytes;
+    }
+  }
+
+  /// Samples RSS while [VideoPlayerActivity] is open (no route nav events during playback).
+  static Future<void> sampleDuringNativePlayback() async {
+    final snapshot = sample();
+    final rssMb = snapshot.rssMb;
+    if (rssMb == null) return;
+
+    final line =
+        'native_playback_memory rss_mb=$rssMb image_cache_mb=${(snapshot.imageCacheBytes / (1024 * 1024)).round()}';
+    unawaited(OxplayerCrashlytics.log(line));
+
+    if (!shouldWarn(
+      snapshot: snapshot,
+      previous: _lastSnapshot,
+      leanBack: _leanBack,
+      route: 'native_playback',
+      lastWarningScreen: _lastWarningScreen,
+      lastWarningAt: _lastWarningAt,
+      now: DateTime.now(),
+    )) {
+      _lastSnapshot = snapshot;
+      return;
+    }
+
+    _lastWarningScreen = 'native_playback';
+    _lastWarningAt = DateTime.now();
+    _lastSnapshot = snapshot;
+
+    unawaited(OxplayerCrashlytics.recordError(
+      StateError('high memory during native playback: ${rssMb}MB RSS'),
+      null,
+      fatal: false,
+      reason: 'tv_memory_pressure',
+    ));
+
+    if (!Sentry.isEnabled) return;
+    await Sentry.captureMessage(
+      'high memory (native playback): ${rssMb}MB RSS',
+      level: SentryLevel.warning,
+      withScope: (scope) {
+        scope
+          ..setTag('perf', 'high_memory')
+          ..setTag('screen', 'native_playback')
+          ..setTag('leanback', _leanBack.toString())
+          ..setContexts('memory', {
+            'route': 'native_playback',
+            'threshold_mb': highMemoryThresholdMb(leanBack: _leanBack),
+            ...snapshot.toContext(),
+          });
+      },
+    );
   }
 
   static OxplayerMemorySnapshot sample() {

@@ -1607,6 +1607,9 @@ abstract class VideoPlayerListenerCallback {
   /// Current muxed audio + subtitle snapshot from the native ExoPlayer demuxer (embedded tracks only).
   void onMuxedTracksDiscovered(List<NativeMuxedAudioRow> audio, List<NativeMuxedSubtitleRow> subtitles);
 
+  /// ExoPlayer [PlaybackException] surfaced to Dart for Sentry / Crashlytics.
+  void onPlaybackError(int errorCode, String errorCodeName, String? message);
+
   static void setUp(VideoPlayerListenerCallback? api, {BinaryMessenger? binaryMessenger, String messageChannelSuffix = '',}) {
     messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
     {
@@ -1653,6 +1656,35 @@ abstract class VideoPlayerListenerCallback {
               'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerListenerCallback.onMuxedTracksDiscovered was null, expected non-null List<NativeMuxedSubtitleRow>.');
           try {
             api.onMuxedTracksDiscovered(arg_audio!, arg_subtitles!);
+            return wrapResponse(empty: true);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          }
+        });
+      }
+    }
+    {
+      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerListenerCallback.onPlaybackError$messageChannelSuffix', pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          assert(message != null,
+          'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerListenerCallback.onPlaybackError was null.');
+          final List<Object?> args = (message as List<Object?>?)!;
+          final int? arg_errorCode = (args[0] as int?);
+          assert(arg_errorCode != null,
+              'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerListenerCallback.onPlaybackError was null, expected non-null int.');
+          final String? arg_errorCodeName = (args[1] as String?);
+          assert(arg_errorCodeName != null,
+              'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerListenerCallback.onPlaybackError was null, expected non-null String.');
+          final String? arg_message = (args[2] as String?);
+          try {
+            api.onPlaybackError(arg_errorCode!, arg_errorCodeName!, arg_message);
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);

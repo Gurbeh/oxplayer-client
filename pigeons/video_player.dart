@@ -355,6 +355,9 @@ abstract class VideoPlayerListenerCallback {
     List<NativeMuxedAudioRow> audio,
     List<NativeMuxedSubtitleRow> subtitles,
   );
+
+  /// ExoPlayer [PlaybackException] surfaced to Dart for Sentry / Crashlytics.
+  void onPlaybackError(int errorCode, String errorCodeName, String? message);
 }
 
 @FlutterApi()

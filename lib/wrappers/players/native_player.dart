@@ -13,6 +13,7 @@ import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/oxplayer/oxplayer_audio_log.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_audio.dart';
+import 'package:fladder/oxplayer/oxplayer_memory_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/src/video_player_helper.g.dart';
 import 'package:fladder/wrappers/players/base_player.dart';
@@ -23,9 +24,11 @@ bool nativeActivityStarted = false;
 class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
   final player = VideoPlayerApi();
   final activity = NativeVideoActivity();
+  Timer? _playbackMemoryTimer;
 
   @override
   Future<void> dispose() async {
+    _stopPlaybackMemoryWatch();
     nativeActivityStarted = false;
     return activity.disposeActivity();
   }
@@ -68,8 +71,24 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
 
   @override
   Future<StartResult> open(BuildContext newContext) async {
+    OxplayerMemoryTelemetry.trimBeforeNativePlayback();
     nativeActivityStarted = true;
+    _startPlaybackMemoryWatch();
     return activity.launchActivity();
+  }
+
+  void _startPlaybackMemoryWatch() {
+    _playbackMemoryTimer?.cancel();
+    if (!OxplayerConfig.isEnabled) return;
+    _playbackMemoryTimer = Timer.periodic(
+      kOxNativePlaybackMemorySampleInterval,
+      (_) => unawaited(OxplayerMemoryTelemetry.sampleDuringNativePlayback()),
+    );
+  }
+
+  void _stopPlaybackMemoryWatch() {
+    _playbackMemoryTimer?.cancel();
+    _playbackMemoryTimer = null;
   }
 
   @override
@@ -122,6 +141,7 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
 
   @override
   Future<void> stop() async {
+    _stopPlaybackMemoryWatch();
     nativeActivityStarted = false;
     return player.stop();
   }
@@ -165,6 +185,15 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
     });
     // Native ExoPlayer applies muxed tracks in onTracksChanged (properlySetSubAndAudioTracks).
     // Re-calling refreshDefaultTrackSelection here caused a select/deselect loop on TV Home resume.
+  }
+
+  @override
+  void onPlaybackError(int errorCode, String errorCodeName, String? message) {
+    unawaited(OxplayerPlaybackTelemetry.reportNativePlayerError(
+      errorCode: errorCode,
+      errorCodeName: errorCodeName,
+      message: message,
+    ));
   }
 
   final StreamController<PlayerState> _stateController = StreamController.broadcast();

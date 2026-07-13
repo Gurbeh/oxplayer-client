@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+
+import 'package:fladder/oxplayer/oxplayer_crashlytics.dart';
 
 /// Reports video playback failures and related server/stream HTTP to Sentry.
 abstract final class OxplayerPlaybackTelemetry {
@@ -133,6 +137,33 @@ abstract final class OxplayerPlaybackTelemetry {
         'stuck_kind': stuckKind,
       },
     );
+  }
+
+  static Future<void> reportNativePlayerError({
+    required int errorCode,
+    required String errorCodeName,
+    String? message,
+    String? itemId,
+  }) async {
+    final summary = message == null || message.isEmpty ? errorCodeName : '$errorCodeName: $message';
+    await reportFailure(
+      stage: 'exo',
+      reason: summary,
+      itemId: itemId,
+      transient: false,
+      extra: {
+        'error_code': errorCode,
+        'error_code_name': errorCodeName,
+        if (message != null && message.isNotEmpty) 'message': message,
+      },
+    );
+    unawaited(OxplayerCrashlytics.recordError(
+      Exception('exo playback: $summary'),
+      null,
+      fatal: false,
+      reason: 'exo_playback',
+    ));
+    unawaited(OxplayerCrashlytics.log('exo_error code=$errorCode name=$errorCodeName'));
   }
 
   static Future<void> reportNativeOpenFailed({

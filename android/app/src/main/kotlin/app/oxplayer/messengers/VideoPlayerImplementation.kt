@@ -69,6 +69,8 @@ class VideoPlayerImplementation(
     /** One-shot listener: Ox loopback + resume must load from t=0 first, then seek (see [open]). */
     private var loopbackResumeListener: Player.Listener? = null
 
+    private var playbackErrorListener: Player.Listener? = null
+
     private var initialPositionLogPosted = false
 
     private fun scheduleInitialPositionLog(exo: ExoPlayer, requestedStartMs: Long) {
@@ -400,12 +402,27 @@ class VideoPlayerImplementation(
     }
 
     fun init(exoPlayer: ExoPlayer?) {
+        playbackErrorListener?.let { player?.removeListener(it) }
+        playbackErrorListener = null
         player = exoPlayer
         subsInitialized = false
         if (exoPlayer == null) {
             pendingOpenUrl = null
             return
         }
+        val errorListener = object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                Log.e(
+                    OX_NATIVE_PLY_TAG,
+                    "onPlayerError code=${error.errorCode} name=${error.errorCodeName} " +
+                        "msg=${error.message} cause=${error.cause?.message}",
+                    error,
+                )
+                VideoPlayerObject.reportPlaybackError(error)
+            }
+        }
+        playbackErrorListener = errorListener
+        exoPlayer.addListener(errorListener)
         val deferredUrl = pendingOpenUrl
         val deferredPlay = pendingOpenPlay
         if (!deferredUrl.isNullOrBlank()) {
@@ -436,6 +453,8 @@ class VideoPlayerImplementation(
     /** Only clears the binding when the releasing instance is still current (activity switch race). */
     fun releasePlayer(exoPlayer: ExoPlayer): Boolean {
         if (player !== exoPlayer) return false
+        playbackErrorListener?.let { exoPlayer.removeListener(it) }
+        playbackErrorListener = null
         player = null
         subsInitialized = false
         return true

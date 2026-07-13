@@ -38,6 +38,7 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -61,6 +62,7 @@ import app.oxplayer.utility.AllowedOrientations
 import app.oxplayer.utility.conditional
 import app.oxplayer.utility.getAudioTracks
 import app.oxplayer.utility.getSubtitleTracks
+import app.oxplayer.utility.leanBackEnabled
 import kotlin.time.Duration.Companion.seconds
 
 private const val OX_NATIVE_PLY_TAG = "OX_NATIVE_PLY"
@@ -76,9 +78,12 @@ internal fun ExoPlayer(
 ) {
     val videoHost = VideoPlayerObject
     val context = LocalContext.current
+    val activityManager = context.getSystemService<ActivityManager>()
+    val isLowRamDevice = activityManager?.isLowRamDevice == true
+    val isLeanBackTv = leanBackEnabled(context)
+    val conserveMemory = isLowRamDevice || isLeanBackTv
 
     val extractorsFactory = DefaultExtractorsFactory().apply {
-        val isLowRamDevice = context.getSystemService<ActivityManager>()?.isLowRamDevice == true
         setTsExtractorTimestampSearchBytes(
             when (isLowRamDevice) {
                 true -> TsExtractor.TS_PACKET_SIZE * 1800
@@ -104,14 +109,30 @@ internal fun ExoPlayer(
 
     val trackSelector = DefaultTrackSelector(context).apply {
         setParameters(buildUponParameters().apply {
-            setAudioOffloadPreferences(
-                TrackSelectionParameters.AudioOffloadPreferences.DEFAULT.buildUpon().apply {
-                    setAudioOffloadMode(TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED)
-                }.build()
-            )
+            if (!conserveMemory) {
+                setAudioOffloadPreferences(
+                    TrackSelectionParameters.AudioOffloadPreferences.DEFAULT.buildUpon().apply {
+                        setAudioOffloadMode(TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED)
+                    }.build()
+                )
+            }
             setTunnelingEnabled(PlayerSettingsObject.settings.value?.enableTunneling ?: false)
             setAllowInvalidateSelectionsOnRendererCapabilitiesChange(true)
         })
+    }
+
+    val loadControl = if (conserveMemory) {
+        DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                15_000,
+                45_000,
+                1_500,
+                3_000,
+            )
+            .setTargetBufferBytes(32 * 1024 * 1024)
+            .build()
+    } else {
+        DefaultLoadControl.Builder().build()
     }
 
     val trackApplyHandler = remember { Handler(Looper.getMainLooper()) }
@@ -120,6 +141,7 @@ internal fun ExoPlayer(
     val exoPlayer = remember {
         ExoPlayer.Builder(context, renderersFactory)
             .setTrackSelector(trackSelector)
+            .setLoadControl(loadControl)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory))
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true)
@@ -167,6 +189,7 @@ internal fun ExoPlayer(
                         "msg=${error.message} cause=${error.cause?.message}",
                     error,
                 )
+                VideoPlayerObject.reportPlaybackError(error)
                 super.onPlayerError(error)
             }
 
