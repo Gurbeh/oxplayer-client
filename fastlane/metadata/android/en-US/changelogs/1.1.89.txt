@@ -1,0 +1,1 @@
+Support stream v3 encrypted slug playback URLs for CDN caching.
