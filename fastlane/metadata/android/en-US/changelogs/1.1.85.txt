@@ -1,0 +1,1 @@
+Playback errors now reported to Sentry and Crashlytics for faster diagnosis.
