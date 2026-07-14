@@ -69,8 +69,9 @@ abstract final class OxplayerStreamLog {
     if (!kDebugMode || !OxplayerConfig.isEnabled) return;
     final uri = Uri.tryParse(url);
     if (uri == null) return;
-    // /v/* requires JWT in query — unauthenticated probe always 401; use /cdn-probe/range for CDN checks.
-    if (uri.path.contains('/v/')) return;
+    // Tokenless slug URLs (/v/{slug}.mkv with no ?token=) can be probed directly.
+    // Legacy JWT /v/* paths still require ?token= — skip those (use /cdn-probe/range for CDN checks).
+    if (uri.path.contains('/v/') && uri.queryParameters['token'] != null) return;
     unawaited(_probeRange(url));
   }
 

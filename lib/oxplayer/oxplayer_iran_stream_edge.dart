@@ -128,7 +128,7 @@ abstract final class OxplayerIranStreamEdge {
     final uri = Uri.tryParse(url);
     if (uri == null || !uri.hasAuthority) return url;
 
-    final match = RegExp(r'^/v/(\d+)\.[^/]+$').firstMatch(uri.path);
+    final match = RegExp(r'^/v/([A-Za-z0-9_-]+)\.[^/]+$').firstMatch(uri.path);
     if (match == null) return url;
 
     final out = uri.replace(path: '/v/${match.group(1)}.stream.ts').toString();

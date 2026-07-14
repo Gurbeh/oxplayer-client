@@ -17,7 +17,8 @@ bool oxplayerIsOxStreamUrl(String? url) {
   if (url.contains('/stream.ts') || url.contains('stream.ts?')) return true;
   final uri = Uri.tryParse(url);
   if (uri == null) return false;
-  return RegExp(r'/v/\d+\.').hasMatch(uri.path);
+  // Legacy numeric: /v/136.mkv ; Slug (encrypted variant id): /v/{base64url}.mkv
+  return RegExp(r'/v/[A-Za-z0-9_-]+\.[^/]+$').hasMatch(uri.path);
 }
 
 PlaybackType? _playbackTypeForModel(PlaybackModel model) => switch (model) {
