@@ -46,10 +46,13 @@ class _OxplayerPlaybackDiagScreenState extends ConsumerState<OxplayerPlaybackDia
         setState(() => _statusKey = _phaseToStatusKey(phase));
       });
       if (!mounted || _phase != _DiagPhase.running) return;
+      final failed = text.contains('"phaseErrors"');
       setState(() {
         _report = text;
         _phase = _DiagPhase.done;
-        _statusKey = 'oxplayerPlaybackDiagStatusDone';
+        _statusKey = failed
+            ? 'oxplayerPlaybackDiagStatusFailed'
+            : 'oxplayerPlaybackDiagStatusDone';
       });
     } catch (e) {
       if (!mounted) return;

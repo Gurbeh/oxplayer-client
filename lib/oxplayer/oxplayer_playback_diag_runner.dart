@@ -34,51 +34,89 @@ class OxplayerPlaybackDiagRunner {
   Future<String> run({void Function(String phase)? onPhase}) async {
     _cancelled = false;
     final started = DateTime.now().toUtc();
-
-    onPhase?.call('collecting_context');
     final report = <String, Object?>{
       'kind': 'oxplayer_playback_diag',
       'capturedAt': started.toIso8601String(),
-      'app': await _appContext(),
-      'user': _userContext(),
-      'route': _routeContext(),
-      'playback': _playbackContext(),
     };
+    final phaseErrors = <String, String>{};
 
-    if (_cancelled) return _encode(report);
+    onPhase?.call('collecting_context');
+    try {
+      report['app'] = await _appContext();
+      report['user'] = _userContext();
+      report['route'] = _routeContext();
+      report['playback'] = _playbackContext();
+    } catch (e) {
+      phaseErrors['collecting_context'] = e.toString();
+    }
+
+    if (_cancelled) return _encode(report, phaseErrors);
 
     onPhase?.call('probing_api');
-    report['probes'] = await _runProbes();
+    try {
+      report['probes'] = await _runProbes();
+    } catch (e) {
+      phaseErrors['probing_api'] = e.toString();
+      report['probes'] = {'ok': false, 'error': e.toString()};
+    }
 
     if (_cancelled) {
       if (kIsWeb) OxplayerPlaybackDiagHooks.uninstall();
-      return _encode(report);
+      return _encode(report, phaseErrors);
     }
 
     onPhase?.call('probing_playback');
-    report['playbackProbe'] = await _runPlaybackProbe();
+    try {
+      report['playbackProbe'] = await _runPlaybackProbe();
+    } catch (e) {
+      phaseErrors['probing_playback'] = e.toString();
+      report['playbackProbe'] = {'ok': false, 'error': e.toString()};
+    }
 
     if (_cancelled) {
       if (kIsWeb) OxplayerPlaybackDiagHooks.uninstall();
-      return _encode(report);
+      return _encode(report, phaseErrors);
     }
 
     if (kIsWeb) {
       onPhase?.call('watching_playback');
-      OxplayerPlaybackDiagHooks.install();
-      await _watchWeb(const Duration(seconds: 5));
-      if (!_cancelled) {
-        report['webHooks'] = OxplayerPlaybackDiagHooks.snapshot();
+      try {
+        OxplayerPlaybackDiagHooks.install();
+        await _watchWeb(const Duration(seconds: 5));
+        if (!_cancelled) {
+          report['webHooks'] = OxplayerPlaybackDiagHooks.snapshot();
+        }
+      } catch (e) {
+        phaseErrors['watching_playback'] = e.toString();
+        report['webHooks'] = {'ok': false, 'error': e.toString()};
+      } finally {
+        OxplayerPlaybackDiagHooks.uninstall();
       }
-      OxplayerPlaybackDiagHooks.uninstall();
     }
 
-    report['checks'] = _deriveChecks(report);
-    return _encode(report);
+    try {
+      report['checks'] = _deriveChecks(report);
+    } catch (e) {
+      phaseErrors['derive_checks'] = e.toString();
+    }
+
+    return _encode(report, phaseErrors);
   }
 
-  String _encode(Map<String, Object?> report) {
-    return const JsonEncoder.withIndent('  ').convert(report);
+  String _encode(Map<String, Object?> report, [Map<String, String>? phaseErrors]) {
+    if (phaseErrors != null && phaseErrors.isNotEmpty) {
+      report['phaseErrors'] = phaseErrors;
+    }
+    try {
+      return const JsonEncoder.withIndent('  ').convert(report);
+    } catch (e) {
+      return const JsonEncoder.withIndent('  ').convert({
+        'kind': report['kind'],
+        'capturedAt': report['capturedAt'],
+        'encodeError': e.toString(),
+        'phaseErrors': phaseErrors,
+      });
+    }
   }
 
   Future<void> _watchWeb(Duration duration) async {
