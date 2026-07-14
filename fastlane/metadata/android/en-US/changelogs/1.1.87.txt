@@ -1,0 +1,1 @@
+Use telegram.me instead of t.me for Telegram links.
