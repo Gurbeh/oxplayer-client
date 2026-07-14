@@ -455,7 +455,7 @@ class PlaybackModelHelper {
 
       final mediaPath = isValidVideoUrl(mediaSource.path ?? "");
       final resolvedMediaPath = mediaPath != null && OxplayerEnv.isEnabled
-          ? await oxplayerResolveStreamPlaybackUrl(ref, mediaPath)
+          ? await oxplayerResolveStreamPlaybackUrl(ref.read, mediaPath)
           : mediaPath;
 
       OxplayerStreamLog.event('playback_url', fields: {
@@ -651,7 +651,7 @@ class PlaybackModelHelper {
 
       final mediaPath = isValidVideoUrl(mediaSource.path ?? "");
       final resolvedMediaPath = mediaPath != null && OxplayerEnv.isEnabled
-          ? await oxplayerResolveStreamPlaybackUrl(ref, mediaPath)
+          ? await oxplayerResolveStreamPlaybackUrl(ref.read, mediaPath)
           : mediaPath;
 
       newModel = DirectPlaybackModel(

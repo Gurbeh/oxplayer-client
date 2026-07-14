@@ -392,7 +392,7 @@ class LibMPV extends BasePlayer {
             if (OxplayerEnv.isEnabled && oxplayerIsOxStreamUrl(url)) {
               final bridgeRef = OxplayerStreamRepairBridge.ref;
               final failoverUrl = bridgeRef != null
-                  ? await oxplayerFailoverStreamUrl(bridgeRef, url)
+                  ? await oxplayerFailoverStreamUrl(bridgeRef.read, url)
                   : null;
               if (failoverUrl != null && failoverUrl != url) {
                 log("Failover ox-stream to alternate node");
@@ -424,7 +424,7 @@ class LibMPV extends BasePlayer {
             if (OxplayerEnv.isEnabled && oxplayerIsOxStreamUrl(url)) {
               final bridgeRef = OxplayerStreamRepairBridge.ref;
               final failoverUrl = bridgeRef != null
-                  ? await oxplayerFailoverStreamUrl(bridgeRef, url)
+                  ? await oxplayerFailoverStreamUrl(bridgeRef.read, url)
                   : null;
               if (failoverUrl != null && failoverUrl != url) {
                 log("Failover ox-stream to alternate node (retry)");

@@ -235,7 +235,7 @@ class OxplayerPlaybackDiagRunner {
     }
 
     final resolved = await oxplayerResolveStreamPlaybackUrl(
-      _ref as Ref,
+      _ref.read,
       apiMinted,
       forceRefreshNodes: true,
     );

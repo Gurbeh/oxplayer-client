@@ -8,6 +8,7 @@ import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_route.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
+import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_http_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_nodes_api.dart';
@@ -76,7 +77,7 @@ String _iranVanityEarly(String url) {
 
 /// Rewrites an API-minted ox-stream URL to a healthy discovery node host.
 Future<String?> oxplayerResolveStreamPlaybackUrl(
-  Ref ref,
+  OxplayerRead read,
   String? apiMintedUrl, {
   bool forceRefreshNodes = false,
 }) async {
@@ -109,17 +110,17 @@ Future<String?> oxplayerResolveStreamPlaybackUrl(
     return await _finalizeStreamPlaybackUrl(workingUrl, via: 'invalid_uri');
   }
 
-  final token = ref.read(userProvider)?.credentials.token.trim() ?? '';
+  final token = read(userProvider)?.credentials.token.trim() ?? '';
   if (token.isEmpty) {
     return await _finalizeStreamPlaybackUrl(workingUrl, via: 'no_token');
   }
 
-  final base = ref.read(serverUrlProvider)?.trim() ?? '';
+  final base = read(serverUrlProvider)?.trim() ?? '';
   if (base.isEmpty) {
     return await _finalizeStreamPlaybackUrl(workingUrl, via: 'no_api_base');
   }
 
-  final api = ref.read(_streamNodesApiProvider);
+  final api = read(_streamNodesApiProvider);
   final nodes = await api.fetchHealthyNodes(
     baseUrl: base,
     accessToken: token,
@@ -165,7 +166,7 @@ Future<String?> oxplayerResolveStreamPlaybackUrl(
 
 /// Failover to the next healthy node within [budget], rewriting [currentUrl]'s host.
 Future<String?> oxplayerFailoverStreamUrl(
-  Ref ref,
+  OxplayerRead read,
   String currentUrl, {
   Duration budget = const Duration(milliseconds: 1500),
 }) async {
@@ -181,13 +182,13 @@ Future<String?> oxplayerFailoverStreamUrl(
     OxplayerStreamLog.event('failover_attempt', fields: {'activeNodeId': active});
   }
 
-  final token = ref.read(userProvider)?.credentials.token.trim() ?? '';
+  final token = read(userProvider)?.credentials.token.trim() ?? '';
   if (token.isEmpty) return null;
 
-  final base = ref.read(serverUrlProvider)?.trim() ?? '';
+  final base = read(serverUrlProvider)?.trim() ?? '';
   if (base.isEmpty) return null;
 
-  final api = ref.read(_streamNodesApiProvider);
+  final api = read(_streamNodesApiProvider);
   while (DateTime.now().isBefore(deadline)) {
     final nodes = await api.fetchHealthyNodes(
       baseUrl: base,

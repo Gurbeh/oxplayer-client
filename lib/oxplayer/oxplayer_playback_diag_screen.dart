@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -52,7 +54,7 @@ class _OxplayerPlaybackDiagScreenState extends ConsumerState<OxplayerPlaybackDia
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _report = '{\n  "error": "${e.runtimeType}"\n}';
+        _report = '{\n  "error": ${jsonEncode(e.toString())}\n}';
         _phase = _DiagPhase.done;
         _statusKey = 'oxplayerPlaybackDiagStatusFailed';
       });

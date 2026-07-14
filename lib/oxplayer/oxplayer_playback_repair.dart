@@ -96,7 +96,7 @@ Future<String?> oxplayerTryRepairStreamUrl(String deadUrl) async {
 
   final r = OxplayerStreamRepairBridge.ref;
   if (r != null) {
-    final failoverUrl = await oxplayerFailoverStreamUrl(r, deadUrl);
+    final failoverUrl = await oxplayerFailoverStreamUrl(r.read, deadUrl);
     if (failoverUrl != null && failoverUrl != deadUrl) {
       return failoverUrl;
     }

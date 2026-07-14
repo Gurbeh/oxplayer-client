@@ -35,18 +35,18 @@ abstract final class OxplayerEnv {
 
   static String? get telegramBotOpenLink {
     final b = botUsername;
-    return b == null ? null : 'https://t.me/$b';
+    return b == null ? null : 'https://telegram.me/$b';
   }
 
   static String? get telegramBotLoginLink {
     final b = botUsername;
-    return b == null ? null : 'https://t.me/$b?start=login';
+    return b == null ? null : 'https://telegram.me/$b?start=login';
   }
 
   /// Deep link for self-service account delete in the main bot.
   static String? get telegramBotDeleteAccountLink {
     final b = botUsername;
-    return b == null ? null : 'https://t.me/$b?start=delete_account';
+    return b == null ? null : 'https://telegram.me/$b?start=delete_account';
   }
 
   /// Deep link for app login attempt: ?start=li_<32-char hex attemptId>.
@@ -64,6 +64,6 @@ abstract final class OxplayerEnv {
     final b = botUsername;
     final id = attemptId.trim();
     if (b == null || id.isEmpty) return null;
-    return 'https://t.me/$b?start=li_$id';
+    return 'https://telegram.me/$b?start=li_$id';
   }
 }

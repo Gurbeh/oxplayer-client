@@ -5,5 +5,5 @@ export const PRIVACY_PACKAGE_ID = "app.oxplayer";
 
 export const privacyRepoUrl = "https://github.com/Gurbeh/oxplayer-client";
 export const privacyIssuesUrl = "https://github.com/Gurbeh/oxplayer-client/issues";
-export const privacyDeleteBotUrl = "https://t.me/OXPlayerBot?start=delete_account";
+export const privacyDeleteBotUrl = "https://telegram.me/OXPlayerBot?start=delete_account";
 export const telegramPrivacyUrl = "https://telegram.org/privacy";
