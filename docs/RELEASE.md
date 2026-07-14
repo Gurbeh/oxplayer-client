@@ -167,6 +167,51 @@ curl -s https://api.oxplayer.app/ox/client/android-update
 # expect {"version":"M.m.p"}
 ```
 
+### 7. Web (Hetzner static) — `oxplayer.ir` / `web.oxplayer.app`
+
+On **release** builds (`build_type=release`), **Deploy Web · Hetzner** dispatches `oxplayer-be` → SSH → `/srv/oxplayer-web`. This is **not** GitHub Pages or ghcr.io Docker — those update separately.
+
+**One-time setup** (required — release CI **fails** if missing):
+
+Fine-grained PAT on account with access to `Aryan-mor/oxplayer-be`:
+
+- Repository access: `Aryan-mor/oxplayer-be`
+- Permissions: **Contents** read, **Actions** read + write (workflow dispatch)
+
+Store as **`OXPLAYER_BE_DISPATCH_TOKEN`** in **either**:
+
+1. **GitHub secret** on `Gurbeh/oxplayer-client` (quick):
+
+```bash
+gh secret set OXPLAYER_BE_DISPATCH_TOKEN --repo Gurbeh/oxplayer-client
+# paste PAT when prompted
+```
+
+2. **Infisical** `/core/client-ci` (preferred with other CI secrets):
+
+```bash
+# oxplayer-be repo — admin machine identity
+export OXPLAYER_BE_DISPATCH_TOKEN='<same PAT>'
+pnpm infisical:bootstrap-client-ci
+```
+
+`scripts/release-client.sh` refuses to push a release tag until the GitHub secret exists (local guard). CI loads Infisical first, then falls back to the GitHub secret.
+
+**Manual redeploy** (any semver already built):
+
+```bash
+gh workflow run "Deploy · Web (Hetzner static)" \
+  --repo Aryan-mor/oxplayer-be \
+  -f version=M.m.p
+```
+
+Verify:
+
+```bash
+gh run list --repo Aryan-mor/oxplayer-be --workflow="Deploy · Web (Hetzner static)" --limit 3
+curl -fsSI https://web.oxplayer.app/main.dart.js | grep -i last-modified
+```
+
 ---
 
 ## Quick reference
@@ -178,6 +223,7 @@ curl -s https://api.oxplayer.app/ox/client/android-update
 | ghcr.io Docker web | — | auto on nightly/release **Build OXPlayer** (after **Create Release**) |
 | Prerelease assets | same as nightly | same as nightly |
 | Stable release | `pubspec.yaml` + optional `fastlane/.../changelogs/{M.m.p}.txt` | `Prepare Release` → `Build OXPlayer` on `vM.m.p` with `build_type=release` → publish draft |
+| Hetzner web (`oxplayer.ir`) | `OXPLAYER_BE_DISPATCH_TOKEN` once | auto on release **Build OXPlayer** → **Deploy Web · Hetzner** |
 
 ## Local Android sanity check (optional)
 

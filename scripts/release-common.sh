@@ -214,7 +214,27 @@ release_client_next_version() {
   echo "${major}.${minor}.${new_patch}+${new_patch}"
 }
 
-release_client_version_name() {
-  local full="$1"
-  echo "${full%%+*}"
+release_client_require_web_dispatch_token() {
+  local has_gh=0
+
+  if gh secret list --repo Gurbeh/oxplayer-client --json name -q '.[].name' 2>/dev/null \
+    | grep -qx 'OXPLAYER_BE_DISPATCH_TOKEN'; then
+    has_gh=1
+  fi
+
+  if [[ "${has_gh}" -eq 0 ]]; then
+    echo "error: OXPLAYER_BE_DISPATCH_TOKEN is not set on Gurbeh/oxplayer-client." >&2
+    echo "Release builds will fail at Deploy Web · Hetzner without it." >&2
+    echo "" >&2
+    echo "Fix (pick one):" >&2
+    echo "  1. GitHub secret on Gurbeh/oxplayer-client:" >&2
+    echo "       gh secret set OXPLAYER_BE_DISPATCH_TOKEN --repo Gurbeh/oxplayer-client" >&2
+    echo "     (fine-grained PAT: Contents read + Actions read/write on Aryan-mor/oxplayer-be)" >&2
+    echo "  2. Infisical /core/client-ci (preferred with other CI secrets):" >&2
+    echo "       OXPLAYER_BE_DISPATCH_TOKEN=<same PAT>" >&2
+    echo "       pnpm infisical:bootstrap-client-ci   # from oxplayer-be" >&2
+    echo "" >&2
+    echo "See oxplayer-client/docs/RELEASE.md § Web (Hetzner)." >&2
+    exit 1
+  fi
 }

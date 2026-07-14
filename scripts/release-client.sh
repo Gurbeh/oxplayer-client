@@ -36,6 +36,7 @@ cd "${ROOT}"
 
 release_require_gh_auth
 release_preflight
+release_client_require_web_dispatch_token
 release_run_verify
 
 NEW_VERSION="$(release_client_next_version)"

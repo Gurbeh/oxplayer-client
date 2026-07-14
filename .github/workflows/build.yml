@@ -1123,22 +1123,63 @@ jobs:
     if: |
       needs.fetch-info.outputs.build_type == 'release' &&
       needs.create_release.result == 'success'
-    continue-on-error: true
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
+      - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
+
       - name: Trigger oxplayer-be static web deploy
+        id: dispatch
         env:
-          GH_TOKEN: ${{ secrets.OXPLAYER_BE_DISPATCH_TOKEN }}
+          GH_TOKEN_GITHUB: ${{ secrets.OXPLAYER_BE_DISPATCH_TOKEN }}
+          GH_TOKEN_INFISICAL: ${{ env.OXPLAYER_BE_DISPATCH_TOKEN }}
           VERSION: ${{ needs.fetch-info.outputs.version_name }}
           BE_REPO: Aryan-mor/oxplayer-be
         run: |
           set -euo pipefail
-          if [ -z "${GH_TOKEN:-}" ]; then
-            echo "::warning::Skip Hetzner deploy: set secret OXPLAYER_BE_DISPATCH_TOKEN (PAT with repo + workflow on oxplayer-be)"
-            exit 0
+          GH_TOKEN="${GH_TOKEN_INFISICAL:-${GH_TOKEN_GITHUB:-}}"
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::error::Missing OXPLAYER_BE_DISPATCH_TOKEN — set in Infisical /core/client-ci or Gurbeh/oxplayer-client GitHub Secrets (PAT with repo + workflow on oxplayer-be). See docs/RELEASE.md § Web (Hetzner)."
+            exit 1
           fi
+          export GH_TOKEN
+          echo "dispatch_before=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
           echo "Dispatch deploy-client-web v${VERSION} → ${BE_REPO}"
           gh api "repos/${BE_REPO}/dispatches" \
             -f event_type=deploy-client-web \
             -f "client_payload[version]=${VERSION}"
+
+      - name: Wait for oxplayer-be web deploy
+        env:
+          GH_TOKEN_GITHUB: ${{ secrets.OXPLAYER_BE_DISPATCH_TOKEN }}
+          GH_TOKEN_INFISICAL: ${{ env.OXPLAYER_BE_DISPATCH_TOKEN }}
+          BE_REPO: Aryan-mor/oxplayer-be
+          DISPATCH_BEFORE: ${{ steps.dispatch.outputs.dispatch_before }}
+        run: |
+          set -euo pipefail
+          GH_TOKEN="${GH_TOKEN_INFISICAL:-${GH_TOKEN_GITHUB:-}}"
+          export GH_TOKEN
+          for attempt in $(seq 1 24); do
+            run_id="$(gh run list --repo "${BE_REPO}" \
+              --workflow="Deploy · Web (Hetzner static)" \
+              --event repository_dispatch \
+              --limit 5 \
+              --json databaseId,createdAt \
+              --jq "[.[] | select(.createdAt >= \"${DISPATCH_BEFORE}\")] | .[0].databaseId // empty")"
+            if [ -n "${run_id}" ]; then
+              echo "Web deploy run: ${run_id}"
+              gh run watch "${run_id}" --repo "${BE_REPO}" --exit-status
+              exit 0
+            fi
+            echo "Attempt ${attempt}/24: waiting for web deploy workflow..."
+            sleep 10
+          done
+          echo "::error::Timed out waiting for Deploy · Web (Hetzner static) on ${BE_REPO}"
+          exit 1
