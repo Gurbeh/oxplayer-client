@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
-import 'package:fladder/oxplayer/oxplayer_about_error_logs_button.dart';
+import 'package:fladder/oxplayer/oxplayer_developer_mode_store.dart';
+import 'package:fladder/oxplayer/oxplayer_version_tap_unlock.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
-import 'package:fladder/screens/crash_screen/crash_screen.dart';
 import 'package:fladder/screens/settings/settings_scaffold.dart';
 import 'package:fladder/screens/shared/fladder_icon.dart';
 import 'package:fladder/screens/shared/fladder_logo.dart';
@@ -18,11 +18,40 @@ import 'package:fladder/util/localization_helper.dart';
 const _oxplayerWebsite = 'https://oxplayer.app';
 const _oxplayerWebsiteLabel = 'oxplayer.app';
 
-class OxplayerAboutSettingsPage extends ConsumerWidget {
+class OxplayerAboutSettingsPage extends ConsumerStatefulWidget {
   const OxplayerAboutSettingsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<OxplayerAboutSettingsPage> createState() => _OxplayerAboutSettingsPageState();
+}
+
+class _OxplayerAboutSettingsPageState extends ConsumerState<OxplayerAboutSettingsPage> {
+  bool _developerModeUnlocked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDeveloperMode();
+  }
+
+  Future<void> _loadDeveloperMode() async {
+    final unlocked = await OxplayerDeveloperModeStore.isUnlocked();
+    if (!mounted) return;
+    setState(() => _developerModeUnlocked = unlocked);
+  }
+
+  Future<void> _unlockDeveloperMode() async {
+    if (_developerModeUnlocked) return;
+    await OxplayerDeveloperModeStore.unlock();
+    if (!mounted) return;
+    setState(() => _developerModeUnlocked = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(context.localized.oxplayerDeveloperModeUnlocked)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final applicationInfo = ref.watch(applicationInfoProvider);
 
     return SettingsScaffold(
@@ -32,7 +61,10 @@ class OxplayerAboutSettingsPage extends ConsumerWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(context.localized.aboutVersion(applicationInfo.versionAndPlatform)),
+            OxplayerVersionTapUnlock(
+              onUnlocked: _unlockDeveloperMode,
+              child: Text(context.localized.aboutVersion(applicationInfo.versionAndPlatform)),
+            ),
             Text(context.localized.aboutBuild(applicationInfo.buildNumber)),
             const SizedBox(height: 16),
             const Text('Created by Gurbeh'),
@@ -82,27 +114,16 @@ class OxplayerAboutSettingsPage extends ConsumerWidget {
             ),
           ],
         ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            OxplayerAboutErrorLogsButton(
-              label: context.localized.errorLogs,
-              onOpenErrorLogs: () => showDialog(
-                context: context,
-                builder: (context) => const CrashScreen(),
+        if (_developerModeUnlocked)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              FilledButton.tonal(
+                onPressed: () => context.router.push(const OxplayerDeveloperModeRoute()),
+                child: Text(context.localized.oxplayerDeveloperModeTitle),
               ),
-            ),
-          ],
-        ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            FilledButton.tonal(
-              onPressed: () => context.router.push(const OxplayerPlaybackDiagRoute()),
-              child: Text(context.localized.oxplayerPlaybackDiagTitle),
-            ),
-          ],
-        ),
+            ],
+          ),
       ].addInBetween(const SizedBox(height: 16)),
     );
   }

@@ -2920,5 +2920,21 @@
   "oxplayerPlaybackDiagStatusFailed": "Test failed — partial report below",
   "@oxplayerPlaybackDiagStatusFailed": {},
   "oxplayerPlaybackDiagStatusCancelled": "Cancelled",
-  "@oxplayerPlaybackDiagStatusCancelled": {}
+  "@oxplayerPlaybackDiagStatusCancelled": {},
+  "oxplayerDeveloperModeTitle": "Developer mode",
+  "@oxplayerDeveloperModeTitle": {},
+  "oxplayerDeveloperModeIntro": "Internal diagnostics. Do not use unless you know what you are doing.",
+  "@oxplayerDeveloperModeIntro": {},
+  "oxplayerDeveloperModeUnlocked": "Developer mode enabled",
+  "@oxplayerDeveloperModeUnlocked": {},
+  "oxplayerDeveloperModeCheckSentry": "Check Sentry",
+  "@oxplayerDeveloperModeCheckSentry": {},
+  "oxplayerDeveloperModeCheckStream": "Check stream",
+  "@oxplayerDeveloperModeCheckStream": {},
+  "oxplayerDeveloperModeCheckCrashlytics": "Check Crashlytics",
+  "@oxplayerDeveloperModeCheckCrashlytics": {},
+  "oxplayerDeveloperModeSentrySent": "Sentry test sent",
+  "@oxplayerDeveloperModeSentrySent": {},
+  "oxplayerDeveloperModeCrashlyticsUnavailable": "Crashlytics is not available on this build",
+  "@oxplayerDeveloperModeCrashlyticsUnavailable": {}
 }

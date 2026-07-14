@@ -112,6 +112,7 @@ final List<AutoRoute> _settingsChildren = [
   AutoRoute(page: PlayerSettingsRoute.page, path: 'player', maintainState: false),
   AutoRoute(page: AboutSettingsRoute.page, path: 'about'),
   AutoRoute(page: OxplayerPlaybackDiagRoute.page, path: 'playback-diag'),
+  AutoRoute(page: OxplayerDeveloperModeRoute.page, path: 'developer-mode'),
 ];
 
 final List<AutoRoute> _controlPanelRoutes = [

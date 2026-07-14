@@ -117,4 +117,10 @@ abstract final class OxplayerCrashlytics {
     unawaited(crashlytics.setUserIdentifier(jellyfinUserId));
     unawaited(crashlytics.setCustomKey('server_id', account.credentials.serverId));
   }
+
+  /// Forces a native crash so Firebase Crashlytics can be verified from developer mode.
+  static void triggerTestCrash() {
+    if (!_initialized) return;
+    FirebaseCrashlytics.instance.crash();
+  }
 }
