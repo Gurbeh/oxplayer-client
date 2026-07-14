@@ -1,0 +1,1 @@
+Hide About diagnostics behind developer mode unlock.
