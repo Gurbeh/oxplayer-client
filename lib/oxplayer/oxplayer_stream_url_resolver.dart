@@ -105,6 +105,18 @@ Future<String?> oxplayerResolveStreamPlaybackUrl(
     return await _finalizeStreamPlaybackUrl(workingUrl, via: 'web_direct');
   }
 
+  // Global cohort: the API mints the single vanity host (stream.oxplayer.app).
+  // Cloudflare distributes across origin nodes (DNS round-robin) and all viewers
+  // share one edge cache face, so skip per-node host rewrite. Iran keeps its
+  // node/edge-pin rewrite path below.
+  if (OxplayerRoute.active != OxplayerEdge.iran) {
+    OxplayerStreamLog.event('resolve_vanity_cdn', fields: {
+      'url': OxplayerStreamLog.describeUrl(workingUrl),
+      'host': OxplayerStreamLog.describeHost(workingUrl),
+    });
+    return await _finalizeStreamPlaybackUrl(workingUrl, via: 'vanity_cdn');
+  }
+
   final uri = Uri.tryParse(workingUrl);
   if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
     return await _finalizeStreamPlaybackUrl(workingUrl, via: 'invalid_uri');
