@@ -248,6 +248,7 @@ jobs:
 
       - name: Upload debug symbols to Sentry
         if: needs.fetch-info.outputs.build_type != 'development'
+        continue-on-error: true
         env:
           SENTRY_URL: https://de.sentry.io
           SENTRY_RELEASE: oxplayer-client@${{ needs.fetch-info.outputs.version_name }}+${{ needs.fetch-info.outputs.android_version_code }}
@@ -260,7 +261,8 @@ jobs:
               exit 1
             fi
           done
-          dart run sentry_dart_plugin
+          chmod +x .github/scripts/retry_command.sh
+          .github/scripts/retry_command.sh 3 45 -- dart run sentry_dart_plugin
 
       - name: Verify native ABI parity (Play 64-bit / no x86)
         if: needs.fetch-info.outputs.build_type != 'development'
