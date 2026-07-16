@@ -960,7 +960,79 @@ jobs:
             printf '%s\n' "" > gh-release-body.md
           fi
 
+      # softprops/action-gh-release alone fails hard on GitHub API Unicorn/503 flakes.
+      # Prefer gh with retries; fall back to softprops once if gh still fails.
+      - name: Create GitHub Release (retry)
+        id: gh_release
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          V="${{ steps.version.outputs.version }}"
+          if [[ "${{ needs.fetch-info.outputs.build_type }}" == "nightly" ]]; then
+            TAG="${{ env.NIGHTLY_TAG }}"
+            TITLE="OXPlayer nightly — ${V}"
+            EXTRA_FLAGS=(--prerelease --notes-file gh-release-body.md)
+          else
+            TAG="${{ github.ref_name }}"
+            TITLE="OXPlayer ${V}"
+            EXTRA_FLAGS=(--latest --generate-notes)
+          fi
+
+          FILES=(
+            "OXPlayer-Android-${V}-arm64-v8a.apk"
+            "OXPlayer-Android-${V}-armeabi-v7a.apk"
+            "OXPlayer-Android-${V}-x86_64.apk"
+            "OXPlayer-Android-${V}.aab"
+            "OXPlayer-Windows-${V}-Setup.exe"
+            "OXPlayer-Windows-${V}.zip"
+            "OXPlayer-iOS-${V}.ipa"
+            "OXPlayer-macOS-${V}.dmg"
+            "OXPlayer-Linux-${V}.zip"
+            "OXPlayer-Linux-${V}.AppImage"
+            "OXPlayer-Linux-${V}.AppImage.zsync"
+            "OXPlayer-Web-${V}.zip"
+          )
+          if [[ "${{ needs.fetch-info.outputs.build_type }}" == "release" ]]; then
+            FILES+=("OXPlayer-Linux-${V}.flatpak")
+          fi
+
+          for f in "${FILES[@]}"; do
+            if [[ ! -f "$f" ]]; then
+              echo "::error::missing release asset: $f"
+              exit 1
+            fi
+          done
+
+          # Replace existing draft/broken release for this tag if present.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Deleting existing release $TAG before recreate"
+            gh release delete "$TAG" --yes || true
+          fi
+
+          attempt=1
+          max=6
+          while (( attempt <= max )); do
+            echo "=== gh release create attempt ${attempt}/${max} ==="
+            if gh release create "$TAG" \
+              --title "$TITLE" \
+              "${EXTRA_FLAGS[@]}" \
+              "${FILES[@]}"; then
+              echo "Release ${TAG} created"
+              exit 0
+            fi
+            sleep_s=$(( attempt * 20 ))
+            echo "Release create failed; sleeping ${sleep_s}s"
+            sleep "${sleep_s}"
+            attempt=$((attempt + 1))
+          done
+          echo "::error::gh release create failed after ${max} attempts"
+          exit 1
+
       - uses: softprops/action-gh-release@v3
+        if: steps.gh_release.outcome != 'success'
         with:
           tag_name: ${{ needs.fetch-info.outputs.build_type == 'nightly' && env.NIGHTLY_TAG || github.ref_name }}
           name: ${{ needs.fetch-info.outputs.build_type == 'nightly' && format('OXPlayer nightly — {0}', steps.version.outputs.version) || format('OXPlayer {0}', steps.version.outputs.version) }}
@@ -986,6 +1058,20 @@ jobs:
             ${{ needs.fetch-info.outputs.build_type == 'release' && format('OXPlayer-Linux-{0}.flatpak', steps.version.outputs.version) || '' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Fail if release still missing
+        if: steps.gh_release.outcome != 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          TAG="${{ needs.fetch-info.outputs.build_type == 'nightly' && env.NIGHTLY_TAG || github.ref_name }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release ${TAG} exists (softprops fallback succeeded)"
+            exit 0
+          fi
+          echo "::error::Create Release failed (gh + softprops)"
+          exit 1
 
       - name: Notify admins (Telegram via oxplayer API)
         if: success()
