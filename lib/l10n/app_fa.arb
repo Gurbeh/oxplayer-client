@@ -274,8 +274,8 @@
     "heightOffset": "ارتفاع",
     "loggedIn": "ورود-in",
     "login": "ورود در",
-    "logout": "ورود",
-    "logoutUserPopupTitle": "{userName}?",
+    "logout": "خروج",
+    "logoutUserPopupTitle": "خروج {userName}؟",
     "@logoutUserPopupTitle": {
         "description": "Pop-up for logging out the user",
         "placeholders": {
@@ -798,7 +798,7 @@
         }
     },
     "lockscreen": "صفحه قفل",
-    "logoutUserPopupContent": "این کار باعث خروج {userName} و حذف کاربر از اپلیکیشن می‌شود.\nباید دوباره در {serverName} وارد شوید.",
+    "logoutUserPopupContent": "این کار باعث خروج {userName} از OXPlayer روی این دستگاه می‌شود.\nهر وقت بخواهید دوباره وارد شوید.",
     "@logoutUserPopupContent": {
         "description": "Pop-up for logging out the user description",
         "placeholders": {
@@ -2126,6 +2126,22 @@
     "oxplayerHelpOpenBot": "باز کردن @{username} در تلگرام",
     "oxplayerHelpBotNotConfigured": "نام کاربری ربات در این نسخه تنظیم نشده.",
     "oxplayerSessionExpiredMessage": "نشست شما منقضی شده. دوباره وارد شوید.",
+    "oxplayerLogoutUserPopupTitle": "خروج {userName}؟",
+    "@oxplayerLogoutUserPopupTitle": {
+        "placeholders": {
+            "userName": {
+                "type": "String"
+            }
+        }
+    },
+    "oxplayerLogoutUserPopupContent": "این کار باعث خروج {userName} از OXPlayer روی این دستگاه می‌شود.\nهر وقت بخواهید دوباره وارد شوید.",
+    "@oxplayerLogoutUserPopupContent": {
+        "placeholders": {
+            "userName": {
+                "type": "String"
+            }
+        }
+    },
     "oxplayerLoginBootstrapEnvError": "OXPLAYER_API_BASE_URL در assets/env/default.env تنظیم نشده.",
     "oxplayerLoginTelegramTitle": "ورود با تلگرام",
     "oxplayerLoginDeviceNotReady": "دستگاه آماده نیست. دوباره تلاش کنید.",
@@ -2134,18 +2150,19 @@
     "oxplayerLoginWithTelegramWeb": "ورود با تلگرام",
     "oxplayerLoginOpenTelegramDevice": "باز کردن تلگرام روی این دستگاه",
     "oxplayerLoginWaitingApprovalTitle": "در انتظار تأیید در تلگرام… ورود خودکار انجام می‌شود.",
-    "oxplayerLoginTvSubtitle": "کیوآر را با تلگرام روی گوشی اسکن کنید. تلویزیون خودکار وارد می‌شود.",
-    "oxplayerLoginWebPhoneSubtitle": "دکمه را بزنید تا تلگرام باز شود، سپس درخواست ورود را تأیید کنید.",
-    "oxplayerLoginWebDesktopSubtitle": "کیوآر را با گوشی اسکن کنید یا دکمه را برای باز کردن تلگرام بزنید.",
-    "oxplayerLoginMobilePhoneSubtitle": "دکمه را بزنید یا از آیکن کیوآر برای ورود از دستگاه دیگر استفاده کنید.",
-    "oxplayerLoginMobileDesktopSubtitle": "کیوآر را با دستگاه دیگر اسکن کنید یا تلگرام را روی این دستگاه باز کنید.",
+    "oxplayerLoginTvSubtitle": "این کد را در ربات تلگرام (ورود) وارد کنید، یا کیوآر را با تلگرام گوشی اسکن کنید. تلویزیون خودکار وارد می‌شود.",
+    "oxplayerLoginWebPhoneSubtitle": "کد را در ربات تلگرام (ورود) وارد کنید، یا دکمه را بزنید تا تلگرام باز شود و تأیید کنید.",
+    "oxplayerLoginWebDesktopSubtitle": "کد را در ربات تلگرام (ورود) وارد کنید، کیوآر را اسکن کنید، یا تلگرام را از دکمه باز کنید.",
+    "oxplayerLoginMobilePhoneSubtitle": "کد را در ربات تلگرام (ورود) وارد کنید، یا دکمه / کیوآر را برای ورود بزنید.",
+    "oxplayerLoginMobileDesktopSubtitle": "کد را در ربات تلگرام (ورود) وارد کنید، کیوآر را اسکن کنید، یا تلگرام را روی این دستگاه باز کنید.",
     "oxplayerLoginTimedOutTryAgain": "زمان تمام شد. در تلگرام تأیید کنید و دوباره تلاش کنید.",
-    "oxplayerLoginFailedTryCode": "ورود ناموفق. دوباره تلاش کنید یا کد ورود بزنید.",
+    "oxplayerLoginFailedTryCode": "ورود ناموفق. کد را در ربات تلگرام وارد کنید یا دوباره تلاش کنید.",
     "oxplayerLoginConnectionError": "خطای اتصال. بعد از تأیید روی همین صفحه بمانید یا دوباره تلاش کنید.",
     "oxplayerLoginTryAgain": "تلاش دوباره",
     "oxplayerLoginManualCodePrompt": "ورود نشد؟ کد ورود را دستی وارد کنید",
     "oxplayerLoginCodeTitle": "کد ورود",
-    "oxplayerLoginCodeHint": "کد ۶ حرفی را از ربات تلگرام بگیرید و اینجا وارد کنید.",
+    "oxplayerLoginCodeHint": "در ربات تلگرام، ورود را باز کنید و این کد را وارد کنید.",
+    "oxplayerLoginCodeCopy": "کپی کد",
     "oxplayerLoginCodeLabel": "کد",
     "oxplayerLoginCodeInvalid": "کد ۶ حرفی ربات را وارد کنید.",
     "oxplayerLoginCodeFailed": "ورود ناموفق. کد را بررسی کنید.",

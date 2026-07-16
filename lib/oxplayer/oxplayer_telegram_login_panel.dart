@@ -16,17 +16,16 @@ import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/screens/shared/media/external_urls.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
+import 'package:fladder/util/clipboard_helper.dart';
 import 'package:fladder/util/localization_helper.dart';
 
 class OxplayerTelegramLoginPanel extends ConsumerStatefulWidget {
   const OxplayerTelegramLoginPanel({
     required this.onSuccess,
-    required this.onManualCode,
     super.key,
   });
 
   final Future<void> Function() onSuccess;
-  final VoidCallback onManualCode;
 
   @override
   ConsumerState<OxplayerTelegramLoginPanel> createState() => _OxplayerTelegramLoginPanelState();
@@ -35,6 +34,7 @@ class OxplayerTelegramLoginPanel extends ConsumerStatefulWidget {
 class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLoginPanel> with WidgetsBindingObserver {
   final _api = OxplayerLoginAttemptApi();
   String? _attemptId;
+  String? _loginCode;
   String? _telegramLink;
   bool _waiting = false;
   bool _cancelPoll = false;
@@ -87,6 +87,7 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
       _error = null;
       _waiting = false;
       _attemptId = null;
+      _loginCode = null;
       _telegramLink = null;
     });
     try {
@@ -99,6 +100,7 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
       }
       setState(() {
         _attemptId = created.attemptId;
+        _loginCode = created.code;
         _telegramLink = link;
       });
       unawaited(_pollForCompletion(userOpenedTelegram: false));
@@ -214,6 +216,67 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
     }
   }
 
+  Widget _buildLoginCode(BuildContext context, {required bool isTv}) {
+    final l10n = context.localized;
+    final theme = Theme.of(context);
+    final code = _loginCode;
+    if (code == null) {
+      if (_error == null) {
+        return const Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: Center(child: CircularProgressIndicator()),
+        );
+      }
+      return const SizedBox.shrink();
+    }
+
+    final codeText = Text(
+      code,
+      style: theme.textTheme.headlineMedium?.copyWith(
+        fontWeight: FontWeight.bold,
+        letterSpacing: 6,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+      textAlign: TextAlign.center,
+      semanticsLabel: code,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          l10n.oxplayerLoginCodeTitle,
+          style: theme.textTheme.titleSmall,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          l10n.oxplayerLoginCodeHint,
+          style: theme.textTheme.bodySmall,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 12),
+        if (isTv)
+          Center(child: codeText)
+        else
+          Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                codeText,
+                const SizedBox(width: 4),
+                IconButton(
+                  tooltip: l10n.oxplayerLoginCodeCopy,
+                  onPressed: () => context.copyToClipboard(code),
+                  icon: const Icon(Icons.copy_rounded),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.localized;
@@ -254,6 +317,8 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
           style: theme.textTheme.bodySmall,
           textAlign: TextAlign.center,
         ),
+        const SizedBox(height: 16),
+        _buildLoginCode(context, isTv: isTv),
         if (showInlineQr) ...[
           const SizedBox(height: 20),
           if (link != null)
@@ -272,13 +337,10 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
                 ),
               ),
             )
-          else if (_error == null)
+          else if (_error == null && _loginCode == null)
             const Center(child: CircularProgressIndicator())
           else
             const SizedBox(height: 200),
-        ] else if (link == null && _error == null) ...[
-          const SizedBox(height: 20),
-          const Center(child: CircularProgressIndicator()),
         ],
         if (showDeviceButton) ...[
           const SizedBox(height: 20),
@@ -356,19 +418,8 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
             child: Text(l10n.oxplayerLoginTryAgain),
           ),
         ],
-        const SizedBox(height: 16),
-        TextButton(
-          onPressed: showWaitingOnDevice ? null : widget.onManualCode,
-          child: Text(
-            l10n.oxplayerLoginManualCodePrompt,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.primary,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
         if (bot != null) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: 16),
           Text(
             '@$bot',
             textAlign: TextAlign.center,

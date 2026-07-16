@@ -249,14 +249,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               contentColor: Theme.of(context).colorScheme.error,
               onTap: () {
                 final user = ref.read(userProvider);
+                final userName = user?.name ?? "";
+                final title = OxplayerConfig.isEnabled
+                    ? context.localized.oxplayerLogoutUserPopupTitle(userName)
+                    : context.localized.logoutUserPopupTitle(userName);
+                final body = OxplayerConfig.isEnabled
+                    ? context.localized.oxplayerLogoutUserPopupContent(userName)
+                    : context.localized.logoutUserPopupContent(userName, user?.credentials.url ?? "");
                 showDialog(
                   context: context,
                   builder: (context) => AlertDialog(
-                    title: Text(context.localized.logoutUserPopupTitle(user?.name ?? "")),
+                    title: Text(title),
                     scrollable: true,
-                    content: Text(
-                      context.localized.logoutUserPopupContent(user?.name ?? "", user?.credentials.url ?? ""),
-                    ),
+                    content: Text(body),
                     actions: [
                       ElevatedButton(
                         onPressed: () => Navigator.pop(context),

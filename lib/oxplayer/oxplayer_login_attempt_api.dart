@@ -7,9 +7,15 @@ import 'package:http/http.dart' as http;
 import 'package:fladder/oxplayer/oxplayer_auth_http.dart';
 
 class OxplayerLoginAttemptCreated {
-  const OxplayerLoginAttemptCreated({required this.attemptId, required this.expiresInSeconds});
+  const OxplayerLoginAttemptCreated({
+    required this.attemptId,
+    required this.code,
+    required this.expiresInSeconds,
+  });
 
   final String attemptId;
+  /// 6-character code shown in the app; user enters it in the Telegram bot.
+  final String code;
   final int expiresInSeconds;
 }
 
@@ -50,11 +56,13 @@ class OxplayerLoginAttemptApi {
     }
     final map = jsonDecode(response.body) as Map<String, dynamic>;
     final id = map['attemptId'] as String?;
-    if (id == null || id.isEmpty) {
+    final code = (map['code'] as String?)?.trim().toUpperCase() ?? '';
+    if (id == null || id.isEmpty || code.length != 6) {
       throw OxplayerLoginAttemptException('Invalid login attempt response');
     }
     return OxplayerLoginAttemptCreated(
       attemptId: id,
+      code: code,
       expiresInSeconds: (map['expiresIn'] as num?)?.toInt() ?? 600,
     );
   }

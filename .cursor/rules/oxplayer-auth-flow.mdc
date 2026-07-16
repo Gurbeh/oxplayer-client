@@ -16,13 +16,14 @@ OXPlayer replaces this with **Telegram sign-in via the main bot** — no Jellyfi
    └─ Splash: oxplayerRestoreSession() — GET /Users/Me; on 401 try refresh; else logout → /ox-login
 
 2. User sees OxplayerLoginScreen  (route: /ox-login)
-   └─ FladderLogo + OxplayerTelegramLoginPanel (QR + Sign in with Telegram) — primary
+   └─ FladderLogo + OxplayerTelegramLoginPanel — primary
+   └─ App creates login attempt → shows 6-char code (copy button except TV) + QR
+   └─ User enters code in main-bot Login / `/login`, OR opens `?start=li_<attemptId>` and approves
+   └─ App long-polls until bot completes → session issued
    └─ Hidden tester: press and hold the login QR for 5s → POST /auth/test-account
-   └─ App creates login attempt → opens `?start=li_<attemptId>` → long-poll until bot completes
-   └─ Fallback: OxplayerClaimCodeLoginPanel (6-char code from bot `/login`)
 
-3. Jellyfin AuthenticateByName (username `ox`, password = code or attempt token)
-   ← session token + `X-Ox-Refresh-Token` header (stored in SharedPreferences)
+3. Session from completed login attempt (poll returns Jellyfin auth result)
+   ← access token + `X-Ox-Refresh-Token` header (stored in SharedPreferences)
 
 4. Token stored → FladderConfig.baseUrl = OxplayerEnv.apiBaseUrl
    └─ Fladder treats api-v2 as its Jellyfin server
@@ -35,11 +36,10 @@ OXPlayer replaces this with **Telegram sign-in via the main bot** — no Jellyfi
 | File | Role |
 |------|------|
 | `oxplayer_login_screen.dart` | Login UI at `/ox-login` |
-| `oxplayer_telegram_login_panel.dart` | QR + Telegram deep-link login (primary); 5s QR hold → test account |
+| `oxplayer_telegram_login_panel.dart` | Code + QR + Telegram deep-link; 5s QR hold → test account |
 | `oxplayer_test_account_sign_in.dart` | POST `/auth/test-account` |
 | `oxplayer_test_account_qr_hold.dart` | 5s hold detector on QR |
-| `oxplayer_login_attempt_api.dart` | POST attempt + long-poll GET |
-| `oxplayer_claim_code_login_panel.dart` | Manual code entry (fallback) |
+| `oxplayer_login_attempt_api.dart` | POST attempt (returns code) + long-poll GET |
 | `oxplayer_jellyfin_auth.dart` | Jellyfin authenticateByName + refresh |
 | `oxplayer_session.dart` | Cold-start restore, refresh, invalidate |
 | `oxplayer_session_interceptor.dart` | 401 → refresh or logout |

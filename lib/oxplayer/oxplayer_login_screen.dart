@@ -6,7 +6,6 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:fladder/models/account_model.dart';
 import 'package:fladder/models/login_screen_model.dart';
 import 'package:fladder/oxplayer/oxplayer_account_switch.dart';
-import 'package:fladder/oxplayer/oxplayer_claim_code_login_panel.dart';
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_route.dart';
@@ -34,7 +33,6 @@ class OxplayerLoginScreen extends ConsumerStatefulWidget {
 class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
   bool _bootstrapping = true;
   String? _bootstrapError;
-  bool _manualCode = false;
   bool _editUsersMode = false;
 
   @override
@@ -105,7 +103,6 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
 
   void _backToAccountGrid() {
     setState(() {
-      _manualCode = false;
       _editUsersMode = false;
     });
     ref.read(authProvider.notifier).goUserSelect();
@@ -113,11 +110,6 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
 
   bool _consumeSystemBack(List<AccountModel> accounts, bool showAccountGrid) {
     if (accounts.isEmpty) return false;
-
-    if (_manualCode) {
-      setState(() => _manualCode = false);
-      return true;
-    }
 
     if (!showAccountGrid) {
       _backToAccountGrid();
@@ -129,7 +121,6 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
 
   void _startAddAccount() {
     setState(() {
-      _manualCode = false;
       _editUsersMode = false;
     });
     ref.read(authProvider.notifier).addNewUser();
@@ -141,7 +132,7 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
     final accounts = ref.watch(authProvider.select((value) => value.accounts));
     final showAccountGrid = screen == LoginScreenType.users && accounts.isNotEmpty;
     final showBackToAccounts = !showAccountGrid && accounts.isNotEmpty;
-    final interceptSystemBack = accounts.isNotEmpty && (!showAccountGrid || _manualCode);
+    final interceptSystemBack = accounts.isNotEmpty && !showAccountGrid;
 
     return PopScope(
       canPop: !interceptSystemBack,
@@ -244,16 +235,9 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
                                             ),
                                             const SizedBox(height: 8),
                                           ],
-                                          if (_manualCode)
-                                            OxplayerClaimCodeLoginPanel(
-                                              onSuccess: _onLoginSuccess,
-                                              onBack: () => setState(() => _manualCode = false),
-                                            )
-                                          else
-                                            OxplayerTelegramLoginPanel(
-                                              onSuccess: _onLoginSuccess,
-                                              onManualCode: () => setState(() => _manualCode = true),
-                                            ),
+                                          OxplayerTelegramLoginPanel(
+                                            onSuccess: _onLoginSuccess,
+                                          ),
                                         ],
                                       ),
                               ),

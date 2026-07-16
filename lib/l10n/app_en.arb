@@ -2793,19 +2793,19 @@
   "@oxplayerLoginOpenTelegramDevice": {},
   "oxplayerLoginWaitingApprovalTitle": "Waiting for approval in Telegram… This screen will sign you in automatically.",
   "@oxplayerLoginWaitingApprovalTitle": {},
-  "oxplayerLoginTvSubtitle": "Scan the QR code with Telegram on your phone. This TV will sign you in automatically.",
+  "oxplayerLoginTvSubtitle": "Enter this code in the Telegram bot (Login), or scan the QR with Telegram on your phone. This TV signs in automatically.",
   "@oxplayerLoginTvSubtitle": {},
-  "oxplayerLoginWebPhoneSubtitle": "Tap the button to open Telegram, then approve the login request.",
+  "oxplayerLoginWebPhoneSubtitle": "Enter the code in the Telegram bot (Login), or tap the button to open Telegram and approve.",
   "@oxplayerLoginWebPhoneSubtitle": {},
-  "oxplayerLoginWebDesktopSubtitle": "Scan the QR with your phone, or tap the button to open Telegram in a new tab.",
+  "oxplayerLoginWebDesktopSubtitle": "Enter the code in the Telegram bot (Login), scan the QR, or open Telegram from the button.",
   "@oxplayerLoginWebDesktopSubtitle": {},
-  "oxplayerLoginMobilePhoneSubtitle": "Tap the button to open Telegram, or use the QR icon to sign in from another device.",
+  "oxplayerLoginMobilePhoneSubtitle": "Enter the code in the Telegram bot (Login), or tap the button / QR to sign in.",
   "@oxplayerLoginMobilePhoneSubtitle": {},
-  "oxplayerLoginMobileDesktopSubtitle": "Scan the QR with another device, or tap the button to open Telegram on this device.",
+  "oxplayerLoginMobileDesktopSubtitle": "Enter the code in the Telegram bot (Login), scan the QR, or open Telegram on this device.",
   "@oxplayerLoginMobileDesktopSubtitle": {},
   "oxplayerLoginTimedOutTryAgain": "Timed out. Approve in Telegram, then tap Try again.",
   "@oxplayerLoginTimedOutTryAgain": {},
-  "oxplayerLoginFailedTryCode": "Sign-in failed. Try again or use a login code.",
+  "oxplayerLoginFailedTryCode": "Sign-in failed. Enter the code in the Telegram bot, or try again.",
   "@oxplayerLoginFailedTryCode": {},
   "oxplayerLoginConnectionError": "Connection error. Stay on this screen after approving, or tap Try again.",
   "@oxplayerLoginConnectionError": {},
@@ -2815,8 +2815,10 @@
   "@oxplayerLoginManualCodePrompt": {},
   "oxplayerLoginCodeTitle": "Login code",
   "@oxplayerLoginCodeTitle": {},
-  "oxplayerLoginCodeHint": "Get a 6-character code from the Telegram bot, then enter it here.",
+  "oxplayerLoginCodeHint": "In the Telegram bot, open Login and enter this code.",
   "@oxplayerLoginCodeHint": {},
+  "oxplayerLoginCodeCopy": "Copy code",
+  "@oxplayerLoginCodeCopy": {},
   "oxplayerLoginCodeLabel": "Code",
   "@oxplayerLoginCodeLabel": {},
   "oxplayerLoginCodeInvalid": "Enter the 6-character code from the bot.",
@@ -2867,6 +2869,22 @@
   "@oxplayerReportIssueContextFailed": {},
   "oxplayerSessionExpiredMessage": "Your session expired. Log out and sign in again.",
   "@oxplayerSessionExpiredMessage": {},
+  "oxplayerLogoutUserPopupTitle": "Log out {userName}?",
+  "@oxplayerLogoutUserPopupTitle": {
+    "placeholders": {
+      "userName": {
+        "type": "String"
+      }
+    }
+  },
+  "oxplayerLogoutUserPopupContent": "This will sign {userName} out of OXPlayer on this device.\nYou can sign in again anytime.",
+  "@oxplayerLogoutUserPopupContent": {
+    "placeholders": {
+      "userName": {
+        "type": "String"
+      }
+    }
+  },
   "oxplayerFollow": "Follow",
   "@oxplayerFollow": {},
   "oxplayerUnfollow": "Unfollow",
