@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/photos_model.dart';
 import 'package:fladder/models/items/watched_state.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/providers/ox_item_flags.dart';
 import 'package:fladder/util/humanize_duration.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/widgets/shared/status_card.dart';
@@ -110,7 +113,7 @@ class ProgressOverlay extends StatelessWidget {
   }
 }
 
-class UnplayedWatchedOverlay extends StatelessWidget {
+class UnplayedWatchedOverlay extends ConsumerWidget {
   final ItemBaseModel poster;
   final EdgeInsets padding;
 
@@ -121,8 +124,14 @@ class UnplayedWatchedOverlay extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final unplayedState = poster.watchedState(context.localized);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final WatchedState unplayedState;
+    if (OxplayerConfig.isEnabled) {
+      final played = ref.watch(oxItemFlagsProvider.select((s) => s.isPlayed(poster.id)));
+      unplayedState = played ? const Played() : const Unplayed();
+    } else {
+      unplayedState = poster.watchedState(context.localized);
+    }
     if (unplayedState case Unplayed()) {
       return const SizedBox.shrink();
     }

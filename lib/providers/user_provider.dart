@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:chopper/chopper.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +14,8 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/library_filters_model.dart';
 import 'package:fladder/models/seerr_credentials_model.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/providers/ox_item_flags.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/image_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
@@ -170,6 +174,9 @@ class User extends _$User {
     final response = await (favorite
         ? api.usersUserIdFavoriteItemsItemIdPost(itemId: itemId)
         : api.usersUserIdFavoriteItemsItemIdDelete(itemId: itemId));
+    if (OxplayerConfig.isEnabled && response.isSuccessful) {
+      ref.read(oxItemFlagsProvider.notifier).setFavorite(itemId, favorite);
+    }
     return Response(response.base, UserData.fromDto(response.body));
   }
 
@@ -182,6 +189,15 @@ class User extends _$User {
         : api.usersUserIdPlayedItemsItemIdDelete(
             itemId: itemId,
           ));
+    if (OxplayerConfig.isEnabled && response.isSuccessful) {
+      final flags = ref.read(oxItemFlagsProvider.notifier);
+      flags.setPlayed(itemId, enable);
+      if (enable) {
+        flags.setWatchlisted(itemId, false);
+      }
+      // Series/season mark cascades to episodes — refresh full membership sets.
+      unawaited(flags.load());
+    }
     return Response(response.base, UserData.fromDto(response.body));
   }
 

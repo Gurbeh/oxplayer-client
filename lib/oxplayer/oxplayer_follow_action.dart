@@ -6,7 +6,7 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/providers/ox_catalog_interest.dart';
+import 'package:fladder/oxplayer/providers/ox_item_flags.dart';
 import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/widgets/shared/item_actions.dart';
@@ -18,8 +18,7 @@ bool oxIsFollowableItem(ItemBaseModel item) {
 List<ItemAction> oxplayerFollowActions(BuildContext context, WidgetRef ref, ItemBaseModel item) {
   if (!OxplayerConfig.isEnabled || !oxIsFollowableItem(item)) return const [];
 
-  final interestAsync = ref.watch(oxCatalogInterestProvider(item.id));
-  final following = interestAsync.value?.following ?? false;
+  final following = ref.watch(oxItemFlagsProvider.select((s) => s.isFollowing(item.id)));
 
   return [
     ItemActionButton(
@@ -33,13 +32,11 @@ List<ItemAction> oxplayerFollowActions(BuildContext context, WidgetRef ref, Item
 
 Future<void> _toggleFollow(BuildContext context, WidgetRef ref, String catalogId) async {
   final loc = context.localized;
-  final wasFollowing = (await ref.read(oxCatalogInterestProvider(catalogId).future)).following;
-  final ok = await ref.read(oxCatalogInterestProvider(catalogId).notifier).toggleFollowing();
+  final wasFollowing = ref.read(oxItemFlagsProvider).isFollowing(catalogId);
+  final ok = await ref.read(oxItemFlagsProvider.notifier).toggleFollowing(catalogId);
   if (!ok) {
     FladderSnack.show(loc.oxplayerFollowFailed);
     return;
   }
-  final nowFollowing = ref.read(oxCatalogInterestProvider(catalogId)).value?.following ?? false;
-  if (nowFollowing == wasFollowing) return;
-  FladderSnack.show(nowFollowing ? loc.oxplayerFollowAdded : loc.oxplayerFollowRemoved);
+  FladderSnack.show(!wasFollowing ? loc.oxplayerFollowAdded : loc.oxplayerFollowRemoved);
 }

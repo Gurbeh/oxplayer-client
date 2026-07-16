@@ -16,6 +16,8 @@ import 'package:fladder/util/focus_provider.dart';
 import 'package:fladder/oxplayer/ox_detail_poster_badges.dart';
 import 'package:fladder/oxplayer/oxplayer_catalog_interest_status.dart';
 import 'package:fladder/oxplayer/ox_boxset_availability_overlay.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/providers/ox_item_flags.dart';
 import 'package:fladder/util/item_base_model/item_base_model_extensions.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/refresh_state.dart';
@@ -63,6 +65,9 @@ class PosterImage extends ConsumerWidget {
     final radius = FladderTheme.smallShape.borderRadius;
     final padding = const EdgeInsets.all(5);
     final myKey = key ?? UniqueKey();
+    final showFavourite = OxplayerConfig.isEnabled
+        ? ref.watch(oxItemFlagsProvider.select((s) => s.isFavorite(poster.id)))
+        : poster.userData.isFavourite;
 
     return Hero(
       tag: myKey,
@@ -125,7 +130,7 @@ class PosterImage extends ConsumerWidget {
               radius: radius as BorderRadius,
             ),
           BottomOverlaysContainer(
-            showFavourite: poster.userData.isFavourite,
+            showFavourite: showFavourite,
             showProgress: true,
             progress: poster.progress,
             itemType: poster.type,
@@ -190,7 +195,6 @@ class PosterImage extends ConsumerWidget {
   }
 
   Future<void> _showBottomSheet(BuildContext context, WidgetRef ref) async {
-    await oxPrefetchCatalogInterestStatus(ref, poster);
     if (!context.mounted) return;
     showBottomSheetPill(
       context: context,
@@ -210,7 +214,6 @@ class PosterImage extends ConsumerWidget {
   }
 
   Future<void> _showContextMenu(BuildContext context, WidgetRef ref, Offset globalPos) async {
-    await oxPrefetchCatalogInterestStatus(ref, poster);
     if (!context.mounted) return;
     final position = RelativeRect.fromLTRB(globalPos.dx, globalPos.dy, globalPos.dx, globalPos.dy);
     await showMenu(

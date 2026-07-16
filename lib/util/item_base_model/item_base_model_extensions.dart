@@ -14,12 +14,12 @@ import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/series_model.dart';
-import 'package:fladder/oxplayer/oxplayer_catalog_interest_status.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_follow_action.dart';
 import 'package:fladder/oxplayer/oxplayer_watchlist_action.dart';
 import 'package:fladder/oxplayer/oxplayer_media_issue_action.dart';
 import 'package:fladder/oxplayer/oxplayer_share_action.dart';
+import 'package:fladder/oxplayer/providers/ox_item_flags.dart';
 import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
@@ -111,8 +111,6 @@ enum ItemActions {
 
 extension ItemBaseModelExtensions on ItemBaseModel {
   Future<void> showDetailsMenu(BuildContext context, WidgetRef ref, Offset globalPos) async {
-    await oxPrefetchCatalogInterestStatus(ref, this);
-    if (!context.mounted) return;
     final position = RelativeRect.fromLTRB(globalPos.dx, globalPos.dy, globalPos.dx, globalPos.dy);
     await showMenu(
       context: context,
@@ -147,6 +145,9 @@ extension ItemBaseModelExtensions on ItemBaseModel {
       ArtistModel() => false,
       _ => true,
     };
+    final oxEnabled = OxplayerConfig.isEnabled;
+    final oxFavorite = oxEnabled ? ref.watch(oxItemFlagsProvider.select((s) => s.isFavorite(id))) : userData.isFavourite;
+    final oxPlayed = oxEnabled ? ref.watch(oxItemFlagsProvider.select((s) => s.isPlayed(id))) : userData.played;
     final ItemAction? parentAction = switch (this) {
       EpisodeModel _ => !exclude.contains(ItemActions.openShow)
           ? ItemActionButton(
@@ -260,7 +261,7 @@ extension ItemBaseModelExtensions on ItemBaseModel {
             label: Text(context.localized.addToPlaylist),
           ),
       if (showMarkAs) ...[
-        if (!exclude.contains(ItemActions.markPlayed))
+        if (!exclude.contains(ItemActions.markPlayed) && (!oxEnabled || !oxPlayed))
           ItemActionButton(
             icon: const Icon(IconsaxPlusLinear.eye),
             action: () async {
@@ -273,7 +274,7 @@ extension ItemBaseModelExtensions on ItemBaseModel {
             },
             label: Text(context.localized.markAsWatched),
           ),
-        if (!exclude.contains(ItemActions.markUnplayed))
+        if (!exclude.contains(ItemActions.markUnplayed) && (!oxEnabled || oxPlayed))
           ItemActionButton(
             icon: const Icon(IconsaxPlusLinear.eye_slash),
             label: Text(context.localized.markAsUnwatched),
@@ -289,16 +290,16 @@ extension ItemBaseModelExtensions on ItemBaseModel {
       ],
       if (!exclude.contains(ItemActions.setFavorite))
         ItemActionButton(
-          icon: Icon(userData.isFavourite ? IconsaxPlusLinear.heart_remove : IconsaxPlusLinear.heart_add),
+          icon: Icon(oxFavorite ? IconsaxPlusLinear.heart_remove : IconsaxPlusLinear.heart_add),
           action: () async {
             try {
-              final newData = await ref.read(userProvider.notifier).setAsFavorite(!userData.isFavourite, id);
+              final newData = await ref.read(userProvider.notifier).setAsFavorite(!oxFavorite, id);
               onUserDataChanged?.call(newData?.bodyOrThrow);
             } finally {
               context.refreshData();
             }
           },
-          label: Text(userData.isFavourite ? context.localized.removeAsFavorite : context.localized.addAsFavorite),
+          label: Text(oxFavorite ? context.localized.removeAsFavorite : context.localized.addAsFavorite),
         ),
       ...(OxplayerConfig.isEnabled ? oxplayerShareActions(context, this) : const <ItemAction>[]),
       ...(OxplayerConfig.isEnabled ? oxplayerFollowActions(context, ref, this) : const <ItemAction>[]),

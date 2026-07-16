@@ -242,7 +242,6 @@ class _FocusedFullBannerState extends ConsumerState<TVSliderBanner> {
   }
 
   Future<void> _showBottomSheet(BuildContext context, WidgetRef ref) async {
-    await oxPrefetchCatalogInterestStatus(ref, _currentItem);
     if (!context.mounted) return;
     showBottomSheetPill(
       context: context,
@@ -257,7 +256,6 @@ class _FocusedFullBannerState extends ConsumerState<TVSliderBanner> {
   }
 
   Future<void> _showContextMenu(BuildContext context, WidgetRef ref, Offset globalPos) async {
-    await oxPrefetchCatalogInterestStatus(ref, _currentItem);
     if (!context.mounted) return;
     final position = RelativeRect.fromLTRB(globalPos.dx, globalPos.dy, globalPos.dx, globalPos.dy);
     await showMenu(

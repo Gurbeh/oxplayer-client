@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fladder/oxplayer/oxplayer_image_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_navigation.dart';
 import 'package:fladder/oxplayer/oxplayer_session_store.dart';
+import 'package:fladder/oxplayer/providers/ox_item_flags.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/providers/shared_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
@@ -50,6 +51,7 @@ Future<void> oxplayerPerformSignOut(Ref ref) async {
     await OxplayerSessionStore(ref.read(sharedPreferencesProvider)).clear(account);
   }
   OxplayerImageAuth.clear();
+  ref.read(oxItemFlagsProvider.notifier).clear();
 
   await ref.read(authProvider.notifier).logOutUser();
 

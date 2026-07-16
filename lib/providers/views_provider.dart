@@ -10,6 +10,7 @@ import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_home_feed.dart';
 import 'package:fladder/oxplayer/oxplayer_view_labels.dart';
 import 'package:fladder/oxplayer/providers/ox_favorites_dashboard.dart';
+import 'package:fladder/oxplayer/providers/ox_item_flags.dart';
 import 'package:fladder/oxplayer/providers/ox_watchlist_dashboard.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/providers/api_provider.dart';
@@ -58,6 +59,7 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
         if (user?.userConfiguration == null) {
           await ref.read(userProvider.notifier).updateInformation();
         }
+        unawaited(ref.read(oxItemFlagsProvider.notifier).load());
         final feed = await OxplayerHomeFeed.fetch(ref);
         if (feed != null) {
           final filtered = feed.views
