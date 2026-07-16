@@ -95,7 +95,13 @@ internal fun ExoPlayer(
     }
 
     val dataSourceFactory = remember {
-        DefaultDataSource.Factory(context, DefaultHttpDataSource.Factory())
+        // Must match Cloudflare stream Worker X-OX-Client-Signature gate
+        // (oxplayer-client OxplayerStreamHttpAuth.clientSignatureValue).
+        val httpFactory = DefaultHttpDataSource.Factory()
+            .setDefaultRequestProperties(
+                mapOf("X-OX-Client-Signature" to "YourSuperSecureStaticClientKey123"),
+            )
+        DefaultDataSource.Factory(context, httpFactory)
     }
 
     val audioAttributes = AudioAttributes.Builder()

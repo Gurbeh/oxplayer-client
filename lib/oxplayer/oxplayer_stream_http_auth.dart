@@ -3,8 +3,15 @@ import 'package:fladder/oxplayer/oxplayer_iran_stream_edge.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 
 /// Bearer auth for ox-stream when edge caches by path only (not Iran vanity redirect).
+///
+/// Also attaches [clientSignatureHeader] so the Cloudflare range-normalize Worker
+/// can reject hotlinked / third-party players (must match worker.mjs gate).
 abstract final class OxplayerStreamHttpAuth {
   static final Map<String, String> _bearerByKey = {};
+
+  /// Cloudflare Worker `X-OX-Client-Signature` gate (static shared secret).
+  static const String clientSignatureHeader = 'X-OX-Client-Signature';
+  static const String clientSignatureValue = 'YourSuperSecureStaticClientKey123';
 
   static const String _cHeaderAuth = String.fromEnvironment(
     'OXPLAYER_STREAM_HEADER_AUTH',
@@ -51,4 +58,22 @@ abstract final class OxplayerStreamHttpAuth {
   }
 
   static void clear() => _bearerByKey.clear();
+
+  /// Default HTTP headers for ox-stream playback (ExoPlayer / native stacks).
+  static Map<String, String> defaultStreamRequestHeaders() => {
+        clientSignatureHeader: clientSignatureValue,
+      };
+
+  /// libmpv `http-header-fields` value (CRLF-separated), including client signature
+  /// and optional Bearer from [stripAndRegister].
+  static String mpvHttpHeaderFields({String? bearer}) {
+    final lines = <String>[
+      '$clientSignatureHeader: $clientSignatureValue',
+    ];
+    final b = bearer?.trim();
+    if (b != null && b.isNotEmpty) {
+      lines.add('Authorization: Bearer $b');
+    }
+    return '${lines.join('\r\n')}\r\n';
+  }
 }

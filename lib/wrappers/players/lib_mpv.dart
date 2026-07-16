@@ -339,22 +339,27 @@ class LibMPV extends BasePlayer {
 
     url = OxplayerStreamHttpAuth.stripAndRegister(url);
 
-    if (OxplayerStreamHttpAuth.needsHeaderAuthForUrl(url)) {
-      final bearer = OxplayerStreamHttpAuth.bearerFor(url);
-      if (bearer != null && bearer.isNotEmpty && _player?.platform is mpv.NativePlayer) {
-        await (_player?.platform as dynamic).setProperty(
-          'http-header-fields',
-          'Authorization: Bearer $bearer\r\n',
-        );
-        OxplayerStreamLog.event('stream_header_auth', fields: {
-          'host': OxplayerStreamLog.describeHost(url),
-        });
-      } else if (OxplayerEnv.isEnabled && oxplayerIsOxStreamUrl(url)) {
-        OxplayerStreamLog.event('stream_header_auth_missing', fields: {
-          'host': OxplayerStreamLog.describeHost(url),
-          'hasBearer': bearer != null && bearer.isNotEmpty,
-          'nativeMpv': _player?.platform is mpv.NativePlayer,
-        });
+    // OX stream: always send Worker client signature; optional Bearer when enabled.
+    if (OxplayerEnv.isEnabled && oxplayerIsOxStreamUrl(url) && _player?.platform is mpv.NativePlayer) {
+      final bearer = OxplayerStreamHttpAuth.needsHeaderAuthForUrl(url)
+          ? OxplayerStreamHttpAuth.bearerFor(url)
+          : null;
+      await (_player?.platform as dynamic).setProperty(
+        'http-header-fields',
+        OxplayerStreamHttpAuth.mpvHttpHeaderFields(bearer: bearer),
+      );
+      if (OxplayerStreamHttpAuth.needsHeaderAuthForUrl(url)) {
+        if (bearer != null && bearer.isNotEmpty) {
+          OxplayerStreamLog.event('stream_header_auth', fields: {
+            'host': OxplayerStreamLog.describeHost(url),
+          });
+        } else {
+          OxplayerStreamLog.event('stream_header_auth_missing', fields: {
+            'host': OxplayerStreamLog.describeHost(url),
+            'hasBearer': false,
+            'nativeMpv': true,
+          });
+        }
       }
     }
 
