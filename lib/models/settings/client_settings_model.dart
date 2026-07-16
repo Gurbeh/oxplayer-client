@@ -102,7 +102,8 @@ abstract class ClientSettingsModel with _$ClientSettingsModel {
     return ClientSettingsModel.internal(
       transcodeDownloadModel: TranscodeDownloadModel.fromDefaults(),
       blurPlaceHolders: leanBackMode ? false : true,
-      backgroundImage: leanBackMode ? BackgroundType.disabled : BackgroundType.blurred,
+      // Leanback: one library/home backdrop (decodeHeight 64) — blur costs extra RAM.
+      backgroundImage: leanBackMode ? BackgroundType.enabled : BackgroundType.blurred,
       themeMode: leanBackMode ? ThemeMode.dark : ThemeMode.system,
       enableBlurEffects: leanBackMode ? false : true,
       useTVExpandedLayout: false,

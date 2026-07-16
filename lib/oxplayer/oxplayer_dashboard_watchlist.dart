@@ -14,6 +14,7 @@ import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_dashboard_skeleton.dart';
 import 'package:fladder/oxplayer/providers/ox_favorites_dashboard.dart';
 import 'package:fladder/oxplayer/providers/ox_watchlist_dashboard.dart';
+import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/shared/media/poster_row.dart';
@@ -28,6 +29,10 @@ Iterable<Widget> oxplayerDashboardRecentlyAddedRows({
   required Iterable<Widget> defaultRows,
 }) {
   if (!OxplayerConfig.isEnabled) return defaultRows;
+
+  // Leanback: skip OX-only shelves — same poster decode cost as Fladder + extras
+  // was pushing TCL home over LMK watermark before play even started.
+  final leanBack = ref.read(argumentsStateProvider).leanBackMode;
 
   final user = ref.read(userProvider);
   final excludes = user?.latestItemsExcludes ?? const [];
@@ -44,6 +49,7 @@ Iterable<Widget> oxplayerDashboardRecentlyAddedRows({
     if (excludes.contains(id)) continue;
 
     if (id == OxHomeDashboardOrder.watchLaterId) {
+      if (leanBack) continue;
       rows.add(
         OxplayerWatchLaterPosterRow(
           contentPadding: padding,
@@ -54,6 +60,7 @@ Iterable<Widget> oxplayerDashboardRecentlyAddedRows({
       continue;
     }
     if (id == OxHomeDashboardOrder.favoritesId) {
+      if (leanBack) continue;
       rows.add(
         OxplayerFavoritesPosterRow(
           contentPadding: padding,

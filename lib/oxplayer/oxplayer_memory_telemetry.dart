@@ -14,8 +14,8 @@ const kOxHighMemoryRssMbPhone = 512;
 const kOxHighMemoryRssMbTv = 384;
 
 /// Cap Flutter image cache on TV while native ExoPlayer activity holds process RAM.
-const kOxTvImageCacheMaxCount = 50;
-const kOxTvImageCacheMaxBytes = 32 * 1024 * 1024;
+const kOxTvImageCacheMaxCount = 30;
+const kOxTvImageCacheMaxBytes = 16 * 1024 * 1024;
 
 /// Interval for RSS sampling while native player activity is foreground.
 const kOxNativePlaybackMemorySampleInterval = Duration(seconds: 45);

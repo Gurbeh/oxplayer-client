@@ -129,7 +129,7 @@ internal fun ExoPlayer(
                 1_500,
                 3_000,
             )
-            .setTargetBufferBytes(32 * 1024 * 1024)
+            .setTargetBufferBytes(16 * 1024 * 1024)
             .build()
     } else {
         DefaultLoadControl.Builder().build()

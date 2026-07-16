@@ -15,6 +15,7 @@ import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/fladder_image.dart';
 import 'package:fladder/util/focus_provider.dart';
 import 'package:fladder/oxplayer/oxplayer_catalog_interest_status.dart';
+import 'package:fladder/oxplayer/oxplayer_tv_ui_limits.dart';
 import 'package:fladder/util/item_base_model/item_base_model_extensions.dart';
 import 'package:fladder/util/item_base_model/play_item_helpers.dart';
 import 'package:fladder/util/localization_helper.dart';
@@ -47,21 +48,31 @@ class _FocusedFullBannerState extends ConsumerState<TVSliderBanner> {
   int _currentIndex = 0;
   _SlideDirection _slideDirection = _SlideDirection.right;
 
-  ItemBaseModel get _currentItem => widget.items[_currentIndex];
+  List<ItemBaseModel> get _items => OxplayerTvUiLimits.capHomeSliderForTv(ref, widget.items);
+
+  ItemBaseModel get _currentItem => _items[_currentIndex.clamp(0, _items.length - 1)];
 
   bool _hasFocus = false;
+
+  @override
+  void didUpdateWidget(covariant TVSliderBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_currentIndex >= _items.length) {
+      _currentIndex = 0;
+    }
+  }
 
   void _navigateLeft() {
     setState(() {
       _slideDirection = _SlideDirection.left;
-      _currentIndex = _currentIndex > 0 ? _currentIndex - 1 : widget.items.length - 1;
+      _currentIndex = _currentIndex > 0 ? _currentIndex - 1 : _items.length - 1;
     });
   }
 
   void _navigateRight() {
     setState(() {
       _slideDirection = _SlideDirection.right;
-      _currentIndex = (_currentIndex + 1) % widget.items.length;
+      _currentIndex = (_currentIndex + 1) % _items.length;
     });
   }
 
@@ -165,6 +176,7 @@ class _FocusedFullBannerState extends ConsumerState<TVSliderBanner> {
                 key: ValueKey(_currentItem.id),
                 image: _currentItem.tvPosterLarge,
                 fit: BoxFit.cover,
+                decodeHeight: 360,
               ),
             ),
           ),
@@ -205,7 +217,7 @@ class _FocusedFullBannerState extends ConsumerState<TVSliderBanner> {
                           duration: _kAnimationDuration,
                           child: ExcludeFocus(
                             child: _NavigationIndicator(
-                              items: widget.items,
+                              items: _items,
                               currentIndex: _currentIndex,
                               onTap: (index) {
                                 setState(() {

@@ -17,6 +17,8 @@ import 'package:fladder/oxplayer/oxplayer_dashboard_empty_help.dart';
 import 'package:fladder/oxplayer/oxplayer_dashboard_skeleton.dart';
 import 'package:fladder/oxplayer/oxplayer_dashboard_watchlist.dart';
 import 'package:fladder/oxplayer/oxplayer_home_refresh.dart';
+import 'package:fladder/oxplayer/oxplayer_tv_ui_limits.dart';
+import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/dashboard_mode_provider.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
@@ -51,7 +53,7 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  late final Timer _timer;
+  Timer? _timer;
   final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey = GlobalKey<RefreshIndicatorState>();
 
   final textController = TextEditingController();
@@ -71,14 +73,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         }
       });
     }
-    _timer = Timer.periodic(const Duration(seconds: 120), (timer) {
-      _refreshIndicatorKey.currentState?.show();
-    });
+    // OX leanback: skip 120s SWR refresh — keeps decoded posters warm and OOM-kills TV.
+    final leanBack = OxplayerConfig.isEnabled && ref.read(argumentsStateProvider).leanBackMode;
+    if (!leanBack) {
+      _timer = Timer.periodic(const Duration(seconds: 120), (timer) {
+        _refreshIndicatorKey.currentState?.show();
+      });
+    }
   }
 
   @override
   void dispose() {
-    _timer.cancel();
+    _timer?.cancel();
     super.dispose();
   }
 
@@ -119,6 +125,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       HomeCarouselSettings.combined => [...allResume, ...dashboardData.nextUp],
       HomeCarouselSettings.cont => allResume,
     };
+    final homeBannerPosters = OxplayerTvUiLimits.capHomeSliderForTv(ref, homeCarouselItems);
 
     final viewSize = AdaptiveLayout.viewSizeOf(context);
 
@@ -200,7 +207,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       firstChild: OxHomeBannerSkeleton(bannerType: bannerType),
                       secondChild: showBanner
                           ? HomeBannerWidget(
-                              posters: homeCarouselItems,
+                              posters: homeBannerPosters,
                               onSelect: (poster) => selectedPoster.value = poster,
                             )
                           : const SizedBox.shrink(),

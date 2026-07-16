@@ -23,6 +23,7 @@ abstract class HomeSettingsModel with _$HomeSettingsModel {
 
   static HomeSettingsModel defaultModel() {
     return HomeSettingsModel(
+      // Leanback: TV slider (capped to 4 items in dashboard) — not full carousel.
       homeBanner: leanBackMode ? HomeBanner.tvSliderBanner : HomeBanner.carousel,
     );
   }

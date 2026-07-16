@@ -4,6 +4,7 @@ import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
+import 'package:fladder/oxplayer/oxplayer_tv_ui_limits.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/screens/shared/media/banner_play_button.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
@@ -39,6 +40,7 @@ class _CarouselBannerState extends ConsumerState<CarouselBanner> {
   @override
   Widget build(BuildContext context) {
     final parentContext = context;
+    final items = OxplayerTvUiLimits.capHomeSliderForTv(ref, widget.items);
     return MouseRegion(
       onEnter: (event) => setState(() => showControls = true),
       onExit: (event) => setState(() => showControls = false),
@@ -51,7 +53,7 @@ class _CarouselBannerState extends ConsumerState<CarouselBanner> {
               (MediaQuery.sizeOf(context).shortestSide * 0.75).clamp(251.0, double.maxFinite),
             );
             final border = BorderRadius.circular(18);
-            final itemExtent = widget.items.length == 1 ? MediaQuery.sizeOf(context).width : maxExtent;
+            final itemExtent = items.length == 1 ? MediaQuery.sizeOf(context).width : maxExtent;
 
             return Padding(
               padding: EdgeInsets.only(top: AdaptiveLayout.of(context).isDesktop ? 6 : 10),
@@ -66,12 +68,12 @@ class _CarouselBannerState extends ConsumerState<CarouselBanner> {
                     enableSplash: false,
                     itemExtent: itemExtent,
                     children: [
-                      ...widget.items.mapIndexed(
+                      ...items.mapIndexed(
                         (index, item) => LayoutBuilder(
                           builder: (context, constraints) {
                             final opacity = (constraints.maxWidth / maxExtent);
                             return FocusButton(
-                              onTap: () => widget.items[index].navigateTo(context),
+                              onTap: () => items[index].navigateTo(context),
                               borderRadius: border,
                               onFocusChanged: (focused) {
                                 if (focused) {
@@ -81,7 +83,7 @@ class _CarouselBannerState extends ConsumerState<CarouselBanner> {
                               onLongPress: AdaptiveLayout.inputDeviceOf(context) == InputDevice.pointer
                                   ? null
                                   : () {
-                                      final poster = widget.items[index];
+                                      final poster = items[index];
                                       showBottomSheetPill(
                                         context: context,
                                         item: poster,
@@ -100,7 +102,7 @@ class _CarouselBannerState extends ConsumerState<CarouselBanner> {
                                       Offset localPosition = details.globalPosition;
                                       RelativeRect position = RelativeRect.fromLTRB(
                                           localPosition.dx, localPosition.dy, localPosition.dx, localPosition.dy);
-                                      final poster = widget.items[index];
+                                      final poster = items[index];
 
                                       await showMenu(
                                         context: context,
@@ -175,7 +177,7 @@ class _CarouselBannerState extends ConsumerState<CarouselBanner> {
                               ),
                               overlays: [
                                 ExcludeFocus(
-                                  child: BannerPlayButton(item: widget.items[index]),
+                                  child: BannerPlayButton(item: items[index]),
                                 ),
                               ],
                             );
