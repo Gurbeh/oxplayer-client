@@ -96,6 +96,21 @@ abstract final class OxplayerCrashlytics {
     }
   }
 
+  /// Latest RSS / image-cache samples — visible on next Crashlytics crash/ANR.
+  static void syncMemorySnapshot({
+    required int? rssMb,
+    required int imageCacheMb,
+    required int imageCacheCount,
+  }) {
+    if (!_initialized) return;
+    final crashlytics = FirebaseCrashlytics.instance;
+    if (rssMb != null) {
+      unawaited(crashlytics.setCustomKey('rss_mb', rssMb));
+    }
+    unawaited(crashlytics.setCustomKey('image_cache_mb', imageCacheMb));
+    unawaited(crashlytics.setCustomKey('image_cache_count', imageCacheCount));
+  }
+
   static void setScreen(String screen) {
     if (!_initialized || screen.isEmpty) return;
     unawaited(FirebaseCrashlytics.instance.setCustomKey('screen', screen));

@@ -135,12 +135,18 @@ abstract final class OxplayerMemoryTelemetry {
 
   static OxplayerMemorySnapshot sample() {
     final cache = PaintingBinding.instance.imageCache;
-    return OxplayerMemorySnapshot(
+    final snapshot = OxplayerMemorySnapshot(
       rssBytes: _currentRssBytes(),
       imageCacheBytes: cache.currentSizeBytes,
       imageCacheCount: cache.currentSize,
       imageCacheMaxBytes: cache.maximumSizeBytes,
     );
+    OxplayerCrashlytics.syncMemorySnapshot(
+      rssMb: snapshot.rssMb,
+      imageCacheMb: (snapshot.imageCacheBytes / (1024 * 1024)).round(),
+      imageCacheCount: snapshot.imageCacheCount,
+    );
+    return snapshot;
   }
 
   static Future<void> onNavigation({
