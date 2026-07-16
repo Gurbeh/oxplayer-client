@@ -1,0 +1,1 @@
+Faster follow/watchlist/favorite menus via membership flags.
