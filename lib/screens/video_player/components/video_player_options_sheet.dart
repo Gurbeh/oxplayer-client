@@ -13,6 +13,7 @@ import 'package:fladder/models/playback/offline_playback_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/transcode_playback_model.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/providers/settings/video_player_settings_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
@@ -301,7 +302,7 @@ class _VideoOptionsMobileState extends ConsumerState<VideoOptions> {
             },
             title: Text(context.localized.showDetails),
           ),
-          if (currentItem.type != FladderItemType.boxset)
+          if (!OxplayerConfig.isEnabled && currentItem.type != FladderItemType.boxset)
             ListTile(
               onTap: () async {
                 await addItemToCollection(context, [currentItem]);

@@ -6,6 +6,7 @@ import 'package:fladder/models/library_filter_model.dart';
 import 'package:fladder/models/library_search/library_search_model.dart';
 import 'package:fladder/models/library_search/library_search_options.dart';
 import 'package:fladder/models/settings/client_settings_model.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/providers/library_search_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/screens/collections/add_to_collection.dart';
@@ -649,17 +650,18 @@ class _LibrarySearchBottomBar extends ConsumerWidget {
           label: Text(context.localized.removeFromPlaylist),
           icon: const Icon(IconsaxPlusLinear.save_remove),
         ),
-      ItemActionButton(
-        action: () async {
-          await addItemToCollection(context, librarySearchResults.selectedPosters);
-          if (context.mounted) context.refreshData();
-        },
-        label: Text(context.localized.addToCollection),
-        icon: const Icon(
-          IconsaxPlusLinear.save_add,
-          size: 20,
+      if (!OxplayerConfig.isEnabled)
+        ItemActionButton(
+          action: () async {
+            await addItemToCollection(context, librarySearchResults.selectedPosters);
+            if (context.mounted) context.refreshData();
+          },
+          label: Text(context.localized.addToCollection),
+          icon: const Icon(
+            IconsaxPlusLinear.save_add,
+            size: 20,
+          ),
         ),
-      ),
       ItemActionButton(
         action: () async {
           await addItemToPlaylist(context, librarySearchResults.selectedPosters);

@@ -235,7 +235,7 @@ extension ItemBaseModelExtensions on ItemBaseModel {
                 : context.localized.playFromStart(subTextShort(context.localized) ?? name)),
           ),
       ItemActionDivider(),
-      if (!exclude.contains(ItemActions.addCollection) && isAdmin)
+      if (!exclude.contains(ItemActions.addCollection) && isAdmin && !OxplayerConfig.isEnabled)
         if (type != FladderItemType.boxset)
           ItemActionButton(
             icon: const Icon(IconsaxPlusLinear.archive_add),
