@@ -214,6 +214,11 @@ release_client_next_version() {
   echo "${major}.${minor}.${new_patch}+${new_patch}"
 }
 
+release_client_version_name() {
+  local full="$1"
+  echo "${full%%+*}"
+}
+
 release_client_require_web_dispatch_token() {
   local has_gh=0
 
