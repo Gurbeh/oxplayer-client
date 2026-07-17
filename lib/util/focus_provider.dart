@@ -104,16 +104,21 @@ class FocusButtonState extends State<FocusButton> {
         if (_keyDownActive) return KeyEventResult.ignored;
         _keyDownActive = true;
         _startLongPressTimer();
+        return KeyEventResult.handled;
       } else if (event is KeyUpEvent) {
         if (!_keyDownActive) return KeyEventResult.ignored;
         if (_longPressTriggered) {
+          final longPress = widget.onLongPress;
           _resetKeyState();
-
-          return KeyEventResult.ignored;
+          // Fire after Select/OK is released so a newly autofocused sheet
+          // action (e.g. Unwatchlist) is not activated by this same KeyUp.
+          longPress?.call();
+          return KeyEventResult.handled;
         }
         _cancelLongPressTimer();
         _keyDownActive = false;
         widget.onTap?.call();
+        return KeyEventResult.handled;
       }
     }
     return KeyEventResult.ignored;
@@ -123,9 +128,10 @@ class FocusButtonState extends State<FocusButton> {
     _longPressTriggered = false;
     _longPressTimer?.cancel();
     _longPressTimer = Timer(_kLongPressTimeout, () {
+      // Keep key state until KeyUp — opening a menu here would move focus
+      // while Select is still held, and KeyUp would activate the focused item.
       _longPressTriggered = true;
-      widget.onLongPress?.call();
-      _resetKeyState();
+      _cancelLongPressTimer();
     });
   }
 

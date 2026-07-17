@@ -1254,20 +1254,48 @@ jobs:
           set -euo pipefail
           GH_TOKEN="${GH_TOKEN_INFISICAL:-${GH_TOKEN_GITHUB:-}}"
           export GH_TOKEN
+
+          run_id=""
           for attempt in $(seq 1 24); do
-            run_id="$(gh run list --repo "${BE_REPO}" \
+            if run_id="$(gh run list --repo "${BE_REPO}" \
               --workflow="Deploy · Web (Hetzner static)" \
               --event repository_dispatch \
               --limit 5 \
               --json databaseId,createdAt \
-              --jq "[.[] | select(.createdAt >= \"${DISPATCH_BEFORE}\")] | .[0].databaseId // empty")"
-            if [ -n "${run_id}" ]; then
-              echo "Web deploy run: ${run_id}"
-              gh run watch "${run_id}" --repo "${BE_REPO}" --exit-status
-              exit 0
+              --jq "[.[] | select(.createdAt >= \"${DISPATCH_BEFORE}\")] | .[0].databaseId // empty" 2>/dev/null)"; then
+              if [ -n "${run_id}" ]; then
+                echo "Web deploy run: ${run_id}"
+                break
+              fi
+            else
+              echo "Attempt ${attempt}/24: gh run list failed (API flake); retrying..."
             fi
             echo "Attempt ${attempt}/24: waiting for web deploy workflow..."
             sleep 10
           done
-          echo "::error::Timed out waiting for Deploy · Web (Hetzner static) on ${BE_REPO}"
+          if [ -z "${run_id}" ]; then
+            echo "::error::Timed out waiting for Deploy · Web (Hetzner static) on ${BE_REPO}"
+            exit 1
+          fi
+
+          # gh run watch often 503s during GitHub incidents; poll conclusion with retries.
+          for watch_attempt in $(seq 1 40); do
+            if gh run watch "${run_id}" --repo "${BE_REPO}" --exit-status; then
+              echo "Web deploy succeeded: ${run_id}"
+              exit 0
+            fi
+            watch_rc=$?
+            conclusion="$(gh run view "${run_id}" --repo "${BE_REPO}" --json conclusion --jq .conclusion 2>/dev/null || true)"
+            if [ "${conclusion}" = "success" ]; then
+              echo "Web deploy succeeded (watch flake, conclusion=success): ${run_id}"
+              exit 0
+            fi
+            if [ "${conclusion}" = "failure" ] || [ "${conclusion}" = "cancelled" ] || [ "${conclusion}" = "timed_out" ]; then
+              echo "::error::Web deploy ${run_id} finished with conclusion=${conclusion}"
+              exit 1
+            fi
+            echo "Watch attempt ${watch_attempt}/40 failed (rc=${watch_rc}, conclusion=${conclusion:-unknown}); retry in 15s..."
+            sleep 15
+          done
+          echo "::error::Timed out watching web deploy ${run_id} on ${BE_REPO}"
           exit 1
