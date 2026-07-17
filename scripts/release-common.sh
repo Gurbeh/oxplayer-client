@@ -33,7 +33,8 @@ release_preflight() {
   cd "${root}"
 
   echo "=== preflight ==="
-  git fetch origin --tags
+  # --tags can fail when a remote tag (e.g. nightly) would clobber a local one.
+  git fetch origin --tags || echo "warn: some remote tags rejected (continuing)"
   git fetch origin main
 
   branch="$(git rev-parse --abbrev-ref HEAD)"
