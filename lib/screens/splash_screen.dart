@@ -16,6 +16,7 @@ import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/shared_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
+import 'package:fladder/oxplayer/ox_splash_brand.dart';
 import 'package:fladder/screens/shared/fladder_logo.dart';
 import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
 
@@ -37,6 +38,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     _splashTiming.markStarted();
     WidgetsBinding.instance.addPostFrameCallback((value) async {
       _splashTiming.markFirstFrame();
+      if (OxplayerConfig.isEnabled && mounted) {
+        await precacheImage(const AssetImage(OxSplashBrand.assetPath), context);
+      }
       await Future.delayed(const Duration(milliseconds: 500));
       if (!context.mounted) return;
 
@@ -163,12 +167,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return const NotificationManagerInitializer(
+    return NotificationManagerInitializer(
       child: Scaffold(
         body: Center(
           child: FractionallySizedBox(
             heightFactor: 0.4,
-            child: FladderLogo(),
+            child: OxplayerConfig.isEnabled ? const OxSplashBrand() : const FladderLogo(),
           ),
         ),
       ),

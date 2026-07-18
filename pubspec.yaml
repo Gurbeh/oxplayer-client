@@ -248,6 +248,7 @@ flutter:
     - config/
     - assets/mp-font.ttf
     - assets/oxplayer/
+    - assets/oxplayer/flags/
     - assets/env/default.env
     - assets/
 
@@ -273,12 +274,12 @@ flutter:
         - asset: assets/fonts/vazirmatn/Vazirmatn-Bold.ttf
           weight: 700
 
-# Native splash: 512px source; prefer PNG with alpha so the logo sits on [color] only.
+# Native splash: temporary flag of Iran (OX). Revert to oxplayer_icon_512 when branding returns.
 flutter_native_splash:
   color: "#210000"
   color_dark: "#210000"
-  image: icons/production/oxplayer_icon_512.png
-  image_dark: icons/production/oxplayer_icon_512.png
+  image: assets/oxplayer/flags/flag_of_iran_round.png
+  image_dark: assets/oxplayer/flags/flag_of_iran_round.png
   android: true
   ios: false
   web: false
@@ -286,5 +287,5 @@ flutter_native_splash:
   android_12:
     color: "#210000"
     color_dark: "#210000"
-    image: icons/production/oxplayer_icon_512.png
-    image_dark: icons/production/oxplayer_icon_512.png
+    image: assets/oxplayer/flags/flag_of_iran_round.png
+    image_dark: assets/oxplayer/flags/flag_of_iran_round.png

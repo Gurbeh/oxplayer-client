@@ -14,6 +14,7 @@ import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/transcode_playback_model.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/widgets/ox_labeled_iran_flag.dart';
 import 'package:fladder/providers/settings/video_player_settings_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
@@ -427,7 +428,13 @@ Future<void> showSubSelection(BuildContext context) {
               (index, subModel) {
                 final selected = playbackModel.mediaStreams?.defaultSubStreamIndex == subModel.index;
                 return ListTile(
-                  title: Text(subModel.label(context)),
+                  title: OxLabeledIranFlag(
+                    label: subModel.label(context),
+                    subtitleLanguage: subModel.language,
+                    playbackModel: playbackModel,
+                    subtitleIndex: subModel.index,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                   tileColor: selected ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3) : null,
                   subtitle: subModel.language.isNotEmpty
                       ? Opacity(opacity: 0.6, child: Text(subModel.language.capitalize()))

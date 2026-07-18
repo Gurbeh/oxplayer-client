@@ -11,7 +11,11 @@ import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/watched_state.dart';
 import 'package:fladder/oxplayer/oxplayer_adult_content.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_iran_content.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
+import 'package:fladder/oxplayer/playback/ox_persian_language.dart';
+import 'package:fladder/oxplayer/widgets/ox_iran_flag_icon.dart';
+import 'package:fladder/oxplayer/widgets/ox_labeled_iran_flag.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/shared/media/components/chip_button.dart';
 import 'package:fladder/screens/shared/media/components/media_header.dart';
@@ -96,6 +100,15 @@ class OverviewHeader extends ConsumerWidget {
 
     final streamHeight = 43.0;
 
+    final mediaStreams = mediaStreamHelper?.mediaStream;
+    final showIranFlag = OxplayerIranContent.isIranian(
+      tags: contentTags,
+      genres: genres,
+      name: name,
+      originalTitle: originalTitle,
+      mediaStreams: mediaStreams,
+    );
+
     final streamOptionsButtons = [
       if ((mediaStreamHelper?.mediaStream.versionStreams.length ?? 0) > 1)
         SizedBox(
@@ -160,7 +173,11 @@ class OverviewHeader extends ConsumerWidget {
             itemBuilder: (context) => [AudioStreamModel.no(), ...mediaStreamHelper!.mediaStream.audioStreams]
                 .mapIndexed((index, e) => ItemActionButton(
                       selected: mediaStreamHelper!.mediaStream.currentAudioStream == e,
-                      label: Text(e.displayTitle),
+                      label: OxLabeledIranFlag(
+                        label: e.displayTitle,
+                        showFlag: OxPersianLanguage.isPersianLanguage(e.language) ||
+                            OxPersianLanguage.isPersianLanguage(e.displayTitle),
+                      ),
                       action: () {
                         final newItem = mediaStreamHelper!.mediaStream.copyWith(
                           defaultAudioStreamIndex: e.index,
@@ -188,15 +205,24 @@ class OverviewHeader extends ConsumerWidget {
                 IconsaxPlusLinear.subtitle,
                 color: Theme.of(context).colorScheme.onPrimaryContainer,
               ),
-              Text(
-                (mediaStreamHelper?.mediaStream.currentSubStream?.shortTitle ?? context.localized.off).toUpperCase(),
+              OxLabeledIranFlag(
+                label: (mediaStreamHelper?.mediaStream.currentSubStream?.shortTitle ?? context.localized.off)
+                    .toUpperCase(),
+                subtitleLanguage: mediaStreamHelper?.mediaStream.currentSubStream?.language,
+                mediaStreams: mediaStreams,
+                subtitleIndex: mediaStreamHelper?.mediaStream.currentSubStream?.index ?? -1,
               ),
             ],
           ),
           itemBuilder: (context) => [SubStreamModel.no(), ...mediaStreamHelper!.mediaStream.subStreams]
               .mapIndexed((index, e) => ItemActionButton(
                     selected: mediaStreamHelper!.mediaStream.currentSubStream == e,
-                    label: Text(e.displayTitle),
+                    label: OxLabeledIranFlag(
+                      label: e.displayTitle,
+                      subtitleLanguage: e.language,
+                      mediaStreams: mediaStreams,
+                      subtitleIndex: e.index,
+                    ),
                     action: () {
                       final newItem = mediaStreamHelper!.mediaStream.copyWith(
                         defaultSubStreamIndex: e.index,
@@ -294,6 +320,7 @@ class OverviewHeader extends ConsumerWidget {
                   productionYear: productionYear,
                   runTime: runTime,
                   communityRating: communityRating,
+                  showIranFlag: showIranFlag,
                 ),
                 _OxGenresWithAdultChip(
                   genres: genres,
@@ -435,6 +462,7 @@ class MetadataLabels extends StatelessWidget {
   final double? communityRating;
   final WatchedState? playLabel;
   final List<Widget> additionalLabels;
+  final bool showIranFlag;
 
   const MetadataLabels({
     this.favourite,
@@ -444,6 +472,7 @@ class MetadataLabels extends StatelessWidget {
     this.communityRating,
     this.playLabel,
     this.additionalLabels = const [],
+    this.showIranFlag = false,
     super.key,
   });
 
@@ -472,6 +501,7 @@ class MetadataLabels extends StatelessWidget {
               ],
             ),
           ),
+        if (showIranFlag) const SimpleLabel(iconWidget: OxIranFlagIcon(size: 18)),
         if (productionYear != null)
           SimpleLabel(
             icon: IconsaxPlusBold.calendar,
