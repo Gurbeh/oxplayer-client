@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 class OxSplashBrand extends StatelessWidget {
   const OxSplashBrand({super.key});
 
-  static const assetPath = 'assets/oxplayer/flags/flag_of_iran_round.png';
+  /// 512px PNG (~50KB). Do not use multi-MB source art — decodes into RAM on low-memory TVs.
+  static const assetPath = 'assets/oxplayer/flags/iran_splash_512.png';
 
   @override
   Widget build(BuildContext context) {
@@ -13,6 +14,7 @@ class OxSplashBrand extends StatelessWidget {
       fit: BoxFit.contain,
       filterQuality: FilterQuality.medium,
       gaplessPlayback: true,
+      cacheWidth: 512,
     );
   }
 }

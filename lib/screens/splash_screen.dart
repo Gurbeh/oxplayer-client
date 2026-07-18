@@ -39,7 +39,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     WidgetsBinding.instance.addPostFrameCallback((value) async {
       _splashTiming.markFirstFrame();
       if (OxplayerConfig.isEnabled && mounted) {
-        await precacheImage(const AssetImage(OxSplashBrand.assetPath), context);
+        await precacheImage(
+          ResizeImage.resizeIfNeeded(512, null, const AssetImage(OxSplashBrand.assetPath)),
+          context,
+        );
       }
       await Future.delayed(const Duration(milliseconds: 500));
       if (!context.mounted) return;

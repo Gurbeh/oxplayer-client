@@ -6,10 +6,11 @@ class OxIranFlagIcon extends StatelessWidget {
 
   const OxIranFlagIcon({this.size = 22, super.key});
 
-  static const assetPath = 'assets/oxplayer/flags/flag_of_iran_round.png';
+  static const assetPath = 'assets/oxplayer/flags/iran_android.png';
 
   @override
   Widget build(BuildContext context) {
+    final cachePx = (size * MediaQuery.devicePixelRatioOf(context)).ceil().clamp(1, 96);
     return Image.asset(
       assetPath,
       width: size,
@@ -17,6 +18,8 @@ class OxIranFlagIcon extends StatelessWidget {
       fit: BoxFit.contain,
       filterQuality: FilterQuality.medium,
       gaplessPlayback: true,
+      cacheWidth: cachePx,
+      cacheHeight: cachePx,
     );
   }
 }
