@@ -1,0 +1,1 @@
+Subtitle Options link and thinner default black outline on white text.
