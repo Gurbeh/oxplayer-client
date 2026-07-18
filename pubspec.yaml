@@ -249,7 +249,7 @@ flutter:
     - assets/mp-font.ttf
     - assets/oxplayer/
     - assets/oxplayer/flags/iran_android.png
-    - assets/oxplayer/flags/iran_splash_512.png
+    - assets/oxplayer/flags/iran_splash_256.png
     - assets/env/default.env
     - assets/
 
@@ -279,8 +279,8 @@ flutter:
 flutter_native_splash:
   color: "#210000"
   color_dark: "#210000"
-  image: assets/oxplayer/flags/iran_splash_512.png
-  image_dark: assets/oxplayer/flags/iran_splash_512.png
+  image: assets/oxplayer/flags/iran_splash_256.png
+  image_dark: assets/oxplayer/flags/iran_splash_256.png
   android: true
   ios: false
   web: false
@@ -288,5 +288,5 @@ flutter_native_splash:
   android_12:
     color: "#210000"
     color_dark: "#210000"
-    image: assets/oxplayer/flags/iran_splash_512.png
-    image_dark: assets/oxplayer/flags/iran_splash_512.png
+    image: assets/oxplayer/flags/iran_splash_256.png
+    image_dark: assets/oxplayer/flags/iran_splash_256.png

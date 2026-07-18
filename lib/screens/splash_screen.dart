@@ -40,7 +40,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       _splashTiming.markFirstFrame();
       if (OxplayerConfig.isEnabled && mounted) {
         await precacheImage(
-          ResizeImage.resizeIfNeeded(512, null, const AssetImage(OxSplashBrand.assetPath)),
+          ResizeImage.resizeIfNeeded(256, null, const AssetImage(OxSplashBrand.assetPath)),
           context,
         );
       }
