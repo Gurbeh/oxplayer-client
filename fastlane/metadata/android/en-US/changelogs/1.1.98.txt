@@ -1,0 +1,1 @@
+Fix Iran flag on Persian content and splash screen.
