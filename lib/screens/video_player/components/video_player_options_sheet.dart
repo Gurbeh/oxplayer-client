@@ -410,7 +410,7 @@ Future<void> showSubSelection(BuildContext context) {
                           label: context.localized.subtitleConfiguration,
                         );
                       },
-                      icon: const Icon(Icons.display_settings_rounded))
+                      icon: const Icon(IconsaxPlusLinear.setting_3))
               ],
             ),
             children: playbackModel?.subStreams?.mapIndexed(
