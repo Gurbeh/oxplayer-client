@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 
 import 'package:fladder/models/settings/subtitle_settings_model.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/wrappers/players/base_player.dart';
 
-/// Bundled Persian subtitle font (Google Fonts — Vazirmatn, OFL).
+/// Bundled Persian subtitle font (Vazirmatn v33.003, OFL).
 abstract final class OxSubtitleFont {
   static const family = 'Vazirmatn';
+  static const version = '33.003';
 
   /// Used by mpv/libass when a Persian or Arabic subtitle track is active.
   static const libassFontAsset = 'assets/fonts/vazirmatn/Vazirmatn-Regular.ttf';
+
+  static String get libassFontForPlayer =>
+      OxplayerConfig.isEnabled ? libassFontAsset : libassFallbackFont;
 
   /// Jellyfin / ISO-639 language tags that should use a Persian/Arabic font.
   static const _persianOrArabicLanguageCodes = {
