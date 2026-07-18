@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:fladder/oxplayer/playback/ox_subtitle_font.dart';
@@ -23,6 +24,21 @@ void main() {
         OxSubtitleFont.shouldUsePersianFont(language: 'fa', text: 'Hello'),
         isTrue,
       );
+    });
+
+    test('default settings use white fill with thin black outline', () {
+      expect(OxSubtitleFont.defaultSettings.color, equals(Colors.white));
+      expect(OxSubtitleFont.defaultSettings.outlineSize, 1);
+    });
+
+    test('assForceStyle includes outline and Persian font name', () {
+      final style = OxSubtitleFont.assForceStyle(
+        OxSubtitleFont.defaultSettings,
+        language: 'fa',
+      );
+      expect(style, contains('FontName=Vazirmatn'));
+      expect(style, contains('Outline=1'));
+      expect(style, contains('OutlineColour='));
     });
   });
 }

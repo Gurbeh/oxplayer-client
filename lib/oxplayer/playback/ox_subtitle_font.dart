@@ -15,6 +15,30 @@ abstract final class OxSubtitleFont {
   static String get libassFontForPlayer =>
       OxplayerConfig.isEnabled ? libassFontAsset : libassFallbackFont;
 
+  /// OXPlayer default subtitle appearance (white fill + thin black outline).
+  static const defaultSettings = SubtitleSettingsModel(
+    color: Colors.white,
+    outlineColor: Color.fromRGBO(0, 0, 0, 0.85),
+    outlineSize: 1,
+  );
+
+  /// libass `sub-ass-force-style` string from user subtitle settings.
+  static String assForceStyle(
+    SubtitleSettingsModel settings, {
+    String? language,
+  }) {
+    final parts = <String>[
+      'PrimaryColour=${_assColor(settings.color)}',
+      'OutlineColour=${_assColor(settings.outlineColor)}',
+      'Outline=${settings.outlineSize.clamp(1, 25).round()}',
+      'BorderStyle=1',
+    ];
+    if (shouldUsePersianFont(language: language, text: '')) {
+      parts.insert(0, 'FontName=$family');
+    }
+    return parts.join(',');
+  }
+
   /// Jellyfin / ISO-639 language tags that should use a Persian/Arabic font.
   static const _persianOrArabicLanguageCodes = {
     'fa',
@@ -86,4 +110,15 @@ abstract final class OxSubtitleFont {
 
   static bool _isLatinLetterRune(int rune) =>
       (rune >= 0x0041 && rune <= 0x005A) || (rune >= 0x0061 && rune <= 0x007A);
+
+  static String _assColor(Color color) {
+    final alpha = (255 - (color.a * 255).round()).clamp(0, 255);
+    final red = (color.r * 255).round().clamp(0, 255);
+    final green = (color.g * 255).round().clamp(0, 255);
+    final blue = (color.b * 255).round().clamp(0, 255);
+    return '&H${alpha.toRadixString(16).padLeft(2, '0')}'
+        '${blue.toRadixString(16).padLeft(2, '0')}'
+        '${green.toRadixString(16).padLeft(2, '0')}'
+        '${red.toRadixString(16).padLeft(2, '0')}';
+  }
 }

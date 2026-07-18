@@ -42,6 +42,7 @@ class LibMPV extends BasePlayer {
   VideoController? _controller;
   String _currentSubtitleCodec = '';
   String _currentSubtitleLanguage = '';
+  SubtitleSettingsModel? _subtitleSettings;
 
   final StreamController<PlayerState> _stateController = StreamController.broadcast();
   @override
@@ -738,7 +739,7 @@ class LibMPV extends BasePlayer {
       _currentSubtitleCodec = '';
       _currentSubtitleLanguage = '';
       await _player?.setSubtitleTrack(mpv.SubtitleTrack.no());
-      await _applyOxLibassSubtitleFont(null);
+      await _syncLibassSubtitleStyle();
       return -1;
     }
     _currentSubtitleCodec = wantedSubtitle.codec;
@@ -751,22 +752,32 @@ class LibMPV extends BasePlayer {
     } else if (subTrack != null) {
       await _player?.setSubtitleTrack(subTrack);
     }
-    await _applyOxLibassSubtitleFont(wantedSubtitle.language);
+    await _syncLibassSubtitleStyle();
     return wantedSubtitle.index;
   }
 
-  Future<void> _applyOxLibassSubtitleFont(String? language) async {
+  @override
+  void applySubtitleSettings(SubtitleSettingsModel settings) {
+    _subtitleSettings = settings;
+    unawaited(_syncLibassSubtitleStyle());
+  }
+
+  Future<void> _syncLibassSubtitleStyle() async {
     if (!OxplayerConfig.isEnabled || _player?.platform is! mpv.NativePlayer) return;
-    final usePersianFont = OxSubtitleFont.shouldUsePersianFont(language: language, text: '');
     final native = _player!.platform as dynamic;
+    final hasSubtitle = _currentSubtitleCodec.isNotEmpty || _currentSubtitleLanguage.isNotEmpty;
+    final settings = _subtitleSettings;
     try {
-      if (usePersianFont) {
-        await native.setProperty('sub-ass-override', 'force');
-        await native.setProperty('sub-ass-force-style', 'FontName=${OxSubtitleFont.family}');
-      } else {
+      if (!hasSubtitle || settings == null) {
         await native.setProperty('sub-ass-override', 'no');
         await native.setProperty('sub-ass-force-style', '');
+        return;
       }
+      await native.setProperty('sub-ass-override', 'force');
+      await native.setProperty(
+        'sub-ass-force-style',
+        OxSubtitleFont.assForceStyle(settings, language: _currentSubtitleLanguage),
+      );
     } catch (_) {}
   }
 

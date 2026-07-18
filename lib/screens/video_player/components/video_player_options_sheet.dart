@@ -23,6 +23,7 @@ import 'package:fladder/screens/playlists/add_to_playlists.dart';
 import 'package:fladder/screens/video_player/components/video_player_quality_controls.dart';
 import 'package:fladder/screens/video_player/components/video_player_queue.dart';
 import 'package:fladder/screens/video_player/components/video_subtitle_controls.dart';
+import 'package:fladder/util/focus_provider.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/device_orientation_extension.dart';
 import 'package:fladder/util/list_padding.dart';
@@ -402,15 +403,24 @@ Future<void> showSubSelection(BuildContext context) {
                 Text(context.localized.subtitle),
                 const Spacer(),
                 if (player.backend == PlayerOptions.libMPV || player.backend == PlayerOptions.libMDK)
-                  IconButton.outlined(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        showSubtitleControls(
-                          context: context,
-                          label: context.localized.subtitleConfiguration,
-                        );
-                      },
-                      icon: const Icon(IconsaxPlusLinear.setting_3))
+                  FocusButton(
+                    onTap: () {
+                      Navigator.pop(context);
+                      showSubtitleControls(
+                        context: context,
+                        label: context.localized.subtitleConfiguration,
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      child: Text(
+                        'Options',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              decoration: TextDecoration.underline,
+                            ),
+                      ),
+                    ),
+                  )
               ],
             ),
             children: playbackModel?.subStreams?.mapIndexed(
