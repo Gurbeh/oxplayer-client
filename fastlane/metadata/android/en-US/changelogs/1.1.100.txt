@@ -1,0 +1,1 @@
+Fix Android TV crashes from oversized Iran flag images; smaller splash and in-app flag icons.
