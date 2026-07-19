@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-/// Bundled Iran flag image (round PNG, not Unicode emoji).
+/// Small Iran flag for metadata rows and subtitle pickers ([iran_splash_256.png]).
 class OxIranFlagIcon extends StatelessWidget {
   final double size;
 
   const OxIranFlagIcon({this.size = 22, super.key});
 
-  static const assetPath = 'assets/oxplayer/flags/iran_android.png';
+  static const assetPath = 'assets/oxplayer/flags/iran_splash_256.png';
 
   @override
   Widget build(BuildContext context) {

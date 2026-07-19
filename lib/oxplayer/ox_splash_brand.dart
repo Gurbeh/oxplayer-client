@@ -1,20 +1,31 @@
 import 'package:flutter/material.dart';
 
-/// Temporary OX splash branding (flag of Iran instead of app logo).
+/// OX splash branding — same asset/size as native Android splash ([iran_android.png]).
 class OxSplashBrand extends StatelessWidget {
   const OxSplashBrand({super.key});
 
-  /// 256px PNG (~27KB). Do not use multi-MB source art — decodes into RAM on low-memory TVs.
-  static const assetPath = 'assets/oxplayer/flags/iran_splash_256.png';
+  static const assetPath = 'assets/oxplayer/flags/iran_android.png';
+
+  /// Matches source PNG (265×265). Keep in sync with native splash + precache.
+  static const displaySize = 265.0;
+
+  static const splashBackground = Color(0xFF210000);
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset(
-      assetPath,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.medium,
-      gaplessPlayback: true,
-      cacheWidth: 256,
+    return SizedBox(
+      width: displaySize,
+      height: displaySize,
+      child: Image.asset(
+        assetPath,
+        width: displaySize,
+        height: displaySize,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
+        gaplessPlayback: true,
+        cacheWidth: displaySize.round(),
+        cacheHeight: displaySize.round(),
+      ),
     );
   }
 }

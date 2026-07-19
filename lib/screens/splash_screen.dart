@@ -40,7 +40,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       _splashTiming.markFirstFrame();
       if (OxplayerConfig.isEnabled && mounted) {
         await precacheImage(
-          ResizeImage.resizeIfNeeded(256, null, const AssetImage(OxSplashBrand.assetPath)),
+          ResizeImage.resizeIfNeeded(
+            OxSplashBrand.displaySize.round(),
+            OxSplashBrand.displaySize.round(),
+            const AssetImage(OxSplashBrand.assetPath),
+          ),
           context,
         );
       }
@@ -172,10 +176,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   Widget build(BuildContext context) {
     return NotificationManagerInitializer(
       child: Scaffold(
+        backgroundColor: OxplayerConfig.isEnabled ? OxSplashBrand.splashBackground : null,
         body: Center(
-          child: FractionallySizedBox(
+          child: OxplayerConfig.isEnabled ? const OxSplashBrand() : const FractionallySizedBox(
             heightFactor: 0.4,
-            child: OxplayerConfig.isEnabled ? const OxSplashBrand() : const FladderLogo(),
+            child: FladderLogo(),
           ),
         ),
       ),
