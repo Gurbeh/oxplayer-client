@@ -127,7 +127,9 @@ internal fun ExoPlayer(
         })
     }
 
-    val loadControl = if (conserveMemory) {
+    // Fladder TV: Media3 DefaultLoadControl (~50s). OX 15–45s / 16MB caused
+    // mid-playback rebuffers on leanback; keep reduced buffer only for phone low-RAM.
+    val loadControl = if (isLowRamDevice && !isLeanBackTv) {
         DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 15_000,
