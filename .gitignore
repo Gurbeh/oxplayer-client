@@ -98,3 +98,8 @@ node_modules/
 # Legacy TDLib Dart codegen (app no longer uses TDLib; ignore local leftovers)
 lib/td_api_generated/
 android/.kotlin/*
+
+# graphify — keep graph, skip local rebuild cache
+graphify-out/cache/
+graphify-out/cost.json
+
