@@ -1,0 +1,1 @@
+Prefetch home detail cache so poster taps open faster
