@@ -7,6 +7,7 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/view_model.dart';
 import 'package:fladder/models/views_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_home_detail_prefetch.dart';
 import 'package:fladder/oxplayer/oxplayer_home_feed.dart';
 import 'package:fladder/oxplayer/oxplayer_view_labels.dart';
 import 'package:fladder/oxplayer/providers/ox_favorites_dashboard.dart';
@@ -162,6 +163,7 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
       loading: false,
       loaded: true,
     );
+    OxplayerHomeDetailPrefetch.schedule(ref);
   }
 
   Future<ViewModel> _fetchRecentlyAdded(ViewModel view, {required bool showAllCollections}) async {
