@@ -46,15 +46,32 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
             ref.read(jellyApiProvider),
             seriesModel.id,
           );
-          final core = await oxFetchSeriesCoreState(ref, seriesModel, state);
-          if (core == null) return null;
-          apply(core);
 
-          if (oxSeerrRatingsMissingRt(ref.read(oxLibraryItemRatingsProvider(seriesModel.id)))) {
-            oxPrefetchSeerrTvRatings(ref, seriesModel.id, core.tmdbId);
+          // Catalog = playable episodes. Apply before core so Play is not blocked on item JSON.
+          // Chopper disk SWR makes seasons/episodes near-instant on revisit.
+          final catalogBase = state;
+          if (catalogBase != null) {
+            final withCatalog = await oxLoadSeriesCatalogPhase(
+              ref,
+              catalogBase,
+              seriesModel.id,
+              prefetchCatalog: catalogPrefetch,
+            );
+            apply(withCatalog);
           }
 
-          unawaited(_oxContinueSeriesLoad(seriesModel.id, loadGen, catalogPrefetch));
+          final core = await oxFetchSeriesCoreState(ref, seriesModel, state);
+          if (core == null) {
+            if (state == null) return null;
+          } else {
+            apply(core);
+          }
+
+          if (oxSeerrRatingsMissingRt(ref.read(oxLibraryItemRatingsProvider(seriesModel.id)))) {
+            oxPrefetchSeerrTvRatings(ref, seriesModel.id, state?.tmdbId);
+          }
+
+          unawaited(_oxContinueSeriesSupplementary(seriesModel.id, loadGen));
           return null;
         }
 
@@ -98,29 +115,15 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
     return load();
   }
 
-  Future<void> _oxContinueSeriesLoad(
-    String seriesId,
-    int loadGen,
-    Future<OxSeriesCatalogLoad> catalogPrefetch,
-  ) async {
+  Future<void> _oxContinueSeriesSupplementary(String seriesId, int loadGen) async {
     try {
       final base = state;
       if (base == null || loadGen != _loadGeneration) return;
 
-      final supplementaryFuture = oxLoadSeriesSupplementaryPhase(ref, seriesId, base);
-      final withCatalog = await oxLoadSeriesCatalogPhase(
-        ref,
-        base,
-        seriesId,
-        prefetchCatalog: catalogPrefetch,
-      );
-      if (loadGen != _loadGeneration) return;
-      state = withCatalog;
-
-      final supplementary = await supplementaryFuture;
+      final supplementary = await oxLoadSeriesSupplementaryPhase(ref, seriesId, base);
       if (loadGen != _loadGeneration) return;
       state = oxMergeSeriesSupplementary(
-        withCatalog,
+        base,
         related: supplementary.related,
         seerrRelated: supplementary.seerrRelated,
         seerrRecommended: supplementary.seerrRecommended,

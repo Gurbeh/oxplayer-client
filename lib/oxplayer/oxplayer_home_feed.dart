@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/view_model.dart';
+import 'package:fladder/oxplayer/oxplayer_api_disk_cache.dart';
 import 'package:fladder/oxplayer/oxplayer_catalog_http.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_route.dart';
@@ -47,17 +48,39 @@ class OxHomeFeedResult {
 abstract final class OxplayerHomeFeed {
   static const _feedLimit = 16;
 
-  /// One HTTP round-trip for views, latest shelves, next up, continue watching, and watch later.
-  static Future<OxHomeFeedResult?> fetch(Ref ref) async {
+  static Uri? _feedUri(Ref ref) {
     final base = (OxplayerRoute.apiBaseUrl ?? OxplayerEnv.apiBaseUrl)?.trim();
     final userId = ref.read(userProvider)?.id;
     if (base == null || base.isEmpty || userId == null || userId.isEmpty) {
       return null;
     }
-
-    final uri = Uri.parse('$base/Users/$userId/Home/Feed').replace(
+    return Uri.parse('$base/Users/$userId/Home/Feed').replace(
       queryParameters: {'limit': '$_feedLimit'},
     );
+  }
+
+  static String? _cacheKey(Ref ref, Uri uri) {
+    final userId = ref.read(userProvider)?.id;
+    if (userId == null || userId.isEmpty) return null;
+    return OxplayerApiDiskCache.key(userId: userId, method: 'GET', uri: uri);
+  }
+
+  /// Disk SWR: last successful Home/Feed body (survives kill / dispose).
+  static Future<OxHomeFeedResult?> loadCached(Ref ref) async {
+    final uri = _feedUri(ref);
+    if (uri == null) return null;
+    final key = _cacheKey(ref, uri);
+    if (key == null) return null;
+    final entry = await OxplayerApiDiskCache.read(key);
+    if (entry == null || entry.body.isEmpty) return null;
+    return _parseBodyString(entry.body, ref);
+  }
+
+  /// One HTTP round-trip for views, latest shelves, next up, continue watching, and watch later.
+  /// On 200, writes disk cache for the next cold open.
+  static Future<OxHomeFeedResult?> fetch(Ref ref) async {
+    final uri = _feedUri(ref);
+    if (uri == null) return null;
     final headers = oxCatalogApiHeaders(ref);
 
     http.Response response;
@@ -74,9 +97,33 @@ abstract final class OxplayerHomeFeed {
       return null;
     }
 
-    final body = jsonDecode(response.body);
-    if (body is! Map<String, dynamic>) return null;
+    final key = _cacheKey(ref, uri);
+    if (key != null && response.body.isNotEmpty) {
+      await OxplayerApiDiskCache.write(
+        key,
+        OxplayerApiDiskCacheEntry(
+          savedAt: DateTime.now().toUtc(),
+          statusCode: response.statusCode,
+          body: response.body,
+          headers: {'content-type': response.headers['content-type'] ?? 'application/json'},
+        ),
+      );
+    }
 
+    return _parseBodyString(response.body, ref);
+  }
+
+  static OxHomeFeedResult? _parseBodyString(String raw, Ref ref) {
+    try {
+      final body = jsonDecode(raw);
+      if (body is! Map<String, dynamic>) return null;
+      return _parse(body, ref);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static OxHomeFeedResult _parse(Map<String, dynamic> body, Ref ref) {
     final shelfItemsByParent = <String, List<ItemBaseModel>>{};
     final shelves = body['Shelves'];
     if (shelves is List) {

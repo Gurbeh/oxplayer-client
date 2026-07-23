@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:chopper/chopper.dart';
@@ -8,6 +10,8 @@ import 'package:fladder/models/account_model.dart';
 import 'package:fladder/models/api_result.dart';
 import 'package:fladder/models/credentials_model.dart';
 import 'package:fladder/models/login_screen_model.dart';
+import 'package:fladder/oxplayer/oxplayer_api_disk_cache.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
 import 'package:fladder/providers/favourites_provider.dart';
@@ -195,6 +199,9 @@ class AuthNotifier extends StateNotifier<LoginScreenModel> {
     ref.read(userProvider.notifier).clear();
     ref.read(libraryScreenProvider.notifier).clear();
     ref.read(seerrDashboardProvider.notifier).clear();
+    if (OxplayerConfig.isEnabled) {
+      unawaited(OxplayerApiDiskCache.clearAll());
+    }
   }
 
   Future<void> setServer(String server) async {

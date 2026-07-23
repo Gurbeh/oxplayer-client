@@ -19,6 +19,7 @@ import 'package:fladder/oxplayer/oxplayer_route.dart';
 import 'package:fladder/oxplayer/oxplayer_route_env.dart';
 import 'package:fladder/oxplayer/oxplayer_route_interceptor.dart';
 import 'package:fladder/oxplayer/oxplayer_session_interceptor.dart';
+import 'package:fladder/oxplayer/oxplayer_swr_http_client.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/providers/connectivity_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
@@ -53,21 +54,31 @@ final serverUrlProvider = StateProvider<String?>((ref) {
 @riverpod
 class JellyApi extends _$JellyApi {
   @override
-  JellyService build() => JellyService(
-        ref,
-        JellyfinOpenApi.create(
-          interceptors: [
-            if (OxplayerEnv.isEnabled) OxplayerRouteInterceptor(ref),
-            JellyRequest(ref),
-            if (OxplayerEnv.isEnabled) OxplayerHttpPerformanceInterceptor(),
-            if (OxplayerEnv.isEnabled) OxplayerPlaybackHttpInterceptor(ref),
-            if (OxplayerEnv.isEnabled) OxplayerForceRepairInterceptor(ref),
-            OxplayerSessionInterceptor(ref),
-            JellyResponse(ref),
-            HttpLoggingInterceptor(level: Level.basic),
-          ],
-        ),
+  JellyService build() {
+    http.Client? httpClient;
+    if (OxplayerEnv.isEnabled) {
+      httpClient = OxplayerSwrHttpClient(
+        inner: http.Client(),
+        userId: () => ref.read(userProvider)?.id ?? '',
       );
+    }
+    return JellyService(
+      ref,
+      JellyfinOpenApi.create(
+        httpClient: httpClient,
+        interceptors: [
+          if (OxplayerEnv.isEnabled) OxplayerRouteInterceptor(ref),
+          JellyRequest(ref),
+          if (OxplayerEnv.isEnabled) OxplayerHttpPerformanceInterceptor(),
+          if (OxplayerEnv.isEnabled) OxplayerPlaybackHttpInterceptor(ref),
+          if (OxplayerEnv.isEnabled) OxplayerForceRepairInterceptor(ref),
+          OxplayerSessionInterceptor(ref),
+          JellyResponse(ref),
+          HttpLoggingInterceptor(level: Level.basic),
+        ],
+      ),
+    );
+  }
 }
 
 JellyfinOpenApi createJellyfinApiForAccount(Ref ref, String baseUrl, Map<String, String> headers) {

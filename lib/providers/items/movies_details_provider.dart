@@ -7,6 +7,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/movie_model.dart';
+import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
 import 'package:fladder/oxplayer/ox_staged_detail_load.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
@@ -40,6 +41,18 @@ class MovieDetails extends _$MovieDetails {
         }
 
         if (OxplayerConfig.isEnabled) {
+          // Disk SWR: MediaSources → Play button before network round-trip.
+          final cached = await oxLoadCachedLibraryItemDetails(ref, item.id);
+          if (cached != null && cached.model is MovieModel) {
+            final cachedMovie = (cached.model as MovieModel).copyWith(
+              related: state?.related ?? const [],
+              seerrRelated: state?.seerrRelated ?? const [],
+              seerrRecommended: state?.seerrRecommended ?? const [],
+              specialFeatures: state?.specialFeatures ?? const [],
+            );
+            apply(oxplayerPrepareMovieMediaStreams(cachedMovie, ref) ?? cachedMovie);
+          }
+
           final core = await oxFetchMovieCoreState(ref, item, state);
           if (core == null) return null;
           var playable = oxplayerPrepareMovieMediaStreams(core, ref) ?? core;

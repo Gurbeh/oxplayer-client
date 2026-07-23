@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
+import 'package:fladder/oxplayer/oxplayer_api_disk_cache.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/seerr_api_provider.dart';
@@ -45,6 +46,7 @@ void oxPrefetchSeerrTvRatings(Ref ref, String itemId, int? tmdbId) {
 }
 
 /// Fetches `GET /Items/{id}` and returns the raw JSON (includes `OxRatings` when present).
+/// Writes disk SWR cache on 200 so the next open can hydrate Play instantly.
 Future<Map<String, dynamic>?> oxFetchLibraryItemJson(Ref ref, String itemId) async {
   if (!OxplayerEnv.isEnabled) return null;
 
@@ -69,6 +71,46 @@ Future<Map<String, dynamic>?> oxFetchLibraryItemJson(Ref ref, String itemId) asy
     );
     if (response.statusCode != 200) return null;
     final body = jsonDecode(response.body);
+    if (body is! Map<String, dynamic>) return null;
+
+    final cacheUserId = userId ?? '';
+    if (cacheUserId.isNotEmpty && response.body.isNotEmpty) {
+      await OxplayerApiDiskCache.write(
+        OxplayerApiDiskCache.key(userId: cacheUserId, method: 'GET', uri: uri),
+        OxplayerApiDiskCacheEntry(
+          savedAt: DateTime.now().toUtc(),
+          statusCode: response.statusCode,
+          body: response.body,
+          headers: {'content-type': response.headers['content-type'] ?? 'application/json'},
+        ),
+      );
+    }
+
+    return body;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Disk SWR: last successful `GET /Items/{id}` body (survives kill / dispose).
+Future<Map<String, dynamic>?> oxLoadCachedLibraryItemJson(Ref ref, String itemId) async {
+  if (!OxplayerEnv.isEnabled || itemId.isEmpty) return null;
+
+  final baseUrl = ref.read(serverUrlProvider);
+  final userId = ref.read(userProvider)?.id;
+  if (baseUrl == null || baseUrl.isEmpty || userId == null || userId.isEmpty) {
+    return null;
+  }
+
+  final uri = Uri.parse('$baseUrl/Items/$itemId').replace(
+    queryParameters: {'userId': userId},
+  );
+  final entry = await OxplayerApiDiskCache.read(
+    OxplayerApiDiskCache.key(userId: userId, method: 'GET', uri: uri),
+  );
+  if (entry == null || entry.body.isEmpty) return null;
+  try {
+    final body = jsonDecode(entry.body);
     return body is Map<String, dynamic> ? body : null;
   } catch (_) {
     return null;
@@ -88,6 +130,25 @@ Future<({ItemBaseModel model, SeerrRatingsResponse? ratings})?> oxFetchLibraryIt
   final ratings = oxRatingsFromItemJson(raw);
   oxApplyLibraryItemRatings(ref, itemId, ratings);
   return (model: model, ratings: ratings);
+}
+
+/// Hydrate detail model from disk without waiting on network (Play / MediaSources).
+Future<({ItemBaseModel model, SeerrRatingsResponse? ratings})?> oxLoadCachedLibraryItemDetails(
+  Ref ref,
+  String itemId,
+) async {
+  final raw = await oxLoadCachedLibraryItemJson(ref, itemId);
+  if (raw == null) return null;
+
+  try {
+    final dto = BaseItemDto.fromJsonFactory(raw);
+    final model = ItemBaseModel.fromBaseDto(dto, ref);
+    final ratings = oxRatingsFromItemJson(raw);
+    oxApplyLibraryItemRatings(ref, itemId, ratings);
+    return (model: model, ratings: ratings);
+  } catch (_) {
+    return null;
+  }
 }
 
 /// Rotten Tomatoes / IMDb badges for library detail headers (matches SeerrDetailsScreen).
