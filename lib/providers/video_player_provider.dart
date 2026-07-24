@@ -12,7 +12,9 @@ import 'package:fladder/models/media_playback_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/playback_queue_state.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_audio.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_subtitle.dart';
 import 'package:fladder/oxplayer/oxplayer_audio_log.dart';
+import 'package:collection/collection.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_memory_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_native_playback.dart';
@@ -192,7 +194,13 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
 
       final resolvedAudio = oxplayerResolvePlaybackAudioStream(model);
       await state.setAudioTrack(resolvedAudio, model);
-      await state.setSubtitleTrack(null, model);
+      final resolvedSubIndex = oxplayerResolveSubtitleStreamIndex(
+        selectedIndex: model.mediaStreams?.defaultSubStreamIndex,
+        serverDefaultIndex: model.mediaStreams?.defaultSubStreamIndex,
+        subStreams: model.subStreams,
+      );
+      final resolvedSub = model.subStreams?.firstWhereOrNull((s) => s.index == resolvedSubIndex);
+      await state.setSubtitleTrack(resolvedSub, model);
 
       final runtime = model.item.overview.runTime;
       final deferCatalogDuration = OxplayerEnv.isEnabled && oxplayerUsesNativePlayerRead(ref);

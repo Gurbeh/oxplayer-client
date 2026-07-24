@@ -31,6 +31,7 @@ import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/models/syncing/sync_item.dart';
 import 'package:fladder/models/video_stream_model.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_media_source.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_subtitle.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
@@ -394,11 +395,15 @@ class PlaybackModelHelper {
           newStreamModel?.audioStreams,
           newStreamModel?.defaultAudioStreamIndex);
 
-      final subStreamIndex = selectSubStream(
-          ref.read(userProvider.select((value) => value?.userConfiguration?.rememberSubtitleSelections ?? true)),
-          oldModel?.mediaStreams?.currentSubStream,
-          newStreamModel?.subStreams,
-          newStreamModel?.defaultSubStreamIndex);
+      final subStreamIndex = oxplayerResolveSubtitleStreamIndex(
+        selectedIndex: selectSubStream(
+            ref.read(userProvider.select((value) => value?.userConfiguration?.rememberSubtitleSelections ?? true)),
+            oldModel?.mediaStreams?.currentSubStream,
+            newStreamModel?.subStreams,
+            newStreamModel?.defaultSubStreamIndex),
+        serverDefaultIndex: newStreamModel?.defaultSubStreamIndex,
+        subStreams: newStreamModel?.subStreams,
+      );
 
       //Native player does not allow for loading external subtitles with transcoding
       final isNativePlayer =

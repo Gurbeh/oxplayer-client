@@ -13,6 +13,7 @@ import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/oxplayer/oxplayer_audio_log.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_audio.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_subtitle.dart';
 import 'package:fladder/oxplayer/oxplayer_memory_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/src/video_player_helper.g.dart';
@@ -231,7 +232,13 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
               )
               .toList() ??
           [],
-      defaultSubtrack: model.mediaStreams?.defaultSubStreamIndex ?? 1,
+      defaultSubtrack: oxplayerResolveSubtitleStreamIndex(
+            selectedIndex: model.mediaStreams?.defaultSubStreamIndex,
+            serverDefaultIndex: model.mediaStreams?.defaultSubStreamIndex,
+            subStreams: model.subStreams,
+          ) ??
+          model.mediaStreams?.defaultSubStreamIndex ??
+          1,
       subtitleTracks: model.subStreams
               ?.map(
                 (sub) => SubtitleTrack(
