@@ -1,0 +1,1 @@
+Auto-select preferred subtitles on play
