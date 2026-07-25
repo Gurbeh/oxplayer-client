@@ -15,6 +15,7 @@ import 'package:fladder/oxplayer/oxplayer_iran_content.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
 import 'package:fladder/oxplayer/playback/ox_persian_language.dart';
 import 'package:fladder/oxplayer/widgets/ox_iran_flag_icon.dart';
+import 'package:fladder/oxplayer/widgets/ox_enum_box.dart';
 import 'package:fladder/oxplayer/widgets/ox_labeled_iran_flag.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/shared/media/components/chip_button.dart';
@@ -109,44 +110,62 @@ class OverviewHeader extends ConsumerWidget {
       mediaStreams: mediaStreams,
     );
 
+    final versionCurrentWidget = Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: 8,
+      children: [
+        Icon(
+          IconsaxPlusLinear.video_square,
+          color: Theme.of(context).colorScheme.onPrimaryContainer,
+        ),
+        Text(
+          mediaStreamHelper?.mediaStream.currentVersionStream != null
+              ? oxplayerVersionStreamLabel(
+                  mediaStreamHelper!.mediaStream.currentVersionStream!,
+                  l10n: context.localized,
+                )
+              : '',
+        ),
+      ],
+    );
+    List<ItemAction> versionItemBuilder(BuildContext context) => mediaStreamHelper!.mediaStream.versionStreams
+        .mapIndexed(
+          (index, e) => ItemActionButton(
+            selected: mediaStreamHelper!.mediaStream.currentVersionStream == e,
+            label: Text(oxplayerVersionStreamLabel(e, l10n: context.localized)),
+            action: () {
+              final newItem = mediaStreamHelper!.mediaStream.copyWith(
+                versionStreamIndex: e.index,
+              );
+              mediaStreamHelper!.onItemChanged?.call(newItem);
+            },
+          ),
+        )
+        .toList();
+
     final streamOptionsButtons = [
-      if ((mediaStreamHelper?.mediaStream.versionStreams.length ?? 0) > 1)
+      if (mediaStreamHelper != null && oxplayerShowVersionStreamPicker(mediaStreamHelper!.mediaStream))
         SizedBox(
           height: streamHeight,
-          child: EnumBox(
-            onFocusChanged: (focused) {
-              if (focused) {
-                context.ensureVisible(alignment: 1.0);
-              }
-            },
-            currentWidget: Row(
-              mainAxisSize: MainAxisSize.min,
-              spacing: 8,
-              children: [
-                Icon(
-                  IconsaxPlusLinear.video_square,
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+          child: OxplayerConfig.isEnabled
+              ? OxEnumBox(
+                  onFocusChanged: (focused) {
+                    if (focused) {
+                      context.ensureVisible(alignment: 1.0);
+                    }
+                  },
+                  currentWidget: versionCurrentWidget,
+                  itemBuilder: versionItemBuilder,
+                )
+              : EnumBox(
+                  onFocusChanged: (focused) {
+                    if (focused) {
+                      context.ensureVisible(alignment: 1.0);
+                    }
+                  },
+                  currentWidget: versionCurrentWidget,
+                  itemBuilder: versionItemBuilder,
                 ),
-                Text(
-                  mediaStreamHelper!.mediaStream.currentVersionStream != null
-                      ? oxplayerVersionStreamLabel(mediaStreamHelper!.mediaStream.currentVersionStream!)
-                      : "",
-                ),
-              ],
-            ),
-            itemBuilder: (context) => mediaStreamHelper!.mediaStream.versionStreams
-                .mapIndexed((index, e) => ItemActionButton(
-                      selected: mediaStreamHelper!.mediaStream.currentVersionStream == e,
-                      label: Text(oxplayerVersionStreamLabel(e)),
-                      action: () {
-                        final newItem = mediaStreamHelper!.mediaStream.copyWith(
-                          versionStreamIndex: e.index,
-                        );
-                        mediaStreamHelper!.onItemChanged?.call(newItem);
-                      },
-                    ))
-                .toList(),
-          ),
         ),
       if (mediaStreamHelper != null && mediaStreamHelper!.mediaStream.audioStreams.isNotEmpty)
         SizedBox(

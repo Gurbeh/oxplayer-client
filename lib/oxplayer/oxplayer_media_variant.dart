@@ -132,6 +132,12 @@ OxStreamDelivery _deliveryFromLabel(String blob, VersionStreamModel stream) {
   if (RegExp(r'\bdub(?:bed)?\b').hasMatch(blob) || blob.contains('دوبله') || blob.contains('🎙')) {
     return OxStreamDelivery.dubbed;
   }
+  if (RegExp(r'soft\s+sub').hasMatch(blob)) {
+    return OxStreamDelivery.softSub;
+  }
+  if (RegExp(r'hard\s+sub').hasMatch(blob)) {
+    return OxStreamDelivery.hardSub;
+  }
   if (stream.subStreams.isNotEmpty) {
     return OxStreamDelivery.softSub;
   }

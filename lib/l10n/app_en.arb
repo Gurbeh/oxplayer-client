@@ -2954,5 +2954,49 @@
   "oxplayerDeveloperModeSentrySent": "Sentry test sent",
   "@oxplayerDeveloperModeSentrySent": {},
   "oxplayerDeveloperModeCrashlyticsUnavailable": "Crashlytics is not available on this build",
-  "@oxplayerDeveloperModeCrashlyticsUnavailable": {}
+  "@oxplayerDeveloperModeCrashlyticsUnavailable": {},
+  "oxplayerVariantDubbed": "dubbed ({language})",
+  "@oxplayerVariantDubbed": {
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "oxplayerVariantDubbedGeneric": "dubbed",
+  "@oxplayerVariantDubbedGeneric": {},
+  "oxplayerVariantSoftSub": "soft sub",
+  "@oxplayerVariantSoftSub": {},
+  "oxplayerVariantHardSub": "hard sub ({language})",
+  "@oxplayerVariantHardSub": {
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "oxplayerVariantHardSubGeneric": "hard sub",
+  "@oxplayerVariantHardSubGeneric": {},
+  "oxplayerVariantLangEnglish": "English",
+  "@oxplayerVariantLangEnglish": {},
+  "oxplayerVariantLangPersian": "Persian",
+  "@oxplayerVariantLangPersian": {},
+  "oxplayerVariantLangArabic": "Arabic",
+  "@oxplayerVariantLangArabic": {},
+  "oxplayerVariantLangTurkish": "Turkish",
+  "@oxplayerVariantLangTurkish": {},
+  "oxplayerVariantLangGerman": "German",
+  "@oxplayerVariantLangGerman": {},
+  "oxplayerVariantLangFrench": "French",
+  "@oxplayerVariantLangFrench": {},
+  "oxplayerVariantLangSpanish": "Spanish",
+  "@oxplayerVariantLangSpanish": {},
+  "oxplayerVariantLangRussian": "Russian",
+  "@oxplayerVariantLangRussian": {},
+  "oxplayerVariantLangJapanese": "Japanese",
+  "@oxplayerVariantLangJapanese": {},
+  "oxplayerVariantLangKorean": "Korean",
+  "@oxplayerVariantLangKorean": {},
+  "oxplayerVariantLangChinese": "Chinese",
+  "@oxplayerVariantLangChinese": {}
 }

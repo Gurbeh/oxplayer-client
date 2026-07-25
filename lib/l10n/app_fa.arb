@@ -2167,5 +2167,35 @@
     "oxplayerLoginCodeInvalid": "کد ۶ حرفی ربات را وارد کنید.",
     "oxplayerLoginCodeFailed": "ورود ناموفق. کد را بررسی کنید.",
     "oxplayerLoginContinue": "ادامه",
-    "oxplayerLoginBack": "بازگشت"
+    "oxplayerLoginBack": "بازگشت",
+    "oxplayerVariantDubbed": "دوبله ({language})",
+    "@oxplayerVariantDubbed": {
+        "placeholders": {
+            "language": {
+                "type": "String"
+            }
+        }
+    },
+    "oxplayerVariantDubbedGeneric": "دوبله",
+    "oxplayerVariantSoftSub": "زیرنویس",
+    "oxplayerVariantHardSub": "زیرنویس چسبیده ({language})",
+    "@oxplayerVariantHardSub": {
+        "placeholders": {
+            "language": {
+                "type": "String"
+            }
+        }
+    },
+    "oxplayerVariantHardSubGeneric": "زیرنویس چسبیده",
+    "oxplayerVariantLangEnglish": "انگلیسی",
+    "oxplayerVariantLangPersian": "فارسی",
+    "oxplayerVariantLangArabic": "عربی",
+    "oxplayerVariantLangTurkish": "ترکی",
+    "oxplayerVariantLangGerman": "آلمانی",
+    "oxplayerVariantLangFrench": "فرانسوی",
+    "oxplayerVariantLangSpanish": "اسپانیایی",
+    "oxplayerVariantLangRussian": "روسی",
+    "oxplayerVariantLangJapanese": "ژاپنی",
+    "oxplayerVariantLangKorean": "کره‌ای",
+    "oxplayerVariantLangChinese": "چینی"
 }

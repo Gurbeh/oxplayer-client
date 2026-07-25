@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/items/media_streams_model.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
+import 'package:fladder/oxplayer/widgets/ox_enum_box.dart';
 import 'package:fladder/screens/details_screens/components/label_title_item.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/widgets/shared/enum_selection.dart';
@@ -37,16 +39,22 @@ class MediaStreamInformation extends ConsumerWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (mediaStream.versionStreams.isNotEmpty && mediaStream.versionStreams.length > 1)
+        if (oxplayerShowVersionStreamPicker(mediaStream))
           _StreamOptionSelect(
             label: Text(context.localized.version),
-            current: mediaStream.currentVersionStream?.name ?? "",
+            current: mediaStream.currentVersionStream != null
+                ? oxplayerVersionStreamLabel(
+                    mediaStream.currentVersionStream!,
+                    l10n: context.localized,
+                  )
+                : '',
+            interactiveWithSingleItem: OxplayerConfig.isEnabled,
             itemBuilder: (context) => mediaStream.versionStreams
                 .map((e) => ItemActionButton(
                       selected: mediaStream.currentVersionStream == e,
                       label: textWidget(
                         context,
-                        label: oxplayerVersionStreamLabel(e),
+                        label: oxplayerVersionStreamLabel(e, l10n: context.localized),
                       ),
                       action: () => onVersionIndexChanged?.call(e.index),
                     ))
@@ -115,25 +123,31 @@ class MediaStreamInformation extends ConsumerWidget {
 class _StreamOptionSelect<T> extends StatelessWidget {
   final Text label;
   final String current;
+  final bool interactiveWithSingleItem;
   final List<ItemAction> Function(BuildContext context) itemBuilder;
   const _StreamOptionSelect({
     required this.label,
     required this.current,
+    this.interactiveWithSingleItem = false,
     required this.itemBuilder,
   });
 
   @override
   Widget build(BuildContext context) {
+    final picker = interactiveWithSingleItem
+        ? OxEnumBox(
+            current: current,
+            itemBuilder: itemBuilder,
+          )
+        : EnumBox(
+            current: current,
+            itemBuilder: itemBuilder,
+          );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: LabelTitleItem(
         title: label,
-        content: Flexible(
-          child: EnumBox(
-            current: current,
-            itemBuilder: itemBuilder,
-          ),
-        ),
+        content: Flexible(child: picker),
       ),
     );
   }
