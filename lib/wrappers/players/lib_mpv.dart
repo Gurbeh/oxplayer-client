@@ -847,12 +847,13 @@ class LibMPV extends BasePlayer {
     final useExternalUri =
         hasUrl && (wantedSubtitle.isExternal || wantedSubtitle.supportsExternalStream);
 
-    // Fladder demux match; OX uses API DeliveryUrl for HTTP MKV (embedded fa not in mpv demux).
-    if (subTrack != null) {
-      await _player?.setSubtitleTrack(subTrack);
-    } else if (useExternalUri) {
+    // OX: DeliveryUrl before demux — progressive CDN MKV can expose ghost embedded
+    // tracks (sid set but no dialogue); external SRT from API is the reliable path.
+    if (useExternalUri) {
       final loadGen = _externalSubtitleLoadGen;
       unawaited(_loadExternalSubtitleInBackground(wantedSubtitle, loadGen));
+    } else if (subTrack != null) {
+      await _player?.setSubtitleTrack(subTrack);
     } else if (wantedSubtitle.index >= 0 && !wantedSubtitle.isExternal) {
       await _player!.setSubtitleTrack(
         mpv.SubtitleTrack(
