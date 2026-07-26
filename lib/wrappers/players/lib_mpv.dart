@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:async/async.dart';
+import 'package:http/http.dart' as http;
 import 'package:collection/collection.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -29,7 +30,6 @@ import 'package:fladder/oxplayer/oxplayer_stream_mpv.dart';
 import 'package:fladder/oxplayer/oxplayer_audio_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_http_auth.dart';
-import 'package:fladder/oxplayer/playback/ox_persian_language.dart';
 import 'package:fladder/oxplayer/playback/ox_subtitle_font.dart';
 import 'package:fladder/providers/settings/subtitle_settings_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
@@ -63,10 +63,8 @@ class LibMPV extends BasePlayer {
   double _preferredVolume = 100;
   int _fadeGeneration = 0;
   bool _isFading = false;
-  SubStreamModel? _pendingSubtitle;
-  PlaybackModel? _pendingSubtitlePlayback;
-  Timer? _subtitleRetryTimer;
   bool _subtitleTextSeen = false;
+  int _externalSubtitleLoadGen = 0;
 
   void _logAudio(String phase, {Map<String, Object?> fields = const {}}) {
     OxplayerAudioLog.event(phase, fields: {
@@ -159,11 +157,8 @@ class LibMPV extends BasePlayer {
     _player = null;
     _retryTimer?.cancel();
     _retryTimer = null;
-    _subtitleRetryTimer?.cancel();
-    _subtitleRetryTimer = null;
-    _pendingSubtitle = null;
-    _pendingSubtitlePlayback = null;
     _subtitleTextSeen = false;
+    _externalSubtitleLoadGen++;
   }
 
   void setState(PlayerState state) {
@@ -221,11 +216,6 @@ class LibMPV extends BasePlayer {
           setState(lastState.update(volume: clamped));
         }
       }),
-      player.stream.tracks.listen((_) {
-        if (_pendingSubtitle != null) {
-          unawaited(_applyPendingSubtitleTrack());
-        }
-      }),
       player.stream.subtitle.listen((value) {
         if (value.any((line) => line.trim().isNotEmpty)) {
           if (!_subtitleTextSeen) {
@@ -236,9 +226,6 @@ class LibMPV extends BasePlayer {
                 return line.length > 40 ? '${line.substring(0, 40)}…' : line;
               }(),
             });
-            if (_pendingSubtitle != null) {
-              _clearPendingSubtitle();
-            }
           }
         }
       }),
@@ -342,6 +329,7 @@ class LibMPV extends BasePlayer {
     _loadCompleter = Completer<void>();
     _firstLoadAttempt = DateTime.now();
     _subtitleTextSeen = false;
+    _externalSubtitleLoadGen++;
 
     final isOxStreamTs = _isOxStreamRemuxUrl(url);
     // Progressive ox-stream TS: long-lived HTTP read — no 5s reopen on web or Android mpv.
@@ -623,50 +611,56 @@ class LibMPV extends BasePlayer {
     _loadCompleter?.complete();
     _retryTimer?.cancel();
     _retryTimer = null;
-    unawaited(_applyPendingSubtitleTrack());
   }
 
-  void _clearPendingSubtitle() {
-    _pendingSubtitle = null;
-    _pendingSubtitlePlayback = null;
-    _subtitleRetryTimer?.cancel();
-    _subtitleRetryTimer = null;
-  }
+  /// OX: fetch Jellyfin DeliveryUrl in background — prod API ffmpeg-extracts full SRT (30–90s).
+  /// Never await on playback path (was blocking video for 45s+).
+  Future<void> _loadExternalSubtitleInBackground(SubStreamModel wanted, int loadGen) async {
+    final url = wanted.url;
+    if (url == null || url.isEmpty || _player == null) return;
 
-  void _scheduleSubtitleRetry() {
-    _subtitleRetryTimer?.cancel();
-    var attempts = 0;
-    _subtitleRetryTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
-      attempts++;
-      final pending = _pendingSubtitle;
-      final playback = _pendingSubtitlePlayback;
-      if (pending == null || playback == null || _player == null) {
-        timer.cancel();
-        _subtitleRetryTimer = null;
+    await _configureMpvForTextSubtitle(wanted.codec);
+
+    if (OxplayerConfig.isEnabled) {
+      OxplayerStreamLog.event('subtitle_track_external_start', fields: {
+        'url': OxplayerStreamLog.describeUrl(url),
+        'index': wanted.index,
+      });
+    }
+
+    try {
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(minutes: 3));
+      if (loadGen != _externalSubtitleLoadGen || _player == null) return;
+      if (response.statusCode != 200) {
+        OxplayerStreamLog.event('subtitle_track_external_fail', fields: {
+          'status': response.statusCode,
+          'index': wanted.index,
+        });
         return;
       }
-      unawaited(() async {
-        if (await _tryApplyMuxedSubtitleTrack(pending, playback)) {
-          timer.cancel();
-          _subtitleRetryTimer = null;
-          _pendingSubtitle = null;
-          _pendingSubtitlePlayback = null;
-        } else if (attempts >= 120) {
-          timer.cancel();
-          _subtitleRetryTimer = null;
-        }
-      }());
-    });
-  }
+      final text = response.body.trim();
+      if (text.isEmpty || loadGen != _externalSubtitleLoadGen || _player == null) return;
 
-  Future<void> _applyPendingSubtitleTrack() async {
-    final pending = _pendingSubtitle;
-    final playback = _pendingSubtitlePlayback;
-    if (pending == null || playback == null || _player == null) return;
-    if (await _tryApplyMuxedSubtitleTrack(pending, playback)) {
-      _clearPendingSubtitle();
-    } else if (_pendingSubtitle != null) {
-      _scheduleSubtitleRetry();
+      await _player!.setSubtitleTrack(
+        mpv.SubtitleTrack.data(
+          text,
+          title: wanted.displayTitle,
+          language: wanted.language,
+        ),
+      );
+      await _syncLibassSubtitleStyle();
+      OxplayerStreamLog.event('subtitle_track_external', fields: {
+        'url': OxplayerStreamLog.describeUrl(url),
+        'index': wanted.index,
+        'bytes': text.length,
+        'via': 'data',
+      });
+    } catch (error) {
+      if (loadGen != _externalSubtitleLoadGen) return;
+      OxplayerStreamLog.event('subtitle_track_external_fail', fields: {
+        'index': wanted.index,
+        'error': error.runtimeType.toString(),
+      });
     }
   }
 
@@ -684,121 +678,6 @@ class LibMPV extends BasePlayer {
       await native.setProperty('sub-ass', 'no');
       await native.setProperty('sub-visibility', 'yes');
     } catch (_) {}
-  }
-
-  Future<bool> _applyMpvSubtitleByStreamIndex(SubStreamModel wanted) async {
-    if (_player == null || wanted.index < 0 || wanted.isExternal) return false;
-    await _configureMpvForTextSubtitle(wanted.codec);
-    await _player!.setSubtitleTrack(
-      mpv.SubtitleTrack(
-        wanted.index.toString(),
-        wanted.displayTitle,
-        wanted.language,
-        codec: wanted.codec,
-      ),
-    );
-    await _syncLibassSubtitleStyle();
-    OxplayerStreamLog.event('subtitle_track_direct_sid', fields: {
-      'sid': wanted.index,
-      'codec': wanted.codec,
-    });
-    return _subtitleTextSeen;
-  }
-
-  /// Embedded muxed subs from mpv — only real tracks; never treat "no"/"auto" as embedded.
-  List<mpv.SubtitleTrack> _muxedMpvSubtitleTracks() {
-    return subTracks.where(_isRealMpvSubtitleTrack).toList();
-  }
-
-  bool _isRealMpvSubtitleTrack(mpv.SubtitleTrack track) {
-    final id = track.id.toLowerCase().trim();
-    if (id == 'no' || id == 'auto') return false;
-    if (track.uri || track.data) return false;
-    return id.isNotEmpty;
-  }
-
-  bool _subtitleLangFamilyMatch(String a, String b) {
-    const fa = {'fa', 'fas', 'per', 'pes', 'fae'};
-    const en = {'en', 'eng'};
-    final al = a.toLowerCase();
-    final bl = b.toLowerCase();
-    if (fa.contains(al) && fa.contains(bl)) return true;
-    if (en.contains(al) && en.contains(bl)) return true;
-    return al == bl;
-  }
-
-  bool _subtitleTrackMatchesWanted(mpv.SubtitleTrack track, SubStreamModel wanted) {
-    if (track.id == wanted.index.toString()) return true;
-    final wantedLang = wanted.language.trim().toLowerCase();
-    final trackLang = (track.language ?? '').trim().toLowerCase();
-    if (trackLang.isNotEmpty && _subtitleLangFamilyMatch(trackLang, wantedLang)) return true;
-    final title = (track.title ?? '').toLowerCase();
-    if (OxPersianLanguage.isPersianLanguage(wanted.language) &&
-        (OxPersianLanguage.isPersianLanguage(track.language) ||
-            title.contains('persian') ||
-            title.contains('farsi') ||
-            title.contains('فارسی'))) {
-      return true;
-    }
-    return false;
-  }
-
-  mpv.SubtitleTrack? _matchMpvSubtitleTrack(
-    SubStreamModel wanted,
-    List<mpv.SubtitleTrack> muxed,
-    PlaybackModel playbackModel,
-  ) {
-    if (muxed.isEmpty) return null;
-    final byStreamId = muxed.where((t) => t.id == wanted.index.toString()).firstOrNull;
-    if (byStreamId != null) return byStreamId;
-    for (final t in muxed) {
-      if (_subtitleTrackMatchesWanted(t, wanted)) return t;
-    }
-    return null;
-  }
-
-  /// Returns true when mpv accepted an embedded or external subtitle selection.
-  Future<bool> _tryApplyMuxedSubtitleTrack(SubStreamModel wantedSubtitle, PlaybackModel playbackModel) async {
-    if (_player == null) return false;
-    final muxed = _muxedMpvSubtitleTracks();
-    var subTrack = _matchMpvSubtitleTrack(wantedSubtitle, muxed, playbackModel);
-    if (subTrack != null &&
-        (!_isRealMpvSubtitleTrack(subTrack) || !_subtitleTrackMatchesWanted(subTrack, wantedSubtitle))) {
-      subTrack = null;
-    }
-    OxplayerStreamLog.event('subtitle_track_apply', fields: {
-      'wantedIndex': wantedSubtitle.index,
-      'wantedLang': wantedSubtitle.language,
-      'wantedCodec': wantedSubtitle.codec,
-      'mpvSubCount': subTracks.length,
-      'muxedSubCount': muxed.length,
-      'mpvSubIds': subTracks.map((t) => '${t.id}:${t.language ?? ""}').join(';'),
-      'matched': subTrack != null,
-      'matchedId': subTrack?.id,
-    });
-    if (wantedSubtitle.url != null &&
-        wantedSubtitle.url!.isNotEmpty &&
-        (wantedSubtitle.isExternal || wantedSubtitle.supportsExternalStream)) {
-      await _configureMpvForTextSubtitle(wantedSubtitle.codec);
-      await _player?.setSubtitleTrack(mpv.SubtitleTrack.uri(wantedSubtitle.url!));
-      await _syncLibassSubtitleStyle();
-      OxplayerStreamLog.event('subtitle_track_external', fields: {
-        'url': OxplayerStreamLog.describeUrl(wantedSubtitle.url),
-        'index': wantedSubtitle.index,
-      });
-      return true;
-    }
-    if (subTrack != null) {
-      if (!_isRealMpvSubtitleTrack(subTrack)) return false;
-      await _configureMpvForTextSubtitle(wantedSubtitle.codec);
-      await _player?.setSubtitleTrack(subTrack);
-      await _syncLibassSubtitleStyle();
-      return _subtitleTextSeen;
-    }
-    if (!wantedSubtitle.isExternal && wantedSubtitle.index >= 0) {
-      return await _applyMpvSubtitleByStreamIndex(wantedSubtitle);
-    }
-    return false;
   }
 
   @override
@@ -944,7 +823,6 @@ class LibMPV extends BasePlayer {
     if (_player == null) return -1;
     final wantedSubtitle = model ?? playbackModel.defaultSubStream;
     if (wantedSubtitle == null || wantedSubtitle.index == SubStreamModel.no().index) {
-      _clearPendingSubtitle();
       _currentSubtitleCodec = '';
       _currentSubtitleLanguage = '';
       await _player?.setSubtitleTrack(mpv.SubtitleTrack.no());
@@ -954,13 +832,45 @@ class LibMPV extends BasePlayer {
     _currentSubtitleCodec = wantedSubtitle.codec;
     _currentSubtitleLanguage = wantedSubtitle.language;
     _subtitleTextSeen = false;
-    if (await _tryApplyMuxedSubtitleTrack(wantedSubtitle, playbackModel)) {
-      _clearPendingSubtitle();
-    } else {
-      _pendingSubtitle = wantedSubtitle;
-      _pendingSubtitlePlayback = playbackModel;
-      _scheduleSubtitleRetry();
+    _externalSubtitleLoadGen++;
+
+    await _configureMpvForTextSubtitle(wantedSubtitle.codec);
+
+    // Fladder: jellyfin sub stream index → mpv demux list (skips auto/no).
+    final internalTracks =
+        subTracks.length > 2 ? subTracks.getRange(2, subTracks.length).toList() : <mpv.SubtitleTrack>[];
+    final sublistIndex = playbackModel.subStreams?.sublist(1).indexWhere((e) => e.id == wantedSubtitle.id);
+    final subTrack = internalTracks.elementAtOrNull(sublistIndex ?? -1);
+
+    final url = wantedSubtitle.url;
+    final hasUrl = url != null && url.isNotEmpty;
+    final useExternalUri =
+        hasUrl && (wantedSubtitle.isExternal || wantedSubtitle.supportsExternalStream);
+
+    // Fladder demux match; OX uses API DeliveryUrl for HTTP MKV (embedded fa not in mpv demux).
+    if (subTrack != null) {
+      await _player?.setSubtitleTrack(subTrack);
+    } else if (useExternalUri) {
+      final loadGen = _externalSubtitleLoadGen;
+      unawaited(_loadExternalSubtitleInBackground(wantedSubtitle, loadGen));
+    } else if (wantedSubtitle.index >= 0 && !wantedSubtitle.isExternal) {
+      await _player!.setSubtitleTrack(
+        mpv.SubtitleTrack(
+          wantedSubtitle.index.toString(),
+          wantedSubtitle.displayTitle,
+          wantedSubtitle.language,
+          codec: wantedSubtitle.codec,
+        ),
+      );
+      if (OxplayerConfig.isEnabled) {
+        OxplayerStreamLog.event('subtitle_track_direct_sid', fields: {
+          'sid': wantedSubtitle.index,
+          'codec': wantedSubtitle.codec,
+        });
+      }
     }
+
+    await _syncLibassSubtitleStyle();
     return wantedSubtitle.index;
   }
 
