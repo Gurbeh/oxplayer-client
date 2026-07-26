@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/item_base_model.dart';
+import 'package:fladder/util/duration_extensions.dart';
 import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
 import 'package:fladder/oxplayer/oxplayer_api_disk_cache.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
@@ -90,6 +91,74 @@ Future<Map<String, dynamic>?> oxFetchLibraryItemJson(Ref ref, String itemId) asy
   } catch (_) {
     return null;
   }
+}
+
+/// Fresh `GET /Items/{id}` for playback resume — never reads disk SWR first.
+///
+/// SWR can return stale [UserData.playbackPositionTicks]; resume must use server truth.
+Future<ItemBaseModel?> oxFetchFreshItemForPlayback(Ref ref, String itemId) async {
+  if (!OxplayerEnv.isEnabled || itemId.isEmpty) return null;
+  final raw = await oxFetchLibraryItemJson(ref, itemId);
+  if (raw == null) return null;
+  try {
+    final dto = BaseItemDto.fromJsonFactory(raw);
+    return ItemBaseModel.fromBaseDto(dto, ref);
+  } catch (_) {
+    return null;
+  }
+}
+
+/// After playback stop/progress, patch disk SWR so detail resume label matches server.
+Future<void> oxPatchLibraryItemPlaybackInCache(
+  Ref ref,
+  String itemId,
+  Duration position,
+) async {
+  if (!OxplayerEnv.isEnabled || itemId.isEmpty) return;
+
+  final baseUrl = ref.read(serverUrlProvider);
+  final userId = ref.read(userProvider)?.id;
+  if (baseUrl == null || baseUrl.isEmpty || userId == null || userId.isEmpty) return;
+
+  final uri = Uri.parse('$baseUrl/Items/$itemId').replace(
+    queryParameters: {'userId': userId},
+  );
+  final cacheKey = OxplayerApiDiskCache.key(userId: userId, method: 'GET', uri: uri);
+  final entry = await OxplayerApiDiskCache.read(cacheKey);
+  if (entry == null || entry.body.isEmpty) return;
+
+  try {
+    final decoded = jsonDecode(entry.body);
+    if (decoded is! Map<String, dynamic>) return;
+
+    final ticks = position.toRuntimeTicks;
+    final userData = decoded['UserData'];
+    if (userData is Map<String, dynamic>) {
+      userData['PlaybackPositionTicks'] = ticks;
+      final runTimeTicks = decoded['RunTimeTicks'];
+      if (runTimeTicks is num && runTimeTicks > 0) {
+        userData['PlayedPercentage'] = (ticks / runTimeTicks * 100).clamp(0, 100);
+      }
+      userData['Played'] = false;
+    } else {
+      decoded['UserData'] = {
+        'PlaybackPositionTicks': ticks,
+        'Played': false,
+        if (decoded['RunTimeTicks'] is num && (decoded['RunTimeTicks'] as num) > 0)
+          'PlayedPercentage': (ticks / (decoded['RunTimeTicks'] as num) * 100).clamp(0, 100),
+      };
+    }
+
+    await OxplayerApiDiskCache.write(
+      cacheKey,
+      OxplayerApiDiskCacheEntry(
+        savedAt: DateTime.now().toUtc(),
+        statusCode: entry.statusCode,
+        body: jsonEncode(decoded),
+        headers: entry.headers,
+      ),
+    );
+  } catch (_) {}
 }
 
 /// Disk SWR: last successful `GET /Items/{id}` body (survives kill / dispose).

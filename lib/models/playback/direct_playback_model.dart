@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 
 import 'package:collection/collection.dart';
@@ -13,6 +15,8 @@ import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/trick_play_model.dart';
 import 'package:fladder/models/playback/playback_queue_state.dart';
 import 'package:fladder/models/playback/playback_model.dart';
+import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/util/bitrate_helper.dart';
 import 'package:fladder/util/duration_extensions.dart';
@@ -92,6 +96,10 @@ class DirectPlaybackModel extends PlaybackModel {
             positionTicks: stopPosition.toRuntimeTicks,
           ),
         );
+
+    if (OxplayerEnv.isEnabled) {
+      unawaited(oxPatchLibraryItemPlaybackInCache(ref, item.id, stopPosition));
+    }
 
     return null;
   }

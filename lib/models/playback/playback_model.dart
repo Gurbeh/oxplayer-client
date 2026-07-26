@@ -30,6 +30,7 @@ export 'playback_queue_source.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/models/syncing/sync_item.dart';
 import 'package:fladder/models/video_stream_model.dart';
+import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_media_source.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_subtitle.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
@@ -272,9 +273,9 @@ class PlaybackModelHelper {
 
       if (firstItemToPlay == null) return null;
 
-      final fullItemResponse = await api.usersUserIdItemsItemIdGet(itemId: firstItemToPlay.id);
-
-      final fullItem = fullItemResponse.body;
+      final ItemBaseModel? fullItem = OxplayerEnv.isEnabled
+          ? await oxFetchFreshItemForPlayback(ref, firstItemToPlay.id)
+          : (await api.usersUserIdItemsItemIdGet(itemId: firstItemToPlay.id)).body;
 
       if (fullItem == null) {
         return null;
