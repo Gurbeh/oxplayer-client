@@ -1,0 +1,1 @@
+Fix resume position after SWR disk cache
