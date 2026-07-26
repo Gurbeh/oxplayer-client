@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -6,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_detail_unavailable_telemetry.dart';
 import 'package:fladder/providers/items/item_details_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
@@ -55,13 +58,25 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
           currentWidget = widget.item!.detailScreenWidget;
         });
       } else {
-        final response = await ref.read(itemDetailsProvider.notifier).fetchDetails(widget.id);
+        final fetch = await ref.read(itemDetailsProvider.notifier).fetchDetailsWithTrace(widget.id);
         if (context.mounted) {
-          if (response != null) {
+          if (fetch.item != null) {
             setState(() {
-              currentWidget = response.detailScreenWidget;
+              currentWidget = fetch.item!.detailScreenWidget;
             });
           } else {
+            if (OxplayerConfig.isEnabled) {
+              unawaited(
+                OxplayerDetailUnavailableTelemetry.report(
+                  itemId: widget.id,
+                  hadInlineItem: widget.item != null,
+                  fetchTrace: fetch.trace,
+                  fetchAttempts: fetch.attempts,
+                  router: context.router,
+                  lastHttpStatus: fetch.lastHttpStatus,
+                ),
+              );
+            }
             if (OxplayerConfig.isEnabled && context.mounted) {
               FladderSnack.show(context.localized.shareItemUnavailable, context: context);
             }

@@ -35,6 +35,6 @@ Future<bool> oxplayerMaybeNavigateEpisodeToSeries(
 
   if (oxRouterStackHasSeriesDetail(context.router, seriesId)) return false;
 
-  await context.router.push(DetailsRoute(id: seriesId, tag: tag));
+  await context.router.push(DetailsRoute(id: seriesId, item: episode.parentBaseModel, tag: tag));
   return true;
 }

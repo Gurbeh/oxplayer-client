@@ -29,6 +29,7 @@ import 'package:fladder/oxplayer/oxplayer_stream_mpv.dart';
 import 'package:fladder/oxplayer/oxplayer_audio_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_http_auth.dart';
+import 'package:fladder/oxplayer/playback/ox_persian_language.dart';
 import 'package:fladder/oxplayer/playback/ox_subtitle_font.dart';
 import 'package:fladder/providers/settings/subtitle_settings_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
@@ -62,6 +63,10 @@ class LibMPV extends BasePlayer {
   double _preferredVolume = 100;
   int _fadeGeneration = 0;
   bool _isFading = false;
+  SubStreamModel? _pendingSubtitle;
+  PlaybackModel? _pendingSubtitlePlayback;
+  Timer? _subtitleRetryTimer;
+  bool _subtitleTextSeen = false;
 
   void _logAudio(String phase, {Map<String, Object?> fields = const {}}) {
     OxplayerAudioLog.event(phase, fields: {
@@ -154,6 +159,11 @@ class LibMPV extends BasePlayer {
     _player = null;
     _retryTimer?.cancel();
     _retryTimer = null;
+    _subtitleRetryTimer?.cancel();
+    _subtitleRetryTimer = null;
+    _pendingSubtitle = null;
+    _pendingSubtitlePlayback = null;
+    _subtitleTextSeen = false;
   }
 
   void setState(PlayerState state) {
@@ -209,6 +219,27 @@ class LibMPV extends BasePlayer {
           }
           _preferredVolume = clamped;
           setState(lastState.update(volume: clamped));
+        }
+      }),
+      player.stream.tracks.listen((_) {
+        if (_pendingSubtitle != null) {
+          unawaited(_applyPendingSubtitleTrack());
+        }
+      }),
+      player.stream.subtitle.listen((value) {
+        if (value.any((line) => line.trim().isNotEmpty)) {
+          if (!_subtitleTextSeen) {
+            _subtitleTextSeen = true;
+            OxplayerStreamLog.event('subtitle_text_seen', fields: {
+              'preview': () {
+                final line = value.firstWhere((l) => l.trim().isNotEmpty, orElse: () => '').trim();
+                return line.length > 40 ? '${line.substring(0, 40)}…' : line;
+              }(),
+            });
+            if (_pendingSubtitle != null) {
+              _clearPendingSubtitle();
+            }
+          }
         }
       }),
       player.stream.rate.listen((value) => setState(lastState.update(rate: value))),
@@ -310,6 +341,7 @@ class LibMPV extends BasePlayer {
   Future<void> loadVideo(String url, bool play, {Duration startPosition = Duration.zero}) async {
     _loadCompleter = Completer<void>();
     _firstLoadAttempt = DateTime.now();
+    _subtitleTextSeen = false;
 
     final isOxStreamTs = _isOxStreamRemuxUrl(url);
     // Progressive ox-stream TS: long-lived HTTP read — no 5s reopen on web or Android mpv.
@@ -591,6 +623,182 @@ class LibMPV extends BasePlayer {
     _loadCompleter?.complete();
     _retryTimer?.cancel();
     _retryTimer = null;
+    unawaited(_applyPendingSubtitleTrack());
+  }
+
+  void _clearPendingSubtitle() {
+    _pendingSubtitle = null;
+    _pendingSubtitlePlayback = null;
+    _subtitleRetryTimer?.cancel();
+    _subtitleRetryTimer = null;
+  }
+
+  void _scheduleSubtitleRetry() {
+    _subtitleRetryTimer?.cancel();
+    var attempts = 0;
+    _subtitleRetryTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
+      attempts++;
+      final pending = _pendingSubtitle;
+      final playback = _pendingSubtitlePlayback;
+      if (pending == null || playback == null || _player == null) {
+        timer.cancel();
+        _subtitleRetryTimer = null;
+        return;
+      }
+      unawaited(() async {
+        if (await _tryApplyMuxedSubtitleTrack(pending, playback)) {
+          timer.cancel();
+          _subtitleRetryTimer = null;
+          _pendingSubtitle = null;
+          _pendingSubtitlePlayback = null;
+        } else if (attempts >= 120) {
+          timer.cancel();
+          _subtitleRetryTimer = null;
+        }
+      }());
+    });
+  }
+
+  Future<void> _applyPendingSubtitleTrack() async {
+    final pending = _pendingSubtitle;
+    final playback = _pendingSubtitlePlayback;
+    if (pending == null || playback == null || _player == null) return;
+    if (await _tryApplyMuxedSubtitleTrack(pending, playback)) {
+      _clearPendingSubtitle();
+    } else if (_pendingSubtitle != null) {
+      _scheduleSubtitleRetry();
+    }
+  }
+
+  bool _isAssSubtitleCodec(String codec) {
+    final c = codec.toLowerCase();
+    return c.contains('ass') || c.contains('ssa');
+  }
+
+  /// SRT/VTT need Flutter overlay via sub-text; libass sub-ass=yes blocks that on Android.
+  Future<void> _configureMpvForTextSubtitle(String codec) async {
+    if (_player?.platform is! mpv.NativePlayer || !_settings.useLibass) return;
+    if (_isAssSubtitleCodec(codec)) return;
+    final native = _player!.platform as dynamic;
+    try {
+      await native.setProperty('sub-ass', 'no');
+      await native.setProperty('sub-visibility', 'yes');
+    } catch (_) {}
+  }
+
+  Future<bool> _applyMpvSubtitleByStreamIndex(SubStreamModel wanted) async {
+    if (_player == null || wanted.index < 0 || wanted.isExternal) return false;
+    await _configureMpvForTextSubtitle(wanted.codec);
+    await _player!.setSubtitleTrack(
+      mpv.SubtitleTrack(
+        wanted.index.toString(),
+        wanted.displayTitle,
+        wanted.language,
+        codec: wanted.codec,
+      ),
+    );
+    await _syncLibassSubtitleStyle();
+    OxplayerStreamLog.event('subtitle_track_direct_sid', fields: {
+      'sid': wanted.index,
+      'codec': wanted.codec,
+    });
+    return _subtitleTextSeen;
+  }
+
+  /// Embedded muxed subs from mpv — only real tracks; never treat "no"/"auto" as embedded.
+  List<mpv.SubtitleTrack> _muxedMpvSubtitleTracks() {
+    return subTracks.where(_isRealMpvSubtitleTrack).toList();
+  }
+
+  bool _isRealMpvSubtitleTrack(mpv.SubtitleTrack track) {
+    final id = track.id.toLowerCase().trim();
+    if (id == 'no' || id == 'auto') return false;
+    if (track.uri || track.data) return false;
+    return id.isNotEmpty;
+  }
+
+  bool _subtitleLangFamilyMatch(String a, String b) {
+    const fa = {'fa', 'fas', 'per', 'pes', 'fae'};
+    const en = {'en', 'eng'};
+    final al = a.toLowerCase();
+    final bl = b.toLowerCase();
+    if (fa.contains(al) && fa.contains(bl)) return true;
+    if (en.contains(al) && en.contains(bl)) return true;
+    return al == bl;
+  }
+
+  bool _subtitleTrackMatchesWanted(mpv.SubtitleTrack track, SubStreamModel wanted) {
+    if (track.id == wanted.index.toString()) return true;
+    final wantedLang = wanted.language.trim().toLowerCase();
+    final trackLang = (track.language ?? '').trim().toLowerCase();
+    if (trackLang.isNotEmpty && _subtitleLangFamilyMatch(trackLang, wantedLang)) return true;
+    final title = (track.title ?? '').toLowerCase();
+    if (OxPersianLanguage.isPersianLanguage(wanted.language) &&
+        (OxPersianLanguage.isPersianLanguage(track.language) ||
+            title.contains('persian') ||
+            title.contains('farsi') ||
+            title.contains('فارسی'))) {
+      return true;
+    }
+    return false;
+  }
+
+  mpv.SubtitleTrack? _matchMpvSubtitleTrack(
+    SubStreamModel wanted,
+    List<mpv.SubtitleTrack> muxed,
+    PlaybackModel playbackModel,
+  ) {
+    if (muxed.isEmpty) return null;
+    final byStreamId = muxed.where((t) => t.id == wanted.index.toString()).firstOrNull;
+    if (byStreamId != null) return byStreamId;
+    for (final t in muxed) {
+      if (_subtitleTrackMatchesWanted(t, wanted)) return t;
+    }
+    return null;
+  }
+
+  /// Returns true when mpv accepted an embedded or external subtitle selection.
+  Future<bool> _tryApplyMuxedSubtitleTrack(SubStreamModel wantedSubtitle, PlaybackModel playbackModel) async {
+    if (_player == null) return false;
+    final muxed = _muxedMpvSubtitleTracks();
+    var subTrack = _matchMpvSubtitleTrack(wantedSubtitle, muxed, playbackModel);
+    if (subTrack != null &&
+        (!_isRealMpvSubtitleTrack(subTrack) || !_subtitleTrackMatchesWanted(subTrack, wantedSubtitle))) {
+      subTrack = null;
+    }
+    OxplayerStreamLog.event('subtitle_track_apply', fields: {
+      'wantedIndex': wantedSubtitle.index,
+      'wantedLang': wantedSubtitle.language,
+      'wantedCodec': wantedSubtitle.codec,
+      'mpvSubCount': subTracks.length,
+      'muxedSubCount': muxed.length,
+      'mpvSubIds': subTracks.map((t) => '${t.id}:${t.language ?? ""}').join(';'),
+      'matched': subTrack != null,
+      'matchedId': subTrack?.id,
+    });
+    if (wantedSubtitle.url != null &&
+        wantedSubtitle.url!.isNotEmpty &&
+        (wantedSubtitle.isExternal || wantedSubtitle.supportsExternalStream)) {
+      await _configureMpvForTextSubtitle(wantedSubtitle.codec);
+      await _player?.setSubtitleTrack(mpv.SubtitleTrack.uri(wantedSubtitle.url!));
+      await _syncLibassSubtitleStyle();
+      OxplayerStreamLog.event('subtitle_track_external', fields: {
+        'url': OxplayerStreamLog.describeUrl(wantedSubtitle.url),
+        'index': wantedSubtitle.index,
+      });
+      return true;
+    }
+    if (subTrack != null) {
+      if (!_isRealMpvSubtitleTrack(subTrack)) return false;
+      await _configureMpvForTextSubtitle(wantedSubtitle.codec);
+      await _player?.setSubtitleTrack(subTrack);
+      await _syncLibassSubtitleStyle();
+      return _subtitleTextSeen;
+    }
+    if (!wantedSubtitle.isExternal && wantedSubtitle.index >= 0) {
+      return await _applyMpvSubtitleByStreamIndex(wantedSubtitle);
+    }
+    return false;
   }
 
   @override
@@ -736,6 +944,7 @@ class LibMPV extends BasePlayer {
     if (_player == null) return -1;
     final wantedSubtitle = model ?? playbackModel.defaultSubStream;
     if (wantedSubtitle == null || wantedSubtitle.index == SubStreamModel.no().index) {
+      _clearPendingSubtitle();
       _currentSubtitleCodec = '';
       _currentSubtitleLanguage = '';
       await _player?.setSubtitleTrack(mpv.SubtitleTrack.no());
@@ -744,15 +953,14 @@ class LibMPV extends BasePlayer {
     }
     _currentSubtitleCodec = wantedSubtitle.codec;
     _currentSubtitleLanguage = wantedSubtitle.language;
-    final internalTrack = subTracks.getRange(2, subTracks.length).toList();
-    final index = playbackModel.subStreams?.sublist(1).indexWhere((element) => element.id == wantedSubtitle.id);
-    final subTrack = internalTrack.elementAtOrNull(index ?? -1);
-    if (wantedSubtitle.isExternal && wantedSubtitle.url != null && subTrack == null) {
-      await _player?.setSubtitleTrack(mpv.SubtitleTrack.uri(wantedSubtitle.url!));
-    } else if (subTrack != null) {
-      await _player?.setSubtitleTrack(subTrack);
+    _subtitleTextSeen = false;
+    if (await _tryApplyMuxedSubtitleTrack(wantedSubtitle, playbackModel)) {
+      _clearPendingSubtitle();
+    } else {
+      _pendingSubtitle = wantedSubtitle;
+      _pendingSubtitlePlayback = playbackModel;
+      _scheduleSubtitleRetry();
     }
-    await _syncLibassSubtitleStyle();
     return wantedSubtitle.index;
   }
 
@@ -771,6 +979,11 @@ class LibMPV extends BasePlayer {
       if (!hasSubtitle || settings == null) {
         await native.setProperty('sub-ass-override', 'no');
         await native.setProperty('sub-ass-force-style', '');
+        return;
+      }
+      if (!_isAssSubtitleCodec(_currentSubtitleCodec)) {
+        await native.setProperty('sub-ass', 'no');
+        await native.setProperty('sub-visibility', 'yes');
         return;
       }
       await native.setProperty('sub-ass-override', 'force');
