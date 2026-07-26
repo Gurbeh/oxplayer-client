@@ -1,0 +1,1 @@
+Subtitle retry on play and more reliable detail screen loading
