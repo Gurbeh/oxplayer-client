@@ -88,4 +88,17 @@ void main() {
     expect(seasons.first.seasonNumber, 1);
     expect(seasons.last.seasonNumber, 2);
   });
+
+  test('oxSeriesPickerSeasons omits seasons without playable episodes', () {
+    final playable = _episode(id: 'ep-1', episode: 1);
+    final missing = _episode(id: 'ep-2', episode: 1).copyWith(
+      season: 2,
+      location: ItemLocation.virtual,
+    );
+    final series = _series(episodes: [playable, missing]);
+
+    final seasons = oxSeriesPickerSeasons(series);
+    expect(seasons.length, 1);
+    expect(seasons.single.seasonNumber, 1);
+  });
 }

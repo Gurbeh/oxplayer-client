@@ -394,30 +394,47 @@ class OverviewHeader extends ConsumerWidget {
               Flexible(
                 child: FocusRow(
                   ensureVisibleAlignment: 1.0,
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      mainButton,
-                      if (mediaStreamHelper != null)
-                        Row(
-                          spacing: 4,
+                  child: OxplayerConfig.isEnabled &&
+                          AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad
+                      ? Row(
                           mainAxisSize: MainAxisSize.min,
-                          children: streamOptionsButtons,
+                          spacing: 8,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            if (mainButton != null) mainButton!,
+                            if (mediaStreamHelper != null)
+                              Row(
+                                spacing: 4,
+                                mainAxisSize: MainAxisSize.min,
+                                children: streamOptionsButtons,
+                              ),
+                            if (centerButtons != null) centerButtons!,
+                          ],
+                        )
+                      : Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            mainButton,
+                            if (mediaStreamHelper != null)
+                              Row(
+                                spacing: 4,
+                                mainAxisSize: MainAxisSize.min,
+                                children: streamOptionsButtons,
+                              ),
+                            centerButtons,
+                          ].nonNulls.toList().addInBetween(
+                                Container(
+                                  width: 4,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.onSurface.withAlpha(64),
+                                    borderRadius: FladderTheme.smallShape.borderRadius,
+                                  ),
+                                ),
+                              ),
                         ),
-                      centerButtons,
-                    ].nonNulls.toList().addInBetween(
-                          Container(
-                            width: 4,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.onSurface.withAlpha(64),
-                              borderRadius: FladderTheme.smallShape.borderRadius,
-                            ),
-                          ),
-                        ),
-                  ),
                 ),
               ),
           ],

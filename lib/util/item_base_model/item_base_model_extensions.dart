@@ -16,6 +16,7 @@ import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_follow_action.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_user_data.dart';
 import 'package:fladder/oxplayer/oxplayer_watchlist_action.dart';
 import 'package:fladder/oxplayer/oxplayer_media_issue_action.dart';
 import 'package:fladder/oxplayer/oxplayer_share_action.dart';
@@ -148,6 +149,12 @@ extension ItemBaseModelExtensions on ItemBaseModel {
     final oxEnabled = OxplayerConfig.isEnabled;
     final oxFavorite = oxEnabled ? ref.watch(oxItemFlagsProvider.select((s) => s.isFavorite(id))) : userData.isFavourite;
     final oxPlayed = oxEnabled ? ref.watch(oxItemFlagsProvider.select((s) => s.isPlayed(id))) : userData.played;
+    final oxShowBothMarkActions = oxEnabled &&
+        (oxplayerIsActivePlaybackItem(ref, id) || (userData.progress > 0 && !userData.played));
+    void applyMarkUserData(UserData? newData) {
+      onUserDataChanged?.call(newData);
+      if (oxEnabled) oxplayerSyncPlaybackUserData(ref, id, newData);
+    }
     final ItemAction? parentAction = switch (this) {
       EpisodeModel _ => !exclude.contains(ItemActions.openShow)
           ? ItemActionButton(
@@ -261,27 +268,29 @@ extension ItemBaseModelExtensions on ItemBaseModel {
             label: Text(context.localized.addToPlaylist),
           ),
       if (showMarkAs) ...[
-        if (!exclude.contains(ItemActions.markPlayed) && (!oxEnabled || !oxPlayed))
+        if (!exclude.contains(ItemActions.markPlayed) &&
+            (!oxEnabled || !oxPlayed || oxShowBothMarkActions))
           ItemActionButton(
             icon: const Icon(IconsaxPlusLinear.eye),
             action: () async {
               try {
                 final userData = await ref.read(userProvider.notifier).markAsPlayed(true, id);
-                onUserDataChanged?.call(userData?.bodyOrThrow);
+                applyMarkUserData(userData?.bodyOrThrow);
               } finally {
                 context.refreshData();
               }
             },
             label: Text(context.localized.markAsWatched),
           ),
-        if (!exclude.contains(ItemActions.markUnplayed) && (!oxEnabled || oxPlayed))
+        if (!exclude.contains(ItemActions.markUnplayed) &&
+            (!oxEnabled || oxPlayed || oxShowBothMarkActions))
           ItemActionButton(
             icon: const Icon(IconsaxPlusLinear.eye_slash),
             label: Text(context.localized.markAsUnwatched),
             action: () async {
               try {
                 final userData = await ref.read(userProvider.notifier).markAsPlayed(false, id);
-                onUserDataChanged?.call(userData?.bodyOrThrow);
+                applyMarkUserData(userData?.bodyOrThrow);
               } finally {
                 context.refreshData();
               }

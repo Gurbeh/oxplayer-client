@@ -16,6 +16,7 @@ import 'package:fladder/oxplayer/oxplayer_media_variant.dart';
 import 'package:fladder/oxplayer/ox_series_episode_actions.dart';
 import 'package:fladder/oxplayer/ox_series_selected_episode.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/widgets/ox_detail_action_layout.dart';
 import 'package:fladder/oxplayer/widgets/ox_series_detail_play_buttons.dart';
 import 'package:fladder/oxplayer/widgets/ox_series_episode_picker_button.dart';
 import 'package:fladder/oxplayer/widgets/ox_series_request_button.dart';
@@ -156,11 +157,8 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                             },
                           )
                         : null,
-                    centerButtons: Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
+                    centerButtons: OxDetailActionLayout(
                       alignment: wrapAlignment,
-                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         SelectableIconButton(
                           onPressed: () async {

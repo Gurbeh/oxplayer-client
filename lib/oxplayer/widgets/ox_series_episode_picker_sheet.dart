@@ -33,6 +33,7 @@ class _OxSeriesEpisodePickerSheetState extends ConsumerState<OxSeriesEpisodePick
   late final List<OxSeriesPickerSeason> _seasons = oxSeriesPickerSeasons(widget.series);
   late final AnimationController _slideController;
   late final Animation<double> _slideCurve;
+  final FocusNode _firstEpisodeFocus = FocusNode();
   OxSeriesPickerSeason? _selectedSeason;
 
   @override
@@ -44,13 +45,24 @@ class _OxSeriesEpisodePickerSheetState extends ConsumerState<OxSeriesEpisodePick
     if (_seasons.length == 1) {
       _selectedSeason = _seasons.first;
       _slideController.value = 1;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _focusFirstEpisode());
     }
   }
 
   @override
   void dispose() {
+    _firstEpisodeFocus.dispose();
     _slideController.dispose();
     super.dispose();
+  }
+
+  void _focusFirstEpisode() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_firstEpisodeFocus.canRequestFocus) {
+        _firstEpisodeFocus.requestFocus();
+      }
+    });
   }
 
   void _scrollSheetToTop() {
@@ -69,7 +81,9 @@ class _OxSeriesEpisodePickerSheetState extends ConsumerState<OxSeriesEpisodePick
     setState(() => _selectedSeason = season);
     _scrollSheetToTop();
     _slideController.forward(from: 0).whenComplete(() {
-      if (mounted) _scrollSheetToTop();
+      if (!mounted) return;
+      _scrollSheetToTop();
+      _focusFirstEpisode();
     });
   }
 
@@ -127,11 +141,7 @@ class _OxSeriesEpisodePickerSheetState extends ConsumerState<OxSeriesEpisodePick
                 title: showEpisodeHeader
                     ? _seasonListTitle(context, _selectedSeason!)
                     : l10n.season(_seasons.length),
-                subtitle: showEpisodeHeader
-                    ? l10n.select
-                    : l10n.episode(
-                        _seasons.fold<int>(0, (sum, season) => sum + season.episodes.length),
-                      ),
+                subtitle: showEpisodeHeader ? l10n.select : null,
                 showBack: _seasons.length > 1 && _slideController.value > 0,
                 onBack: _backToSeasons,
               );
@@ -203,7 +213,7 @@ class _OxSeriesEpisodePickerSheetState extends ConsumerState<OxSeriesEpisodePick
             final episode = entry.value;
             final playable = episode.playAble;
             return FocusButton(
-              autoFocus: entry.key == 0 && _slideController.value == 1,
+              focusNode: entry.key == 0 ? _firstEpisodeFocus : null,
               onTap: playable ? () => _playEpisode(episode) : null,
               borderRadius: FladderTheme.largeShape.borderRadius,
               child: ListTile(
@@ -256,13 +266,13 @@ class _SlidePanel extends StatelessWidget {
 
 class _PickerHeader extends StatelessWidget {
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final bool showBack;
   final VoidCallback onBack;
 
   const _PickerHeader({
     required this.title,
-    required this.subtitle,
+    this.subtitle,
     required this.showBack,
     required this.onBack,
   });
@@ -294,8 +304,8 @@ class _PickerHeader extends StatelessWidget {
                   duration: const Duration(milliseconds: 220),
                   switchInCurve: Curves.easeOut,
                   switchOutCurve: Curves.easeIn,
-                  child: Column(
-                    key: ValueKey('$title|$subtitle'),
+                    child: Column(
+                    key: ValueKey('$title|${subtitle ?? ''}'),
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
@@ -304,14 +314,16 @@ class _PickerHeader extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w600,
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle!,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),

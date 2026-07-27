@@ -13,6 +13,7 @@ import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
 import 'package:fladder/oxplayer/oxplayer_media_variant.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/widgets/ox_detail_action_layout.dart';
 import 'package:fladder/oxplayer/widgets/ox_movie_boxset_row.dart';
 import 'package:fladder/oxplayer/widgets/ox_movie_request_button.dart';
 import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
@@ -127,11 +128,8 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                                 prominent: true,
                               )
                             : null,
-                    centerButtons: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                    centerButtons: OxDetailActionLayout(
                       alignment: wrapAlignment,
-                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         SelectableIconButton(
                           onPressed: () async {

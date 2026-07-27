@@ -31,15 +31,19 @@ List<OxSeriesPickerSeason> oxSeriesPickerSeasons(SeriesModel series) {
   if (episodes.isEmpty) return const [];
 
   final bySeason = episodes.episodesBySeason;
-  return bySeason.entries.map((entry) {
-    final seasonMeta = series.seasons?.firstWhereOrNull((season) => season.season == entry.key);
-    final name = _oxPickerSeasonName(seasonMeta, entry.key);
-    return OxSeriesPickerSeason(
-      seasonNumber: entry.key,
-      name: name,
-      episodes: entry.value,
-    );
-  }).toList();
+  return bySeason.entries
+      .map((entry) {
+        final seasonMeta = series.seasons?.firstWhereOrNull((season) => season.season == entry.key);
+        final name = _oxPickerSeasonName(seasonMeta, entry.key);
+        final seasonEpisodes = entry.value.where((episode) => episode.playAble).toList();
+        return OxSeriesPickerSeason(
+          seasonNumber: entry.key,
+          name: name,
+          episodes: seasonEpisodes,
+        );
+      })
+      .where((season) => season.episodes.isNotEmpty)
+      .toList();
 }
 
 String _oxPickerSeasonName(SeasonModel? seasonMeta, int seasonNumber) {
