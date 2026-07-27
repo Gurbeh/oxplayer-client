@@ -16,6 +16,7 @@ import 'package:fladder/oxplayer/oxplayer_media_variant.dart';
 import 'package:fladder/oxplayer/ox_series_episode_actions.dart';
 import 'package:fladder/oxplayer/ox_series_selected_episode.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/widgets/ox_series_episode_picker_button.dart';
 import 'package:fladder/oxplayer/widgets/ox_series_request_button.dart';
 import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
@@ -60,6 +61,8 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
         AdaptiveLayout.viewSizeOf(context) != ViewSize.phone ? WrapAlignment.start : WrapAlignment.center;
 
     final selectedEpisode = oxSeriesSelectedEpisode(ref, details);
+    final needsEpisodePicker =
+        OxplayerConfig.isEnabled && oxSeriesNeedsEpisodePick(details) && selectedEpisode == null;
     final currentEpisode = oxSeriesDetailPlayTarget(details, selectedEpisode: selectedEpisode);
 
     return DetailScaffold(
@@ -91,9 +94,17 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                   OverviewHeader(
                     name: details.name,
                     image: details.images,
-                    mainButton: currentEpisode != null &&
-                            (!OxplayerConfig.isEnabled || currentEpisode.playAble)
-                        ? MediaPlayButton(
+                    mainButton: needsEpisodePicker
+                        ? OxSeriesEpisodePickerButton(
+                            series: details,
+                            onEpisodePlayed: () {
+                              if (!mounted) return;
+                              ref.read(providerId.notifier).fetchDetails(widget.item);
+                            },
+                          )
+                        : currentEpisode != null &&
+                                (!OxplayerConfig.isEnabled || currentEpisode.playAble)
+                            ? MediaPlayButton(
                             item: currentEpisode,
                             onPressed: (restart) async {
                               await currentEpisode.play(

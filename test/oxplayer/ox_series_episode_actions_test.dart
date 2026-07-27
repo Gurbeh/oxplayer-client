@@ -67,4 +67,25 @@ void main() {
 
     expect(oxSeriesDetailPlayTarget(series)?.id, 'ep-1');
   });
+
+  test('oxSeriesDetailPlayTarget returns null until user picks on fresh series', () {
+    final ep1 = _episode(id: 'ep-1', episode: 1);
+    final ep2 = _episode(id: 'ep-2', episode: 2);
+    final series = _series(episodes: [ep1, ep2]);
+
+    expect(oxSeriesNeedsEpisodePick(series), isTrue);
+    expect(oxSeriesDetailPlayTarget(series), isNull);
+    expect(oxSeriesDetailPlayTarget(series, selectedEpisode: ep2)?.id, 'ep-2');
+  });
+
+  test('oxSeriesPickerSeasons groups episodes by season', () {
+    final ep1 = _episode(id: 'ep-1', episode: 1);
+    final ep2 = _episode(id: 'ep-2', episode: 1).copyWith(season: 2);
+    final series = _series(episodes: [ep1, ep2]);
+
+    final seasons = oxSeriesPickerSeasons(series);
+    expect(seasons.length, 2);
+    expect(seasons.first.seasonNumber, 1);
+    expect(seasons.last.seasonNumber, 2);
+  });
 }

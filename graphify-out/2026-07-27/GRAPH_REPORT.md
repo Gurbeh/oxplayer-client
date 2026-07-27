@@ -1,16 +1,16 @@
-# Graph Report - oxplayer-client  (2026-07-27)
+# Graph Report - oxplayer-client  (2026-07-24)
 
 ## Corpus Check
-- 1214 files · ~2,745,372 words
+- 1207 files · ~2,741,909 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 19690 nodes · 32123 edges · 692 communities (479 shown, 213 thin omitted)
+- 19580 nodes · 31932 edges · 714 communities (505 shown, 209 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 425 edges (avg confidence: 0.59)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `676942e7`
+- Built from commit: `6ba13a02`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -424,11 +424,14 @@
 - FlutterStandardWriter
 - translations_pigeon.dart
 - services/battery_optimization.dart
+- flat_button.dart
 - Paragraph.tsx
 - Screensaver
 - SegmentType
 - MediaSegmentType
 - JellyfinOpenApi
+- SeerrUserModel
+- double get
 - caveman-commit
 - caveman-review
 - caveman-commit
@@ -436,15 +439,20 @@
 - lock_screen.dart
 - ox_labeled_iran_flag.dart
 - sync_item_poster.dart
+- home_screen.dart
 - ofRaw
 - PlayerOrientations
 - SegmentSkip
 - details_screens.dart
 - AudioAndSubStreamModel
+- oxplayer_stream_log.dart
 - Flathub shared modules
 - jelly_id.dart
 - oxplayer_login_logo.dart
 - Duration
+- video_subtitle_controls.dart
+- control_users_create.dart
+- default_title_bar.dart
 - prefetch_libmpv_android.sh
 - oxplayer_route_hints.dart
 - 🚀 Fladder Dev Setup
@@ -473,8 +481,16 @@
 - ox_hls_web_buffer_config.dart
 - sync_provider_paths_stub.dart
 - resolution_checker.dart
+- splash_screen.dart
+- playback_options_dialogue.dart
+- normalize_url.dart
 - filled_button_await.dart
 - oxplayer_seerr_bootstrap.dart
+- oxplayer_sentry_user_sync.dart
+- settings_list_group.dart
+- video_player_speed_indicator.dart
+- GlobalKey?
+- small_detail_widgets.dart
 - fab_extended_anim.dart
 - hover_widget.dart
 - create_dmg.sh
@@ -664,11 +680,17 @@
 - VideoPlayerListenerCallback
 - caveman-stats
 - PULL_REQUEST_TEMPLATE.md
+- seerr_json_converter.dart
+- watched_state.dart
 - How to Contribute
 - OXPlayer marketing site
+- ClientSettingsModel
+- VideoPlayerSettingsModel
 - AGENTS.md
+- BoxFit
 - vorbisgain/README.md
 - LaunchImage.imageset/README.md
+- AllowedOrientations
 - ox_media_play_button_skeleton.dart
 - PhotoViewerRoute
 
@@ -699,11 +721,11 @@
 ## Import Cycles
 - None detected.
 
-## Communities (692 total, 213 thin omitted)
+## Communities (714 total, 209 thin omitted)
 
 ### Community 0 - "jellyfin_open_api.swagger.dart"
 Cohesion: 0.00
-Nodes (3256): _, definitionType, client_mapping.dart, jellyfin_open_api.enums.swagger.dart, accessSchedules, accessToken, action, activityLogRetentionDays (+3248 more)
+Nodes (3257): _, definitionType, client_mapping.dart, jellyfin_open_api.enums.swagger.dart, accessSchedules, accessToken, action, activityLogRetentionDays (+3249 more)
 
 ### Community 1 - "@GET"
 Cohesion: 0.01
@@ -711,11 +733,11 @@ Nodes (256): @GET, albumsItemIdInstantMixGet, albumsItemIdSimilarGet, artistsAlb
 
 ### Community 2 - "seerr_models.dart"
 Cohesion: 0.01
-Nodes (325): @Freezed, avatar, certificationGte, certificationLte, class, displayName, downloadStatus, downloadStatus4k (+317 more)
+Nodes (279): avatar, certificationGte, certificationLte, class, displayName, downloadStatus, downloadStatus4k, freeSpace (+271 more)
 
 ### Community 3 - "drift_worker.dart.js"
 Cohesion: 0.01
-Nodes (86): a6(), aC(), aI(), bx(), bZ(), c0(), cB(), cM() (+78 more)
+Nodes (84): a6(), aC(), aI(), bx(), bZ(), c0(), cB(), cM() (+76 more)
 
 ### Community 4 - "@JsonSerializable"
 Cohesion: 0.01
@@ -723,31 +745,31 @@ Nodes (251): @JsonSerializable, AccessSchedule, ActivityLogEntry, ActivityLogEnt
 
 ### Community 5 - "tv_poster_row.dart"
 Cohesion: 0.04
-Nodes (50): double?, PersonKind, PlayAccess, canDelete, canDownload, childCount, collectionType, copyWith (+42 more)
+Nodes (52): autoFocus, _basePosterHeight, build, contentPadding, createState, didUpdateWidget, focused, _hasFocus (+44 more)
 
 ### Community 6 - "package:iconsax_plus/iconsax_plus.dart"
-Cohesion: 0.02
-Nodes (198): ChannelDetailsProvider get, SeerrMediaStatus, creds, oxplayerCanReportMediaIssue, oxplayerMediaIssueActions, user, autoFocus, build (+190 more)
+Cohesion: 0.01
+Nodes (181): ChannelDetailsProvider get, ImageProvider?, Person, SeerrMediaStatus, oxLibraryDetailLabels, oxSeerrRatingLabels, build, OxplayerLoginBotActions (+173 more)
 
 ### Community 7 - "package:flutter_riverpod/flutter_riverpod.dart"
 Cohesion: 0.02
-Nodes (187): LibraryOptions, LibraryOptionsResultDto, UserPolicy, VirtualFolderInfo, homePreferencesProvider, build, ControlLibrariesPage, BasicOptionsSection (+179 more)
+Nodes (166): LibraryOptions, LibraryOptionsResultDto, UserPolicy, VirtualFolderInfo, account, _confirmDeleteAccount, confirmed, link (+158 more)
 
 ### Community 8 - "jellyfin_open_api.enums.swagger.dart"
 Cohesion: 0.01
-Nodes (203): ArtistsNameImagesImageTypeImageIndexGetFormat, ArtistsNameImagesImageTypeImageIndexGetImageType, ArtistsNameImagesImageTypeImageIndexHeadFormat, ArtistsNameImagesImageTypeImageIndexHeadImageType, AudioItemIdHls1PlaylistIdSegmentIdContainerGetContext, AudioItemIdHls1PlaylistIdSegmentIdContainerGetSubtitleMethod, AudioItemIdMainM3u8GetContext, AudioItemIdMainM3u8GetSubtitleMethod (+195 more)
+Nodes (201): ArtistsNameImagesImageTypeImageIndexGetFormat, ArtistsNameImagesImageTypeImageIndexGetImageType, ArtistsNameImagesImageTypeImageIndexHeadFormat, ArtistsNameImagesImageTypeImageIndexHeadImageType, AudioItemIdHls1PlaylistIdSegmentIdContainerGetContext, AudioItemIdHls1PlaylistIdSegmentIdContainerGetSubtitleMethod, AudioItemIdMainM3u8GetContext, AudioItemIdMainM3u8GetSubtitleMethod (+193 more)
 
 ### Community 9 - "package:flutter/material.dart"
-Cohesion: 0.04
-Nodes (53): header, build, createState, _developerModeUnlocked, initState, _loadDeveloperMode, OxplayerAboutSettingsPage, _OxplayerAboutSettingsPageState (+45 more)
+Cohesion: 0.06
+Nodes (37): header, build, createState, _developerModeUnlocked, initState, _loadDeveloperMode, OxplayerAboutSettingsPage, _OxplayerAboutSettingsPageState (+29 more)
 
 ### Community 10 - "@POST"
 Cohesion: 0.01
 Nodes (141): @POST, audioItemIdLyricsPost, audioItemIdRemoteSearchLyricsLyricIdPost, authKeysPost, backupCreatePost, backupRestorePost, brandingSplashscreenPost, clientLogDocumentPost (+133 more)
 
 ### Community 11 - "login_screen_credentials.dart"
-Cohesion: 0.04
-Nodes (68): _backToAccountGrid, _bootstrap, _bootstrapError, _bootstrapping, build, _consumeSystemBack, createState, _editUsersMode (+60 more)
+Cohesion: 0.05
+Nodes (44): _deviceId, authProvider, authLink, build, createState, authLinkData, build, createState (+36 more)
 
 ### Community 12 - "service_provider.dart"
 Cohesion: 0.02
@@ -759,23 +781,19 @@ Nodes (124): AudioTrack, Chapter, a, AudioTrack, audioTracks, backgroundColor, b
 
 ### Community 14 - "media_control_wrapper.dart"
 Cohesion: 0.02
-Nodes (104): BaseAudioHandler, addToTemporaryQueue, _applyQueueItem, _applyReplayGain, audioQueueForDisplay, AudioQueueHandler, clearTemporaryQueue, _disableRepeatOneForSkip (+96 more)
+Nodes (117): BaseAudioHandler, _playPlaylistMusic, _playPlaylistVideos, addToTemporaryQueue, _applyQueueItem, _applyReplayGain, audioQueueForDisplay, AudioQueueHandler (+109 more)
 
 ### Community 15 - "video_player_controls.dart"
 Cohesion: 0.03
-Nodes (127): _playPlaylistMusic, _playPlaylistVideos, setAudioRepeatMode, setShuffleEnabled, _tryRefillAudioQueue, onWindowEnterFullScreen, onWindowLeaveFullScreen, PlaybackModelHelper (+119 more)
+Nodes (117): setAudioRepeatMode, setShuffleEnabled, _tryRefillAudioQueue, onWindowEnterFullScreen, onWindowLeaveFullScreen, shouldReload, videoProfileProvider, playbackRateProvider (+109 more)
 
 ### Community 16 - "package:fladder/widgets/shared/item_actions.dart"
-Cohesion: 0.03
-Nodes (72): info,
-  warning,, ListingsProviderInfo, TunerHostInfo, build, onEpisodePlayed, _openPicker, OxSeriesEpisodePickerButton, series (+64 more)
+Cohesion: 0.02
+Nodes (115): ItemsItemIdRefreshPostImageRefreshMode? get, ItemsItemIdRefreshPostMetadataRefreshMode? get, api, fromDto, imageRefreshMode, ItemLocation, label, MetadataRefresh (+107 more)
 
 ### Community 17 - "package:auto_route/auto_route.dart"
-Cohesion: 0.02
-Nodes (95): dashboard,
-  library,
-  favorites,
-  seerr,, DirectionalFocusIntent, IconData get, GlobalHotKeys, HomeTabs, icon, label, navigate (+87 more)
+Cohesion: 0.07
+Nodes (27): actionButton, currentLocation, destinations, isExpanded, NestedNavigationDrawer, views, actionButton, child (+19 more)
 
 ### Community 18 - "pigeons/video_player.dart"
 Cohesion: 0.02
@@ -783,91 +801,88 @@ Nodes (104): @async, MediaInfo, AudioTrack, audioTracks, backgroundColor, buffer
 
 ### Community 19 - "r"
 Cohesion: 0.04
-Nodes (76): $3(), $5(), aO(), aV(), aZ(), bb(), bd(), bF() (+68 more)
+Nodes (66): $3(), $5(), aO(), aZ(), bb(), bd(), c3(), cR() (+58 more)
 
 ### Community 20 - "List"
 Cohesion: 0.01
-Nodes (187): EdgeInsets, ItemBaseModel? item,
-  bool, oxMovieBoxSetSiblingsProvider, build, contentPadding, itemId, OxMovieBoxSetRow, build (+179 more)
+Nodes (255): ConsumerWidget, dart:collection, EdgeInsets, ItemBaseModel? item,
+  bool, oxMovieBoxSetSiblingsProvider, build, item, OxDetailLoadingContent (+247 more)
 
 ### Community 21 - "dashboard_screen.dart"
 Cohesion: 0.02
-Nodes (102): GlobalKey?, ViewModel, allOrderableIds, dashboardRowIds, favoritesId, _insertRowIfMissing, isDashboardRowId, label (+94 more)
+Nodes (116): CollectionType, PlayAccess, aspectRatio, CollectionTypeExtension, defaultFilters, getIconType, canDelete, canDownload (+108 more)
 
 ### Community 22 - "library_search_screen.dart"
 Cohesion: 0.02
-Nodes (131): dateAdded,
-  tags,
-  releaseDate,
-  rating,, Key get, ItemFilter, FladderItemType, Studio, 0, descending, GroupBy (+123 more)
+Nodes (102): Key get, librarySearchProvider, searchProvider, build, createState, debouncer, didUpdateWidget, favourites (+94 more)
 
 ### Community 23 - "database_item.dart"
 Cohesion: 0.03
 Nodes (79): BoolColumn get, _, actualTableName, _alias, aliasedName, allSchemaEntities, allTables, attachedDatabase (+71 more)
 
 ### Community 24 - "ConsumerStatefulWidget"
-Cohesion: 0.03
-Nodes (82): @RoutePage, ConsumerStatefulWidget, build, OxplayerHelpScreen, OxplayerPlaybackDiagRunner, build, _cancel, _copy (+74 more)
+Cohesion: 0.02
+Nodes (115): @RoutePage, ConsumerStatefulWidget, ItemCounts, build, _openErrorLogs, OxplayerDeveloperModeScreen, _sendSentryTest, _triggerCrashlyticsTest (+107 more)
 
 ### Community 25 - "oxplayer_home_feed.dart"
 Cohesion: 0.03
-Nodes (79): copyWith, dashboardViews, loaded, loading, views, ViewsModel, allResume, build (+71 more)
+Nodes (75): HomeModel, copyWith, dashboardViews, loaded, loading, views, ViewsModel, oxSeriesPlayableNextUp (+67 more)
 
 ### Community 26 - "lib_mpv.dart"
 Cohesion: 0.02
-Nodes (87): AudioTrack get, Completer, addToPlaylist, applyReplayGainForItem, _applyReplayGainSettings, applySubtitleSettings, audioTrack, audioTracks (+79 more)
+Nodes (82): AudioTrack get, Completer, addToPlaylist, applyReplayGainForItem, _applyReplayGainSettings, applySubtitleSettings, audioTrack, audioTracks (+74 more)
 
 ### Community 27 - "package:fladder/jellyfin/jellyfin_open_api.swagger.dart"
-Cohesion: 0.04
-Nodes (52): baseUrl, cacheKey, entry, imdbScore, labels, model, oxApplyLibraryItemRatings, oxFetchFreshItemForPlayback (+44 more)
+Cohesion: 0.06
+Nodes (32): dart:developer, api, copyWith, episodeItems, episodesCanDownload, newEpisodes, newState, oxFetchMovieCoreState (+24 more)
 
 ### Community 28 - "horizontal_list.dart"
-Cohesion: 0.04
-Nodes (50): autoFocus, clampedIndex, contentPadding, contentWidth, createState, _cumulativeOffset, didUpdateWidget, dispose (+42 more)
+Cohesion: 0.02
+Nodes (92): double?, build, ExternalUrlsRow, launchUrl, url, urls, build, name (+84 more)
 
 ### Community 29 - "c"
-Cohesion: 0.05
-Nodes (86): a1(), a2(), a4(), aP(), aQ(), ay(), bg(), bO() (+78 more)
+Cohesion: 0.04
+Nodes (93): a1(), a2(), a3(), a4(), aP(), aQ(), ay(), bg() (+85 more)
 
 ### Community 30 - "bool get"
-Cohesion: 0.04
-Nodes (53): bool get, _, ChannelProgram? get, ItemBaseModel get, ApiError, ApiResult, data, error (+45 more)
+Cohesion: 0.03
+Nodes (77): channelId, ChannelProgramPatterns, endDate, episodeTitle, id, images, indexNumber, isSeries (+69 more)
 
 ### Community 31 - "library_search_provider.dart"
 Cohesion: 0.03
-Nodes (80): api, backToFolder, _buildLibraryMusicQueueSource, clearAllFilters, clearFolderOverWrite, _createMusicQueueSource, fetchGallery, fetchSuggestions (+72 more)
+Nodes (79): api, backToFolder, _buildLibraryMusicQueueSource, clearAllFilters, clearFolderOverWrite, _createMusicQueueSource, fetchGallery, fetchSuggestions (+71 more)
 
 ### Community 32 - "play_item_helpers.dart"
 Cohesion: 0.03
-Nodes (67): ArtistModelMappable, AudioModelMappable, AudioModelMapper, _classifyPlaylistItems, _fetchPlaylistItems, gallery, hasAny, hasGallery (+59 more)
+Nodes (95): @MappableClass, ItemBaseModelMappable, AlbumModelMappable, AlbumModelMapper, ArtistModelMappable, ArtistModelMapper, AudioModelMappable, AudioModelMapper (+87 more)
 
 ### Community 33 - "package:fladder/models/account_model.dart"
 Cohesion: 0.05
-Nodes (43): clear, model, oxplayerIsOxStreamUrl, oxplayerMaybeRetryPlayAfterLoadFailure, oxplayerRefreshPlaybackWithForceRepair, OxplayerStreamRepairBridge, oxplayerTryRepairStreamUrl, playbackType (+35 more)
+Nodes (40): clear, model, oxplayerIsOxStreamUrl, oxplayerMaybeRetryPlayAfterLoadFailure, oxplayerRefreshPlaybackWithForceRepair, OxplayerStreamRepairBridge, oxplayerTryRepairStreamUrl, playbackType (+32 more)
 
 ### Community 34 - "client_settings_model.dart"
 Cohesion: 0.03
-Nodes (78): BackgroundType get, amoledBlack, backgroundImage, blurPlaceHolders, blurUpcomingEpisodes, checkForUpdates, class, ClientSettingsModelPatterns (+70 more)
+Nodes (76): BackgroundType get, amoledBlack, backgroundImage, blurPlaceHolders, blurUpcomingEpisodes, checkForUpdates, class, ClientSettingsModelPatterns (+68 more)
 
 ### Community 35 - "person_model.dart"
-Cohesion: 0.06
-Nodes (35): copyWith, discriminatorKey, discriminatorValue, ensureInitialized, fields, id, ignoreNull, _instance (+27 more)
+Cohesion: 0.03
+Nodes (63): copyWith, discriminatorKey, discriminatorValue, ensureInitialized, fields, id, ignoreNull, _instance (+55 more)
 
 ### Community 36 - "identifty_screen.dart"
 Cohesion: 0.03
-Nodes (87): build, OxSeerrInterestButtons, poster, _toggleFavorite, _toggleFollow, _toggleWatchlist, build, addItemToCollection (+79 more)
+Nodes (75): build, OxSeerrInterestButtons, poster, _toggleFavorite, _toggleFollow, _toggleWatchlist, BookViewerChapters, addItemToCollection (+67 more)
 
 ### Community 37 - "package:http/http.dart"
 Cohesion: 0.05
-Nodes (36): _, Exception, OxplayerAccountDeleteException, attemptId, _client, code, completed, createAttempt (+28 more)
+Nodes (39): _, Client?, Client get, Exception, _client, deleteAccount, _errorMessage, message (+31 more)
 
 ### Community 38 - "package:fladder/providers/api_provider.dart"
-Cohesion: 0.03
-Nodes (96): culturesProvider, PlaybackInfoResponse, oxplayerArmForceRepairPlayback, oxplayerForceRepairHeader, OxplayerForceRepairInterceptor, oxplayerForceRepairNextPlaybackProvider, ref, webProfile (+88 more)
+Cohesion: 0.04
+Nodes (62): culturesProvider, InformationModel, _directUrl, ref, build, _fetch, _defaultHeight, _defaultQuality (+54 more)
 
 ### Community 39 - "auto_router.gr.dart"
 Cohesion: 0.03
-Nodes (60): authLink, favourites, folderId, genres, hashCode, id, item, items (+52 more)
+Nodes (66): authLink, ControlUserEditRoute, ControlUserEditRouteArgs, favourites, folderId, genres, hashCode, id (+58 more)
 
 ### Community 40 - "video_player_settings.dart"
 Cohesion: 0.03
@@ -875,31 +890,31 @@ Nodes (72): AutoNextType get, BoxFit, BoxFit get, allowedOrientations, audioDevi
 
 ### Community 41 - "package:fladder/models/item_base_model.dart"
 Cohesion: 0.02
-Nodes (92): ArtistDetailsNotifier get, FontWeight, following, loc, ok, oxIsFollowableItem, oxplayerFollowActions, _toggleFollow (+84 more)
+Nodes (84): following, loc, ok, oxIsFollowableItem, oxplayerFollowActions, _toggleFollow, wasFollowing, account (+76 more)
 
 ### Community 42 - "seerr_request_provider.dart"
 Cohesion: 0.03
-Nodes (76): availableUsers, class, contentRating, currentUser, genres, isAnime, poster, radarrServers (+68 more)
+Nodes (71): availableUsers, class, contentRating, currentUser, genres, isAnime, poster, radarrServers (+63 more)
 
 ### Community 43 - "k"
-Cohesion: 0.07
-Nodes (72): $1(), aA(), aH(), aR(), au(), aW(), b_(), bq() (+64 more)
+Cohesion: 0.06
+Nodes (88): $1(), a(), aA(), aH(), aR(), au(), aW(), b_() (+80 more)
 
 ### Community 44 - "oxplayer_iran_stream_edge.dart"
-Cohesion: 0.05
-Nodes (34): _cacheKey, clearCache, _fallbackIranOrigin, iranStreamOriginHost, isIranVanityStreamHost, isIranVanityStreamUrl, _isVanityHost, OxplayerIranStreamEdge (+26 more)
+Cohesion: 0.04
+Nodes (42): PlaybackInfoResponse, _cacheKey, clearCache, _fallbackIranOrigin, iranStreamOriginHost, isIranVanityStreamHost, isIranVanityStreamUrl, _isVanityHost (+34 more)
 
 ### Community 45 - "player_bar_shared.dart"
-Cohesion: 0.11
-Nodes (18): build, child, createState, currentIndex, currentLocation, currentSideBarWidth, destinations, drawerKey (+10 more)
+Cohesion: 0.09
+Nodes (22): build, child, createState, currentIndex, currentLocation, currentSideBarWidth, destinations, drawerKey (+14 more)
 
 ### Community 46 - "control_tuner_edit_provider.dart"
 Cohesion: 0.03
 Nodes (68): allowFmp4Container, allowHWTranscoding, allowStreamSharing, _allTransitiveDependencies, call, class, combine, ControlTunerEditFamily (+60 more)
 
 ### Community 47 - "auth_link_dialog.dart"
-Cohesion: 0.18
-Nodes (11): actions, build, createState, DrawerListButton, _DrawerListButtonState, duration, icon, label (+3 more)
+Cohesion: 0.04
+Nodes (46): poster, SeerrRequestBannerCard, _showBottomSheet, _showContextMenu, build, poster, requests, scrollController (+38 more)
 
 ### Community 48 - "sync_provider_helpers.dart"
 Cohesion: 0.04
@@ -907,19 +922,19 @@ Nodes (78): @Deprecated, AsyncValue, AutoDisposeAsyncNotifierProviderElement, Au
 
 ### Community 49 - "package:fladder/oxplayer/oxplayer_env.dart"
 Cohesion: 0.05
-Nodes (46): BodyType, seerrApiProvider, HttpFileService, Interceptor, _needsAuth, OxplayerAuthFileService, OxplayerHttpPerformanceInterceptor, _safePath (+38 more)
+Nodes (45): BodyType, seerrApiProvider, Interceptor, oxplayerArmForceRepairPlayback, oxplayerForceRepairHeader, OxplayerForceRepairInterceptor, oxplayerForceRepairNextPlaybackProvider, ref (+37 more)
 
 ### Community 50 - "seerr_details_provider.dart"
 Cohesion: 0.03
 Nodes (65): _allTransitiveDependencies, call, class, combine, contentRating, createElement, currentUser, _dependencies (+57 more)
 
 ### Community 51 - "oxplayer_stream_url_resolver.dart"
-Cohesion: 0.05
-Nodes (36): active, activeNodeId, api, base, budget, deadline, failedNodeIds, fallback (+28 more)
+Cohesion: 0.06
+Nodes (34): active, activeNodeId, api, base, budget, deadline, failedNodeIds, fallback (+26 more)
 
 ### Community 52 - "boxset_model.dart"
 Cohesion: 0.04
-Nodes (61): @MappableClass, BoxSetModelMappable, BoxSetModelMapper, copyWith, discriminatorKey, discriminatorValue, ensureInitialized, fields (+53 more)
+Nodes (60): BoxSetModelCopyWith, _BoxSetModelCopyWithImpl, BoxSetModelMappable, BoxSetModelMapper, copyWith, discriminatorKey, discriminatorValue, ensureInitialized (+52 more)
 
 ### Community 53 - "item_base_model.dart"
 Cohesion: 0.03
@@ -938,16 +953,16 @@ Cohesion: 0.03
 Nodes (62): _api, approveRequest, authenticateJellyfin, authenticateLocal, deleteMedia, deleteMediaFile, deleteRequest, discoverCatalogTrending (+54 more)
 
 ### Community 57 - "api_provider.dart"
-Cohesion: 0.03
-Nodes (59): jellyApiProvider, base, baseSegments, baseUrl, build, buildServerUri, buildServerUriFromBase, buildServerUrl (+51 more)
+Cohesion: 0.04
+Nodes (49): jellyApiProvider, base, baseSegments, baseUrl, build, buildServerUri, buildServerUriFromBase, buildServerUrl (+41 more)
 
 ### Community 58 - "smtc_web.dart"
 Cohesion: 0.03
 Nodes (60): album, albumArtist, artist, asString, buttonPressStream, channelDown, clearMetadata, disableSmtc (+52 more)
 
 ### Community 59 - "ox_item_flags.dart"
-Cohesion: 0.06
-Nodes (32): oxItemFlagsProvider, downloadPath, oxFetchLibraryItemJson, oxLoadCachedLibraryItemJson, oxPatchLibraryItemPlaybackInCache, build, setFollowing, setWatchlisted (+24 more)
+Cohesion: 0.05
+Nodes (45): oxItemFlagsProvider, downloadPath, baseUrl, entry, imdbScore, labels, model, oxFetchLibraryItemJson (+37 more)
 
 ### Community 60 - ".agents/skills/caveman-compress/scripts/validate.py"
 Cohesion: 0.07
@@ -955,19 +970,19 @@ Nodes (49): benchmark_pair(), count_tokens(), main(), print_table(), Path, main(
 
 ### Community 61 - "auth_provider.dart"
 Cohesion: 0.05
-Nodes (49): initState, build, OxplayerLoginEditUser, user, oxplayerAddAccountRouteList, oxplayerLoginShowsAccountGrid, oxplayerSignOutRouteList, read (+41 more)
+Nodes (40): BuildContext? get, initState, build, OxplayerLoginEditUser, user, oxplayerAddAccountRouteList, oxplayerLoginShowsAccountGrid, oxplayerSignOutRouteList (+32 more)
 
 ### Community 62 - ".cursor/skills/caveman-compress/scripts/validate.py"
 Cohesion: 0.07
 Nodes (49): benchmark_pair(), count_tokens(), main(), print_table(), Path, main(), print_usage(), backup_dir_for() (+41 more)
 
 ### Community 63 - "argumentsStateProvider"
-Cohesion: 0.07
-Nodes (29): capHomeSliderForTv, capHomeSliderItems, firstRun, home, homeSliderMaxItems, _kTvVisualDefaultsAppliedKey, oxplayerEnforceTvHomeBanner, OxplayerTvUiLimits (+21 more)
+Cohesion: 0.05
+Nodes (48): _, FullScreenHelper, capHomeSliderForTv, capHomeSliderItems, firstRun, home, homeSliderMaxItems, _kTvVisualDefaultsAppliedKey (+40 more)
 
 ### Community 64 - "video_player_queue.dart"
 Cohesion: 0.04
-Nodes (57): BoxConstraints, _openPerson, build, openPersonDetailPage, build, createState, _CurrentlyPlayingBarState, FloatingPlayerBar (+49 more)
+Nodes (48): BoxConstraints, build, constraints, item, itemActions, MusicFloatingPlayerBarContent, onShowExpandButton, openFullScreenPlayer (+40 more)
 
 ### Community 65 - "ox_season_seerr_request.dart"
 Cohesion: 0.03
@@ -975,11 +990,11 @@ Nodes (84): AutoDisposeFutureProvider, AutoDisposeFutureProviderElement, AutoDis
 
 ### Community 66 - "playback_model.dart"
 Cohesion: 0.04
-Nodes (47): api, audioStreams, bitRateOptions, chapters, collectQueue, copyWith, _createOfflinePlaybackModel, createPlaybackModel (+39 more)
+Nodes (46): api, audioStreams, bitRateOptions, chapters, collectQueue, copyWith, _createOfflinePlaybackModel, createPlaybackModel (+38 more)
 
 ### Community 67 - "audio_player_queue_dialog.dart"
 Cohesion: 0.04
-Nodes (48): audioStreams, copyWith, DirectPlaybackModel, itemsInQueue, playbackStarted, playbackStopped, setAudio, setQualityOption (+40 more)
+Nodes (54): audioStreams, copyWith, DirectPlaybackModel, itemsInQueue, playbackStarted, playbackStopped, setAudio, setQualityOption (+46 more)
 
 ### Community 68 - "ox_update_service.dart"
 Cohesion: 0.04
@@ -991,15 +1006,15 @@ Nodes (47): class, fChapters, fileSize, fImages, fTrickPlayModel, id, itemModel,
 
 ### Community 70 - "ce"
 Cohesion: 0.06
-Nodes (55): a0(), aN(), bA(), c8(), cD(), ce(), d0(), d6() (+47 more)
+Nodes (53): a0(), aN(), bA(), c8(), ce(), d0(), d6(), d9() (+45 more)
 
 ### Community 71 - "photos_model.dart"
-Cohesion: 0.04
-Nodes (51): BoxSetModelValueCopy, ItemBaseModelValueCopy, AlbumModelValueCopy, ArtistModelValueCopy, AudioModelValueCopy, MusicArtistModelValueCopy, EpisodeModelValueCopy, FolderModelValueCopy (+43 more)
+Cohesion: 0.05
+Nodes (43): BoxSetModelValueCopy, ItemBaseModelValueCopy, AlbumModelValueCopy, ArtistModelValueCopy, AudioModelValueCopy, MusicArtistModelValueCopy, EpisodeModelValueCopy, FolderModelValueCopy (+35 more)
 
 ### Community 72 - "video_player_seek_indicator.dart"
-Cohesion: 0.04
-Nodes (57): controlActiveTasksProvider, VideoHotKeys, api, build, fetchActiveTasks, _refreshTimer, startTask, stopTask (+49 more)
+Cohesion: 0.03
+Nodes (75): controlActiveTasksProvider, DeviceProfile, SegmentVisibility, VideoHotKeys, oxplayerInitVideoPlayerIfNeeded, read, defaultProfile, api (+67 more)
 
 ### Community 73 - "seerr_search_provider.dart"
 Cohesion: 0.04
@@ -1007,27 +1022,27 @@ Nodes (51): certifications, class, currentPage, filters, genres, initialized, is
 
 ### Community 74 - "account_model.dart"
 Cohesion: 0.04
-Nodes (54): AccountModel?, Authentication get, AccountModelPatterns, askForAuthOnLaunch, authMethod, avatar, class, credentials (+46 more)
+Nodes (50): Authentication get, askForAuthOnLaunch, authMethod, avatar, class, credentials, debugFillProperties, hasConfiguredPassword (+42 more)
 
 ### Community 75 - "seerr_chopper_service.dart"
 Cohesion: 0.04
 Nodes (49): _, definitionType, approveRequest, authenticateJellyfin, authenticateLocal, createRequest, deleteMedia, deleteMediaFile (+41 more)
 
 ### Community 76 - "package:flutter/foundation.dart"
-Cohesion: 0.04
-Nodes (42): android, androidDev, DefaultFirebaseOptions, ensureAndroidResolved, _resolvedAndroid, chainErrorHandlers, _handlersChained, init (+34 more)
+Cohesion: 0.11
+Nodes (17): chainErrorHandlers, _handlersChained, init, _initialized, isEnabled, log, OxplayerCrashlytics, recordError (+9 more)
 
 ### Community 77 - "oxplayer_session.dart"
 Cohesion: 0.05
-Nodes (42): access, accessOk, account, account, action, _authPromptVisible, loc, message (+34 more)
+Nodes (40): credentials, oxCatalogApiHeaders, access, accessOk, account, cleared, client, credentials (+32 more)
 
 ### Community 78 - "media_streams_model.dart"
 Cohesion: 0.04
 Nodes (49): AudioSpatialFormat, VideoRangeType, audioIcon, audioStreams, bitDepth, bitRate, channelLayout, channels (+41 more)
 
 ### Community 79 - "seerr_search_screen.dart"
-Cohesion: 0.04
-Nodes (65): oxplayerSeerrCatalogSearchProvider, build, inCatalog, OxplayerSeerrCatalogFilterChip, oxplayerSeerrCatalogOnlyFilterProvider, OxplayerSeerrSearchCatalogRow, query, results (+57 more)
+Cohesion: 0.03
+Nodes (68): FladderItemType, Studio, oxplayerSeerrCatalogSearchProvider, build, oxplayerSeerrCatalogOnlyFilterProvider, api, build, hashCode (+60 more)
 
 ### Community 80 - "playback_queue_source.dart"
 Cohesion: 0.07
@@ -1042,12 +1057,12 @@ Cohesion: 0.06
 Nodes (22): Chapter, fromList(), GuideProgram, ByteBuffer, StandardMessageCodec, MediaInfo, MediaSegment, NativeMuxedAudioRow (+14 more)
 
 ### Community 83 - "main.dart"
-Cohesion: 0.10
-Nodes (19): afterAppBootstrap, beforeAppBootstrap, OxplayerBootstrap, wrapRoot, CustomCacheManager, instance, key, package:fladder/bootstrap/app_bootstrap.dart (+11 more)
+Cohesion: 0.08
+Nodes (24): autoRouter, build, _FladderApp, Main, runOxApp, afterAppBootstrap, beforeAppBootstrap, OxplayerBootstrap (+16 more)
 
 ### Community 84 - "book_viewer_controls.dart"
-Cohesion: 0.05
-Nodes (47): AutoDisposeStateNotifierProvider, Curve, ExtendedPageController, provider, showBookViewerChapters, bottomPadding, controller, controlsVisible (+39 more)
+Cohesion: 0.06
+Nodes (41): AutoDisposeStateNotifierProvider, bookViewerProvider, bookViewerSettingsProvider, build, provider, showBookViewerChapters, BookViewerControls, _BookViewerControlsState (+33 more)
 
 ### Community 85 - "fake_jellyfin_open_api.dart"
 Cohesion: 0.04
@@ -1059,7 +1074,7 @@ Nodes (48): ensureInitialized, fields, ignoreNull, _instance, instantiate, UserD
 
 ### Community 87 - "oxplayer_media_variant.dart"
 Cohesion: 0.04
-Nodes (48): base, blob, build, changed, classified, copyWith, core, current (+40 more)
+Nodes (54): base, blob, build, changed, classified, copyWith, core, current (+46 more)
 
 ### Community 88 - "seerr_filter_dialogs.dart"
 Cohesion: 0.04
@@ -1071,8 +1086,8 @@ Nodes (47): jellyfin,
   local,, _addHeader, apiKey, apiKeyController, _applyServerUrl, _authContent, _authForm, _beginProcessing (+39 more)
 
 ### Community 90 - "O"
-Cohesion: 0.05
-Nodes (55): $2(), a(), a3(), a9(), ak(), am(), b2(), b3() (+47 more)
+Cohesion: 0.07
+Nodes (40): $4(), ak(), am(), b1(), b2(), b3(), b4(), b5() (+32 more)
 
 ### Community 91 - "oxplayer_stuck_playback.dart"
 Cohesion: 0.04
@@ -1081,8 +1096,8 @@ Nodes (46): @visibleForTesting, Duration? catalogDuration,
   Duration, highMemoryThresholdMb, shouldWarn, resetVolumeAnomalyDedupeForTest, advanceSample, bufferMoved (+38 more)
 
 ### Community 92 - "seerr_details_screen.dart"
-Cohesion: 0.11
-Nodes (18): build, createState, _deleteData, _errorMessage, false, _handleAction, _isLoading, isTvSeries (+10 more)
+Cohesion: 0.06
+Nodes (32): catalogAvailableMovies, catalogAvailableSeries, expectedMovies, expectedSeries, fetch, fetchRecentlyAddedPosters, OxplayerSeerrFeed, OxSeerrFeedResult (+24 more)
 
 ### Community 93 - "fladder_notification_overlay.dart"
 Cohesion: 0.04
@@ -1093,129 +1108,132 @@ Cohesion: 0.04
 Nodes (46): actions, align, build, _buildHeaderLabel, _buildHeaderRow, _buildTrackActions, compactLayout, createState (+38 more)
 
 ### Community 95 - "I"
-Cohesion: 0.08
-Nodes (42): aB(), ae(), b0(), b6(), bI(), bj(), cT(), d3() (+34 more)
+Cohesion: 0.06
+Nodes (50): $2(), a9(), aB(), ae(), b0(), b6(), bI(), bj() (+42 more)
 
 ### Community 96 - "localization_delegates.dart"
-Cohesion: 0.13
-Nodes (18): CupertinoLocalizations, FladderCupertinoLocalizationsDelegate, FladderLocalizations, FladderMaterialLocalizationsDelegate, FladderWidgetsLocalizationsDelegate, isSupported, load, _loadedTranslations (+10 more)
+Cohesion: 0.05
+Nodes (42): CupertinoLocalizations, InheritedWidget, FladderCupertinoLocalizationsDelegate, FladderLocalizations, FladderMaterialLocalizationsDelegate, FladderWidgetsLocalizationsDelegate, isSupported, load (+34 more)
 
 ### Community 97 - "static const"
-Cohesion: 0.05
-Nodes (35): dart:developer, assetPath, build, displaySize, OxSplashBrand, splashBackground, event, _logName (+27 more)
+Cohesion: 0.04
+Nodes (48): dart:convert, favourites, fetch, _limitPerType, OxFavoritesFeedResult, OxplayerFavoritesFeed, people, applyFavorites (+40 more)
 
 ### Community 98 - "oxplayer_route_selector.dart"
 Cohesion: 0.04
-Nodes (56): dart:async, dart:convert, Item, baseUrl, headers, OxplayerAuthHttp, send, _shouldFlipToIran (+48 more)
+Nodes (53): dart:async, baseUrl, headers, OxplayerAuthHttp, send, _shouldFlipToIran, uri, _flipToIran (+45 more)
 
 ### Community 99 - "oxplayer_stream_nodes_api.dart"
 Cohesion: 0.06
-Nodes (32): blob, detailed, dubbed, firstToken, fromName, hardSub, height, id (+24 more)
+Nodes (29): global,, _active, iran, _isGlobalStreamNodeHost, _isStreamHost, OxplayerEdge, OxplayerRoute, rewriteStreamUri (+21 more)
 
 ### Community 100 - "oxplayer_pending_route.dart"
-Cohesion: 0.05
-Nodes (39): _bufferedPendingPath, oxplayerBufferPendingPath, oxplayerFlushBufferedPendingPath, oxplayerHasBufferedPendingPath, oxplayerNavigateAfterLogin, oxplayerPendingRouteProvider, oxplayerSetPendingRoute, path (+31 more)
+Cohesion: 0.06
+Nodes (35): _bufferedPendingPath, oxplayerBufferPendingPath, oxplayerFlushBufferedPendingPath, oxplayerHasBufferedPendingPath, oxplayerNavigateAfterLogin, oxplayerPendingRouteProvider, oxplayerSetPendingRoute, path (+27 more)
 
 ### Community 101 - "a"
-Cohesion: 0.07
-Nodes (36): aD(), aF(), aj(), ax(), bL(), bU(), bV(), c5() (+28 more)
+Cohesion: 0.06
+Nodes (39): aD(), aF(), aj(), ax(), bL(), bN(), bU(), bV() (+31 more)
 
 ### Community 102 - "player_settings_pigeon.dart"
-Cohesion: 0.07
-Nodes (29): channelId, ChannelProgramPatterns, endDate, episodeTitle, id, images, indexNumber, isSeries (+21 more)
+Cohesion: 0.09
+Nodes (22): @ConfigurePigeon, @FlutterApi, @HostApi, package:pigeon/pigeon.dart, ApplicationMenu, newInstance, openNewWindow, BatteryOptimizationPigeon (+14 more)
 
 ### Community 103 - "episode_model.dart"
 Cohesion: 0.04
-Nodes (46): available,
-  unaired,, copyWith, discriminatorKey, discriminatorValue, ensureInitialized, EpisodeModelMappable, EpisodeModelMapper, fields (+38 more)
+Nodes (47): available,
+  unaired,, copyWith, discriminatorKey, discriminatorValue, ensureInitialized, _EpisodeModelCopyWithImpl, EpisodeModelMappable, EpisodeModelMapper (+39 more)
 
 ### Community 104 - "login_screen_model.dart"
 Cohesion: 0.08
 Nodes (27): _, accounts, class, errorMessage, hasBaseUrl, hasQuickConnect, loading, LoginScreenModelPatterns (+19 more)
 
 ### Community 105 - "dart:async"
-Cohesion: 0.05
-Nodes (35): dart:typed_data, ApplicationMenu, newInstance, openNewWindow, pigeonChannelCodec, _PigeonCodec, readValueOfType, setUp (+27 more)
+Cohesion: 0.06
+Nodes (32): dart:typed_data, ApplicationMenu, newInstance, openNewWindow, pigeonChannelCodec, _PigeonCodec, readValueOfType, setUp (+24 more)
 
 ### Community 106 - "focus_row.dart"
-Cohesion: 0.05
-Nodes (42): build, child, _childNodes, _clearedByVertical, _clearOnVertical, createState, dispose, ensureVisibleAlignment (+34 more)
+Cohesion: 0.08
+Nodes (26): build, child, _childNodes, _clearedByVertical, _clearOnVertical, createState, dispose, ensureVisibleAlignment (+18 more)
 
 ### Community 107 - "media_segments_model.dart"
 Cohesion: 0.05
-Nodes (42): end, MediaSegmentPatterns, MediaSegmentsModelPatterns, segments, start, toJson, toString, type (+34 more)
+Nodes (37): end, MediaSegmentPatterns, segments, start, toJson, toString, type, commercial,
+  preview,
+  recap,
+  outro, (+29 more)
 
 ### Community 108 - "tv_playback_model.dart"
-Cohesion: 0.04
-Nodes (55): _, channels, class, endDate, LiveTvModelPatterns, loadedChannelIds, loadingChannelIds, _self (+47 more)
+Cohesion: 0.05
+Nodes (41): liveTvProvider, JellyService get, audioStreams, channel, copyWith, currentProgram, dispose, duration (+33 more)
 
 ### Community 109 - "audio_player_full_screen.dart"
 Cohesion: 0.07
 Nodes (31): ReplayGainVolumeLevel, _AudioPlayerControls, _AudioPlayerControlsState, AudioPlayerFullScreen, _AudioPlayerFullScreenState, _AudioPropertyChip, AudioPropertyLabelsRow, _bitDepthLabel (+23 more)
 
 ### Community 110 - "crash_log_provider.dart"
-Cohesion: 0.10
-Nodes (20): Future, ResponseFutureExtensions, clearLogs, _debounceDuration, _debounceTimer, dispose, flushUnreportedToSentry, init (+12 more)
+Cohesion: 0.05
+Nodes (36): dart:io, clearSyncedStoreRows, dbFile, dbPath, capture, flushFromDisk, _logFile, _logFileName (+28 more)
 
 ### Community 111 - "user_provider.dart"
 Cohesion: 0.05
 Nodes (41): AutoDisposeProviderRef, showSyncButtonProviderProvider, ShowSyncButtonProviderRef, userProvider, addSearchQuery, api, build, clear (+33 more)
 
 ### Community 112 - "items/playlist_model.dart"
-Cohesion: 0.11
-Nodes (42): BoxSetModelCopyWith, _BoxSetModelCopyWithImpl, ItemBaseModelCopyWith, _ItemBaseModelCopyWithImpl, AlbumModelCopyWith, _AlbumModelCopyWithImpl, ArtistModelCopyWith, _ArtistModelCopyWithImpl (+34 more)
+Cohesion: 0.07
+Nodes (55): ItemBaseModelCopyWith, _ItemBaseModelCopyWithImpl, AlbumModelCopyWith, _AlbumModelCopyWithImpl, ArtistModelCopyWith, _ArtistModelCopyWithImpl, AudioModelCopyWith, _AudioModelCopyWithImpl (+47 more)
 
 ### Community 113 - "special_feature_model.dart"
 Cohesion: 0.07
 Nodes (30): copyWith, discriminatorKey, discriminatorValue, ensureInitialized, fields, id, ignoreNull, _instance (+22 more)
 
 ### Community 114 - "library_model.dart"
-Cohesion: 0.06
-Nodes (28): BaseItemKind, aspectRatio, defaultFilters, getIconType, copyWith, favourites, genres, id (+20 more)
+Cohesion: 0.13
+Nodes (14): BaseItemKind, copyWith, favourites, genres, id, latest, LibraryModel, loading (+6 more)
 
 ### Community 115 - "series_model.dart"
 Cohesion: 0.05
 Nodes (40): copyWith, discriminatorKey, discriminatorValue, ensureInitialized, fields, id, ignoreNull, _instance (+32 more)
 
 ### Community 116 - "clientSettingsProvider"
-Cohesion: 0.07
-Nodes (26): dart:math, aspectRatio, bannerType, build, contentPadding, homeCached, itemCount, maxHeight (+18 more)
+Cohesion: 0.03
+Nodes (70): AlignmentGeometry?, createState, dispose, onWindowClose, onWindowMove, onWindowMoved, onWindowResize, onWindowResized (+62 more)
 
 ### Community 117 - "viewsProvider"
-Cohesion: 0.07
-Nodes (28): AuthenticationResult, _accessToken, clear, OxplayerImageAuth, syncFromAccount, syncFromCredentials, account, accountResponse (+20 more)
+Cohesion: 0.05
+Nodes (41): AuthenticationResult, context, loggedInGoToHome, oxplayerTapSavedAccount, read, ref, sessionOk, switchFn (+33 more)
 
 ### Community 118 - "StateNotifier"
-Cohesion: 0.05
-Nodes (34): copyWith, favourites, loading, people, activePrograms, copyWith, HomeModel, loaded (+26 more)
+Cohesion: 0.06
+Nodes (33): copyWith, favourites, loading, people, activePrograms, copyWith, loaded, loading (+25 more)
 
 ### Community 119 - "subtitle_settings_model.dart"
-Cohesion: 0.08
-Nodes (24): backGroundColor, color, copyWith, fontSize, fontWeight, fromJson, fromMap, kTextScaleFactorReferenceHeight (+16 more)
+Cohesion: 0.09
+Nodes (22): backGroundColor, color, copyWith, fontSize, fontWeight, fromJson, fromMap, kTextScaleFactorReferenceHeight (+14 more)
 
 ### Community 120 - "sync_widgets.dart"
 Cohesion: 0.05
-Nodes (42): SyncedItemPatterns, _SyncItem, SyncedItem, build, item, SyncButton, syncedItem, build (+34 more)
+Nodes (51): SyncedItemPatterns, _SyncItem, SyncedItem, build, item, SyncButton, syncedItem, context (+43 more)
 
 ### Community 121 - "a5"
-Cohesion: 0.08
-Nodes (30): a5(), bt(), c1(), dB(), dc(), e9(), eO(), fx() (+22 more)
+Cohesion: 0.09
+Nodes (27): a5(), bt(), bw(), c1(), e9(), eO(), fx(), gap() (+19 more)
 
 ### Community 122 - "audio_model.dart"
 Cohesion: 0.05
 Nodes (39): ItemBaseModelMapper, copyWith, discriminatorKey, discriminatorValue, ensureInitialized, fields, ignoreNull, _instance (+31 more)
 
 ### Community 123 - "oxplayer_memory_telemetry.dart"
-Cohesion: 0.03
-Nodes (56): _lastItemId, _lastReportAt, _navigationContext, OxplayerDetailUnavailableTelemetry, report, blocksRootPop, handleRootBack, _lastPress (+48 more)
+Cohesion: 0.06
+Nodes (30): _addNavigationBreadcrumb, _currentRssBytes, _emitMetrics, imageCacheBytes, imageCacheCount, imageCacheMaxBytes, kOxHighMemoryNavDeltaMb, kOxHighMemoryRssMbPhone (+22 more)
 
 ### Community 124 - "TextEditingController"
-Cohesion: 0.08
-Nodes (26): copyWith, discriminatorKey, discriminatorValue, ensureInitialized, fields, id, ignoreNull, _instance (+18 more)
+Cohesion: 0.17
+Nodes (12): _AdvancedLoginOptionsDialog, _AdvancedLoginOptionsDialogState, build, createState, dispose, initialSeerrUrl, _probing, _save (+4 more)
 
 ### Community 125 - "movie_model.dart"
 Cohesion: 0.05
-Nodes (38): copyWith, discriminatorKey, discriminatorValue, ensureInitialized, fields, id, ignoreNull, _instance (+30 more)
+Nodes (40): copyWith, discriminatorKey, discriminatorValue, ensureInitialized, fields, id, ignoreNull, _instance (+32 more)
 
 ### Community 126 - "transcode_download_model.dart"
 Cohesion: 0.06
@@ -1231,30 +1249,30 @@ Nodes (35): availableLibraries, availableOptions, class, ControlLibrariesModelPa
 
 ### Community 129 - "ox_movie_seerr_request.dart"
 Cohesion: 0.06
-Nodes (31): _loginQrImage, onQrHoldComplete, qr, qrHoldEnabled, rootContext, showOxplayerBotQrSheet, _api, _attemptId (+23 more)
+Nodes (34): _loginQrImage, onQrHoldComplete, qr, qrHoldEnabled, rootContext, showOxplayerBotQrSheet, build, embedded (+26 more)
 
 ### Community 130 - "edit_item.dart"
-Cohesion: 0.07
-Nodes (34): general,
+Cohesion: 0.05
+Nodes (48): general,
   primary,
   logo,
-  backdrops,, ImageType, editItemProvider, advanced, build, createState, EditDialogSwitcher, _EditDialogSwitcherState (+26 more)
+  backdrops,, ImageType, PersonKind, editItemProvider, advanced, build, createState, EditDialogSwitcher (+40 more)
 
 ### Community 131 - "ox_github_update_service.dart"
-Cohesion: 0.04
-Nodes (51): isUnlocked, _key, OxplayerDeveloperModeStore, unlock, clear, _keyEdge, OxplayerRouteStore, _prefs (+43 more)
+Cohesion: 0.06
+Nodes (32): build, changelog, checkOnLaunch, currentVersion, _dialogShowing, _downloadPatternsForPlatform, downloadUrl, hasPendingOptionalPrompt (+24 more)
 
 ### Community 132 - "shared_provider.dart"
 Cohesion: 0.05
 Nodes (37): addAccount, api, bookViewSettings, _bookViewSettingsKey, clientSettings, _clientSettingsKey, getAccounts, getActiveAccount (+29 more)
 
 ### Community 133 - "package:fladder/util/adaptive_layout/adaptive_layout.dart"
-Cohesion: 0.01
-Nodes (152): label, PartiallyPlayed, Played, Unplayed, WatchedState, AccessSchedulesEditor, build, label (+144 more)
+Cohesion: 0.06
+Nodes (38): MetadataLabels, _OxGenresWithAdultChip, SimpleLabel, AutoApproveBanner, build, isTv, PermissionDeniedWarning, quota (+30 more)
 
 ### Community 134 - "oxplayer_sentry_user_sync.dart"
-Cohesion: 0.08
-Nodes (24): oxSeasonMarkPlayed, read, ref, refreshAfterWatchStateChange, season, build, child, createState (+16 more)
+Cohesion: 0.12
+Nodes (15): oxSeasonMarkPlayed, read, ref, refreshAfterWatchStateChange, season, build, child, createState (+7 more)
 
 ### Community 135 - "library_screen_provider.dart"
 Cohesion: 0.06
@@ -1262,23 +1280,23 @@ Nodes (34): _, class, favourites, LibraryScreenModelPatterns, libraryScreenProvi
 
 ### Community 136 - "outlined_text_field.dart"
 Cohesion: 0.06
-Nodes (34): InputDecoration?, autocorrect, autoFillHints, autoFocus, borderWidth, controller, createState, decoration (+26 more)
+Nodes (36): InputDecoration?, autocorrect, autoFillHints, autoFocus, borderWidth, build, controller, createState (+28 more)
 
 ### Community 137 - "ox_catalog_interest.dart"
-Cohesion: 0.05
-Nodes (39): _availabilityIconBadge, display, inCatalog, label, overlays, oxDetailPosterBadgesEnabled, oxDetailSeerrPosterOverlays, oxRelatedMediaTypeBadge (+31 more)
+Cohesion: 0.04
+Nodes (52): _availabilityIconBadge, display, inCatalog, label, overlays, oxDetailPosterBadgesEnabled, oxDetailSeerrPosterOverlays, oxRelatedMediaTypeBadge (+44 more)
 
 ### Community 138 - "@DELETE"
 Cohesion: 0.06
 Nodes (36): @DELETE, audioItemIdLyricsDelete, authKeysKeyDelete, brandingSplashscreenDelete, collectionsCollectionIdItemsDelete, devicesDelete, itemsItemIdDelete, itemsItemIdImagesImageTypeDelete (+28 more)
 
 ### Community 139 - "trick_play_image.dart"
-Cohesion: 0.09
-Nodes (22): build, createState, currentOffset, currentUrl, didUpdateWidget, dispose, image, initState (+14 more)
+Cohesion: 0.06
+Nodes (34): CustomPainter, activeColor, build, _GappedContainerPainter, GappedContainerShape, inActiveColor, paint, shouldRepaint (+26 more)
 
 ### Community 140 - "package:chopper/chopper.dart"
 Cohesion: 0.05
-Nodes (39): InformationModel, ItemEditingModel, copyWith, loading, resultCount, results, SearchModel, searchQuery (+31 more)
+Nodes (36): ResponseExtensions, episodeItems, episodes, fields, load, oxEpisodeListFields, oxFetchSeriesCatalogBySeason, OxSeriesCatalogLoad (+28 more)
 
 ### Community 141 - "ox_seerr_bundle.dart"
 Cohesion: 0.06
@@ -1286,7 +1304,7 @@ Nodes (35): base, bundleByName, bundlePeople, copyWith, id, keyPrefix, logoPath,
 
 ### Community 142 - "oxplayer_telegram_login_panel.dart"
 Cohesion: 0.02
-Nodes (76): bottomPadding, build, cacheNeighbors, controller, createState, currentPage, currentScale, didChangeAppLifecycleState (+68 more)
+Nodes (96): AccountModel?, AccountModelPatterns, DynamicSchemeVariant, EditableText, AccountModel, adultEmoji, adultTag, chip (+88 more)
 
 ### Community 143 - "GuideRows"
 Cohesion: 0.08
@@ -1294,15 +1312,15 @@ Nodes (28): ChannelSwitchConfirmDialog(), GuideChannel, GuideDetailView(), Guide
 
 ### Community 144 - "album_model.dart"
 Cohesion: 0.05
-Nodes (39): AlbumModelMappable, AlbumModelMapper, copyWith, discriminatorKey, discriminatorValue, ensureInitialized, fields, id (+31 more)
+Nodes (37): copyWith, discriminatorKey, discriminatorValue, ensureInitialized, fields, id, ignoreNull, _instance (+29 more)
 
 ### Community 145 - "subtitle_settings_provider.dart"
 Cohesion: 0.09
 Nodes (20): dart:ui, backdrop, clampDimension, clampPair, forImageType, logo, OxplayerTvImageSizes, primary (+12 more)
 
 ### Community 146 - "splash_screen.dart"
-Cohesion: 0.20
-Nodes (11): _enableTimeOut, oxplayerSwitchToAccount, DashboardRoute, LockRoute, LoginRoute, LoginRouteArgs, OxplayerLoginRoute, onNavigation (+3 more)
+Cohesion: 0.25
+Nodes (8): DashboardRoute, LoginRoute, LoginRouteArgs, OxplayerLoginRoute, onNavigation, build, callBackOrNavigate, navigateWithLockOnLaunch
 
 ### Community 147 - "item_editing_model.dart"
 Cohesion: 0.06
@@ -1313,8 +1331,8 @@ Cohesion: 0.06
 Nodes (34): applied, base, _bufferedShareCatalogId, _bufferedShareMediaSourceId, catalogId, _clearShareMediaSourceId, fromQuery, host (+26 more)
 
 ### Community 149 - "overview_header.dart"
-Cohesion: 0.07
-Nodes (26): seerrDashboardProvider, seerrUserProvider, api, applyOxFeed, build, clear, fetchCatalogAvailable, fetchDashboard (+18 more)
+Cohesion: 0.06
+Nodes (34): additionalLabels, build, centerButtons, color, communityRating, contentTags, disableheader, favourite (+26 more)
 
 ### Community 150 - "localization_helper.dart"
 Cohesion: 0.06
@@ -1325,36 +1343,36 @@ Cohesion: 0.07
 Nodes (32): _, _allTransitiveDependencies, call, combine, createElement, _dependencies, finish, getProviderOverride (+24 more)
 
 ### Community 152 - "artist_model.dart"
-Cohesion: 0.06
-Nodes (34): copyWith, discriminatorKey, discriminatorValue, ensureInitialized, fields, id, ignoreNull, _instance (+26 more)
+Cohesion: 0.05
+Nodes (37): bool get, copyWith, discriminatorKey, discriminatorValue, ensureInitialized, fields, id, ignoreNull (+29 more)
 
 ### Community 153 - "library_search_model.dart"
 Cohesion: 0.07
-Nodes (31): _, class, debugFillProperties, DiagnosticableTreeMixin, fetchingItems, filters, folderOverwrite, lastIndices (+23 more)
+Nodes (32): _, class, debugFillProperties, DiagnosticableTreeMixin, fetchingItems, filters, folderOverwrite, lastIndices (+24 more)
 
 ### Community 154 - "String get"
-Cohesion: 0.08
-Nodes (24): Color get, DateTime, clipBoard, color, content, copyWith, ErrorLogModel, ErrorType (+16 more)
+Cohesion: 0.06
+Nodes (32): apiKey, class, customHeaders, SeerrCredentialsModelPatterns, _self, serverUrl, sessionCookie, toJson (+24 more)
 
 ### Community 155 - "key_combinations.dart"
-Cohesion: 0.07
-Nodes (30): altKey, altModifier, class, debugFillProperties, key, modifier, _self, toString (+22 more)
+Cohesion: 0.06
+Nodes (34): altKey, altModifier, class, debugFillProperties, key, KeyCombinationPatterns, modifier, _self (+26 more)
 
 ### Community 156 - "category_chip.dart"
-Cohesion: 0.03
-Nodes (54): build, channel, ChannelRow, ChannelRowState, colorFromString, createState, didChangeDependencies, didUpdateWidget (+46 more)
+Cohesion: 0.08
+Nodes (23): build, channel, ChannelRow, ChannelRowState, colorFromString, createState, didChangeDependencies, didUpdateWidget (+15 more)
 
 ### Community 157 - "syncProvider"
-Cohesion: 0.05
-Nodes (44): backgroundDownloaderProvider, BackgroundDownloader, build, backgroundDownloaderProvider, globalConfig, itemDownloadGroup, setMaxConcurrent, updateListener (+36 more)
+Cohesion: 0.12
+Nodes (22): AudioUrlResolver, resolve, OfflinePlaybackModel, playbackStopped, updatePlaybackPosition, loadNewVideo, loadTVChannel, BackgroundDownloader (+14 more)
 
 ### Community 158 - "playback_queue_state.dart"
 Cohesion: 0.06
 Nodes (33): addToNextUp, advanceFromCurrentTo, advanceTo, appendToQueue, AudioQueueSection, clearNextUp, copyWith, fromQueue (+25 more)
 
 ### Community 159 - "listing_provider_edit_dialog.dart"
-Cohesion: 0.08
-Nodes (23): credentials, oxCatalogApiHeaders, account, _confirmDeleteAccount, confirmed, link, loc, oxplayerOpenBotDeleteAccountLink (+15 more)
+Cohesion: 0.06
+Nodes (33): build, currentItem, dragIndex, icon, isCurrent, item, items, _onItemTapped (+25 more)
 
 ### Community 160 - "lib_mdk.dart"
 Cohesion: 0.06
@@ -1370,23 +1388,23 @@ Nodes (32): copyWith, discriminatorKey, discriminatorValue, ensureInitialized, f
 
 ### Community 163 - "library_filter_model.dart"
 Cohesion: 0.06
-Nodes (36): class, debugFillProperties, favourites, genres, groupBy, hideEmptyShows, itemFilters, LibraryFilterModelPatterns (+28 more)
+Nodes (32): class, debugFillProperties, favourites, genres, groupBy, hideEmptyShows, itemFilters, LibraryFilterModelPatterns (+24 more)
 
 ### Community 164 - "ox_media_issue_sheet.dart"
-Cohesion: 0.05
-Nodes (42): oxMediaIssueSubmitProvider, episodeDetailsProvider, OxMediaIssueCategory, displayTitle, episodeNumber, episodePrefix, _fromEpisode, fromItem (+34 more)
+Cohesion: 0.06
+Nodes (33): oxMediaIssueSubmitProvider, seerrUserProvider, OxMediaIssueCategory, build, submit, autofocus, build, _cancelFocus (+25 more)
 
 ### Community 165 - "trickplayer_model.dart"
 Cohesion: 0.06
 Nodes (32): addPosition, array, Bif, BifData, bifImgCount, BifIndexEntry, bifMagicNumbers, BifUtil (+24 more)
 
 ### Community 166 - "client_settings_advanced.dart"
-Cohesion: 0.05
-Nodes (36): IconData, color, FundingSponsor, icon, name, platform, sponsors, url (+28 more)
+Cohesion: 0.12
+Nodes (15): IconData, color, FundingSponsor, icon, name, platform, sponsors, url (+7 more)
 
 ### Community 167 - "native_player.dart"
 Cohesion: 0.06
-Nodes (33): activity, dispose, init, loadVideo, loop, nativeActivityStarted, onMuxedTracksDiscovered, onPlaybackError (+25 more)
+Nodes (32): activity, dispose, init, loadVideo, loop, nativeActivityStarted, onMuxedTracksDiscovered, onPlaybackError (+24 more)
 
 ### Community 168 - "Container.tsx"
 Cohesion: 0.13
@@ -1397,8 +1415,8 @@ Cohesion: 0.16
 Nodes (5): TranslationsPigeon, FlutterError, VideoPlayerControlsCallback, VideoPlayerListenerCallback, Throwable
 
 ### Community 170 - "@Freezed"
-Cohesion: 0.08
-Nodes (23): ItemsItemIdRefreshPostImageRefreshMode? get, ItemsItemIdRefreshPostMetadataRefreshMode? get, api, fromDto, imageRefreshMode, ItemLocation, label, MetadataRefresh (+15 more)
+Cohesion: 0.05
+Nodes (41): @Freezed, SeerrFilterModelPatterns, SeerrMediaInfoPatterns, SeerrRadarrServerPatterns, SeerrRadarrServerResponsePatterns, SeerrRootFolderPatterns, SeerrServiceProfilePatterns, SeerrServiceTagPatterns (+33 more)
 
 ### Community 171 - "GeneratedPluginRegistrant.swift"
 Cohesion: 0.06
@@ -1409,28 +1427,31 @@ Cohesion: 0.07
 Nodes (31): FocusScopeNode, build, child, controller, createState, _CustomKeyboardView, _CustomKeyboardViewState, CustomKeyboardWrapper (+23 more)
 
 ### Community 173 - "video_player_settings_provider.dart"
-Cohesion: 0.04
-Nodes (44): _, firstWhereOrNull, matched, oxplayerResolvePlaybackAudioStream, streams, wantIdx, oxplayerInitVideoPlayerIfNeeded, read (+36 more)
+Cohesion: 0.08
+Nodes (25): _, build, clearOverlaySettings, closePlayer, controls, createState, determineShow, dispose (+17 more)
 
 ### Community 174 - "sync_options_button.dart"
-Cohesion: 0.07
-Nodes (29): _calculateWidth, _transcodeProfile, writeMusicOverlayFile, writeOverlayFile, writePlaylistChildrenOverlay, buildClientSettingsDownload, canSync, clientSettings (+21 more)
+Cohesion: 0.06
+Nodes (38): backgroundDownloaderProvider, build, globalConfig, itemDownloadGroup, setMaxConcurrent, updateListener, updateTranslations, _calculateWidth (+30 more)
 
 ### Community 175 - "player_settings_helper.g.dart"
 Cohesion: 0.06
 Nodes (31): a, acceptedOrientations, AutoNextType, _createConnectionError, decode, _deepEquals, enableTunneling, encode (+23 more)
 
 ### Community 176 - "fladder_image.dart"
-Cohesion: 0.09
-Nodes (20): AlignmentGeometry?, ImageProvider get, alignment, blurFit, blurOnly, cachedImage, decodeHeight, disableBlur (+12 more)
+Cohesion: 0.22
+Nodes (8): ImageProvider get, isUsableHttpImageUrl, lo, t, transparentPlaceholderImageProvider, u, package:flutter/painting.dart, package:transparent_image/transparent_image.dart
 
 ### Community 177 - "@riverpod"
 Cohesion: 0.05
-Nodes (58): _, @riverpod, oxItemFlagsProvider, OxItemFlags, oxMediaIssueSubmitProvider, OxMediaIssueSubmit, oxMovieSeerrRequestProvider, oxMovieSeerrRequest (+50 more)
+Nodes (58): _, @DriftDatabase, @riverpod, AppDatabase, oxItemFlagsProvider, OxItemFlags, oxMediaIssueSubmitProvider, OxMediaIssueSubmit (+50 more)
 
 ### Community 178 - "background_image.dart"
-Cohesion: 0.10
-Nodes (20): @immutable, AdaptiveLayoutModel, controller, copyWith, end, hashCode, inputDevice, isDesktop (+12 more)
+Cohesion: 0.08
+Nodes (25): dateAdded,
+  tags,
+  releaseDate,
+  rating,, ItemFilter, 0, descending, GroupBy, ItemFilterExtension, label, SortingOptions (+17 more)
 
 ### Community 179 - "verify_native_abi_parity.dart"
 Cohesion: 0.06
@@ -1441,20 +1462,20 @@ Cohesion: 0.08
 Nodes (24): body, _cacheDir, clearAll, _dir, _dirFuture, _dirName, _fnv1aHex, fromJson (+16 more)
 
 ### Community 181 - "base_app_wrapper.dart"
-Cohesion: 0.07
-Nodes (30): _initializeNotifications, addPosterSize, ClientSettingsNotifier, closeDirectory, _debouncer, initialize, ref, setAmoledBlack (+22 more)
+Cohesion: 0.06
+Nodes (35): _initializeNotifications, localConnectionAvailableProvider, onStateChange, addPosterSize, ClientSettingsNotifier, closeDirectory, _debouncer, initialize (+27 more)
 
 ### Community 182 - "view_model.dart"
-Cohesion: 0.04
-Nodes (50): photoViewSettingsProvider, build, controller, createState, currentIndex, currentPage, dispose, dragUpDelta (+42 more)
+Cohesion: 0.08
+Nodes (29): photoViewSettingsProvider, _onKey, buildViewer, _PhotoViewerScreenState, build, createState, didChangeAppLifecycleState, dispose (+21 more)
 
 ### Community 183 - "ox_library_item_ratings.dart"
-Cohesion: 0.20
-Nodes (9): api, filePath, oxSeerrBackdropUrl, oxSeerrLogoUrl, oxSeerrPosterUrl, oxSeerrProfileUrl, oxSeerrStillUrl, _resolve (+1 more)
+Cohesion: 0.07
+Nodes (24): HttpFileService, api, filePath, oxSeerrBackdropUrl, oxSeerrLogoUrl, oxSeerrPosterUrl, oxSeerrProfileUrl, oxSeerrStillUrl (+16 more)
 
 ### Community 184 - "oxplayer_playback_diag_runner.dart"
-Cohesion: 0.05
-Nodes (36): global,, _appContext, cancel, _cancelled, _deriveChecks, _encode, _fetchResumePlaybackUrl, _nodesOk (+28 more)
+Cohesion: 0.08
+Nodes (23): _appContext, cancel, _cancelled, _deriveChecks, _encode, _fetchResumePlaybackUrl, _nodesOk, _playbackContext (+15 more)
 
 ### Community 185 - "assetPath"
 Cohesion: 0.10
@@ -1473,20 +1494,20 @@ Cohesion: 0.08
 Nodes (27): _, availableLanguages, cachePath, class, ControlServerModelPatterns, controlServerProvider, language, maxConcurrentLibraryScan (+19 more)
 
 ### Community 189 - "media_banner.dart"
-Cohesion: 0.10
-Nodes (20): animateToTarget, build, controller, createState, currentPage, dispose, dragIntensity, dragOffset (+12 more)
+Cohesion: 0.06
+Nodes (36): build, CarouselBanner, _CarouselBannerState, carouselController, controller, createState, items, maxHeight (+28 more)
 
 ### Community 190 - "progress_floating_button.dart"
-Cohesion: 0.07
-Nodes (30): RoundedTrackShape, CustomTrackShape, build, cancel, controller, createState, CustomTrackShape, dispose (+22 more)
+Cohesion: 0.08
+Nodes (25): build, cancel, controller, createState, dispose, _duration, getPreferredRect, initState (+17 more)
 
 ### Community 191 - "video_player_guide_wrapper.dart"
 Cohesion: 0.07
 Nodes (27): animDuration, build, child, createState, _GuideOverview, _GuideOverviewState, guideVisible, initState (+19 more)
 
 ### Community 192 - "adaptive_layout.dart"
-Cohesion: 0.07
-Nodes (30): AdaptiveLayoutBuilder, _AdaptiveLayoutBuilderState, adaptivePadding, calculateLayout, calculateSize, createState, currentPlatform, data (+22 more)
+Cohesion: 0.06
+Nodes (30): @immutable, adaptivePadding, calculateLayout, calculateSize, createState, currentPlatform, data, defaultTitleBarHeight (+22 more)
 
 ### Community 193 - "focus_provider.dart"
 Cohesion: 0.07
@@ -1509,8 +1530,8 @@ Cohesion: 0.12
 Nodes (4): AudioTrack, SimpleItemModel, SubtitleSettings, SubtitleTrack
 
 ### Community 198 - "ox_series_seerr_request.dart"
-Cohesion: 0.11
-Nodes (19): _backToSeasons, build, createState, _episodeTiles, initState, onEpisodePlayed, _onEpisodeStep, OxSeriesEpisodePickerSheet (+11 more)
+Cohesion: 0.08
+Nodes (28): _allTransitiveDependencies, call, combine, createElement, _dependencies, finish, getProviderOverride, name (+20 more)
 
 ### Community 199 - "discovery_provider.dart"
 Cohesion: 0.08
@@ -1521,166 +1542,166 @@ Cohesion: 0.08
 Nodes (24): alignToInterval, build, _channelScrollControllers, createState, currentChannel, didUpdateWidget, dispose, _generateTimeLabels (+16 more)
 
 ### Community 201 - "movies_details_provider.dart"
-Cohesion: 0.09
-Nodes (25): _, _allTransitiveDependencies, arg, call, combine, createElement, _dependencies, finish (+17 more)
+Cohesion: 0.06
+Nodes (35): _, _allTransitiveDependencies, arg, call, combine, createElement, _dependencies, finish (+27 more)
 
 ### Community 202 - "library_filters_provider.dart"
 Cohesion: 0.04
-Nodes (55): AutoDisposeNotifierProviderElement, AutoDisposeNotifierProviderImpl, AutoDisposeNotifierProviderRef, _, _allTransitiveDependencies, call, ChannelDetailsFamily, ChannelDetailsProvider (+47 more)
+Nodes (59): AutoDisposeNotifierProviderElement, AutoDisposeNotifierProviderImpl, AutoDisposeNotifierProviderRef, _, _allTransitiveDependencies, call, ChannelDetailsFamily, ChannelDetailsProvider (+51 more)
 
 ### Community 203 - "control_dashboard_provider.dart"
-Cohesion: 0.08
-Nodes (25): _, class, ControlDashboardModelPatterns, controlDashboardProvider, isShuttingDown, itemCounts, _self, serverName (+17 more)
+Cohesion: 0.09
+Nodes (24): _, class, ControlDashboardModelPatterns, controlDashboardProvider, isShuttingDown, itemCounts, _self, serverName (+16 more)
 
 ### Community 204 - "photo_viewer_screen.dart"
-Cohesion: 0.14
-Nodes (15): apiKey, class, customHeaders, SeerrCredentialsModelPatterns, _self, serverUrl, sessionCookie, toJson (+7 more)
+Cohesion: 0.07
+Nodes (27): bottomPadding, build, cacheNeighbors, controller, createState, currentPage, currentScale, didChangeAppLifecycleState (+19 more)
 
 ### Community 205 - "Text"
-Cohesion: 0.15
-Nodes (17): FocusRequester, Modifier, TVGuideModel, ProgressBar(), SimpleProgressBar(), StandardProgressBar(), TVProgressBar(), VideoLabel() (+9 more)
+Cohesion: 0.11
+Nodes (23): FocusRequester, Modifier, TVGuideModel, ProgressBar(), SimpleProgressBar(), StandardProgressBar(), TVProgressBar(), VideoLabel() (+15 more)
 
 ### Community 206 - "fladder_slider.dart"
 Cohesion: 0.08
 Nodes (24): Animation, activeTrackColor, animation, build, _controller, createState, _currentValue, didUpdateWidget (+16 more)
 
 ### Community 207 - "ox_media_issue_context.dart"
-Cohesion: 0.10
-Nodes (19): SubtitleSettingsModel, ref, resetSettings, setBackgroundColor, setBackGroundOpacity, setFontSize, setFontWeight, setOutlineColor (+11 more)
+Cohesion: 0.13
+Nodes (14): SubtitleSettingsModel, ref, resetSettings, setBackgroundColor, setBackGroundOpacity, setFontSize, setFontWeight, setOutlineColor (+6 more)
 
 ### Community 208 - "home_settings_model.dart"
 Cohesion: 0.08
-Nodes (26): carouselSettings, class, HomeSettingsModelPatterns, layoutStates, nextUp, screenLayouts, _self, toJson (+18 more)
+Nodes (25): carouselSettings, class, HomeSettingsModelPatterns, layoutStates, nextUp, screenLayouts, _self, toJson (+17 more)
 
 ### Community 209 - "channel_details_provider.dart"
-Cohesion: 0.03
-Nodes (68): TaskTriggerInfo, build, ControlActiveTasksPage, createState, _intervalOptions, _selectedDay, _selectedInterval, _selectedTime (+60 more)
+Cohesion: 0.08
+Nodes (25): ListingsProviderInfo, TunerHostInfo, _addTunerHost, build, ControlLiveTvPage, _deleteListingProvider, _deleteTunerHost, _editListingProvider (+17 more)
 
 ### Community 210 - "ConsumerState"
-Cohesion: 0.05
-Nodes (35): DeviceOrientation, dispose, _initVolumeSync, nextChapter, prevChapter, ref, _sanitizeCrossfade, setBufferSize (+27 more)
+Cohesion: 0.06
+Nodes (31): dispose, _initVolumeSync, nextChapter, prevChapter, ref, _sanitizeCrossfade, setBufferSize, setCrossfadeDurationMs (+23 more)
 
 ### Community 211 - "floating_search_bar.dart"
-Cohesion: 0.06
-Nodes (30): _, FullScreenHelper, getBackdropImage, getChapterUrl, getItemsImageUrl, _leanBack, OxplayerImageNotifier, arguments (+22 more)
+Cohesion: 0.07
+Nodes (25): getBackdropImage, getChapterUrl, getItemsImageUrl, _leanBack, OxplayerImageNotifier, arguments, hasExistingSettings, _hasPersistedClientSettings (+17 more)
 
 ### Community 212 - "video_stream_model.dart"
-Cohesion: 0.07
-Nodes (26): directStream,
+Cohesion: 0.06
+Nodes (30): MediaSegmentsModelPatterns, directStream,
   offline,
-  transcode,, audioStreamIndex, audioStreams, chapters, clear, copyWith, currentItem, currentPosition (+18 more)
+  transcode,, MediaSegmentsModel, _MediaSegmentsModel, audioStreamIndex, audioStreams, chapters, clear (+22 more)
 
 ### Community 213 - "lib_mdk_web.dart"
 Cohesion: 0.07
 Nodes (26): dispose, init, LibMDK, loadVideo, loop, open, pause, play (+18 more)
 
 ### Community 214 - "chapters_model.dart"
-Cohesion: 0.14
-Nodes (13): ChapterExtension, copyWith, fromJson, fromMap, getChapterFromDuration, imageData, imageUrl, name (+5 more)
+Cohesion: 0.08
+Nodes (25): EditingImageModel, fromImage, Chapter, ChapterExtension, chaptersFromInfo, copyWith, fromJson, fromMap (+17 more)
 
 ### Community 215 - "oxplayer_dashboard_skeleton.dart"
 Cohesion: 0.09
-Nodes (27): _, _allTransitiveDependencies, call, catalogId, combine, createElement, _dependencies, finish (+19 more)
+Nodes (26): _, _allTransitiveDependencies, call, catalogId, combine, createElement, _dependencies, finish (+18 more)
 
 ### Community 216 - "simple_video_player.dart"
 Cohesion: 0.09
 Nodes (22): chapters, close, decline, endsAt, hoursAndMinutes, next, nextUpInSeconds, nextVideo (+14 more)
 
 ### Community 217 - "photo_viewer_controls.dart"
-Cohesion: 0.12
-Nodes (15): id, isBrowseOnly, itemModel, kind, normalized, oxplayerIsBrowseSimilarItemId, oxplayerPosterFromCatalogDto, oxplayerPosterFromCatalogItem (+7 more)
+Cohesion: 0.13
+Nodes (13): isUnlocked, _key, OxplayerDeveloperModeStore, unlock, clear, _key, _keyPrefix, OxplayerSessionStore (+5 more)
 
 ### Community 218 - ".agents/skills/caveman-compress/README.md"
 Cohesion: 0.09
 Nodes (20): Before / After, Benchmarks, How It Work, <img src="../../docs/assets/dancing-rock.svg" width="20" height="20" alt="rock"/> Caveman (285 tokens), Install, 📄 Original (706 tokens), Part of Caveman, Security (+12 more)
 
 ### Community 219 - "screenshot_runner.dart"
-Cohesion: 0.08
-Nodes (25): build, _capture, child, createState, _currentIndex, _defaultDeviceProfiles, _DeviceProfile, inputDevice (+17 more)
+Cohesion: 0.04
+Nodes (45): buildClientSettingsAdvanced, settingsListGroup, LayoutMode, controller, copyWith, end, hashCode, inputDevice (+37 more)
 
 ### Community 220 - "sync-firebase-client-config.mjs"
 Cohesion: 0.16
 Nodes (25): accessToken(), b64url(), beRoot, clientRoot, dartString(), downloadGoogleServices(), ensureAndroidApp(), fetchConsoleFirebaseFromInfisical() (+17 more)
 
 ### Community 221 - "CustomVideoControls"
-Cohesion: 0.11
-Nodes (20): CustomButton(), Color, Dp, Modifier, Shape, Modifier, SeekOverlay(), Modifier (+12 more)
+Cohesion: 0.12
+Nodes (19): CustomButton(), Color, Dp, Modifier, Shape, Modifier, SeekOverlay(), Modifier (+11 more)
 
 ### Community 222 - "VideoPlayerImplementation.kt"
-Cohesion: 0.13
-Nodes (18): clearSession(), PlayableData, SubtitleSettings, TVGuideModel, open(), oxAudioLog(), oxStreamLog(), play() (+10 more)
+Cohesion: 0.12
+Nodes (19): clearSession(), init(), PlayableData, SubtitleSettings, TVGuideModel, open(), oxAudioLog(), oxStreamLog() (+11 more)
 
 ### Community 223 - "notification_service.dart"
-Cohesion: 0.06
-Nodes (33): AndroidFlutterLocalNotificationsPlugin, @pragma, IOSFlutterLocalNotificationsPlugin, callbackDispatcher, _fetchAndNotifyLatestItemsForAccount, _fetchAndNotifySeerrRequestsForAccount, performHeadlessUpdateCheck, updateTaskName (+25 more)
+Cohesion: 0.08
+Nodes (24): AndroidFlutterLocalNotificationsPlugin, @pragma, IOSFlutterLocalNotificationsPlugin, callbackDispatcher, performHeadlessUpdateCheck, _backgroundNotificationHandler, _channelDesc, _channelId (+16 more)
 
 ### Community 224 - "home_preferences_model.dart"
-Cohesion: 0.13
-Nodes (16): availableFolders, class, groupedFolders, hidePlayedInLatest, HomePreferencesModelPatterns, latestItemsExcludes, loading, orderedLibraryIds (+8 more)
+Cohesion: 0.07
+Nodes (28): availableFolders, class, groupedFolders, hidePlayedInLatest, HomePreferencesModelPatterns, latestItemsExcludes, loading, orderedLibraryIds (+20 more)
 
 ### Community 225 - "live_tv_model.dart"
-Cohesion: 0.13
-Nodes (13): canonicalId, id, oxCanonicalTmdbPersonItemId, oxPersonHasNavigableTmdbId, oxPersonWithCanonicalId, oxTmdbPersonIdFromRawId, s, tmdbId (+5 more)
+Cohesion: 0.15
+Nodes (14): _, channels, class, endDate, LiveTvModelPatterns, loadedChannelIds, loadingChannelIds, _self (+6 more)
 
 ### Community 226 - "book_viewer_settings_provider.dart"
 Cohesion: 0.08
 Nodes (24): contained,, leftToRight,, BookViewerSettingsModel, BookViewerSettingsNotifier, cachePageZoom, copyWith, covered, _debouncer (+16 more)
 
 ### Community 227 - "package:path_provider/path_provider.dart"
-Cohesion: 0.11
-Nodes (14): clearSyncedStoreRows, clearSyncedStoreRows, customStatement, driftDatabase, openConnection, openConnection, driftDatabase, openConnection (+6 more)
+Cohesion: 0.14
+Nodes (10): clearSyncedStoreRows, clearSyncedStoreRows, customStatement, driftDatabase, openConnection, openConnection, driftDatabase, openConnection (+2 more)
 
 ### Community 228 - "video_player_provider.dart"
-Cohesion: 0.05
-Nodes (40): addToTemporaryQueue, clearTemporaryQueue, init, _isOxStreamRemuxUrl, mediaState, openPlayer, playAudioQueueItem, playbackState (+32 more)
+Cohesion: 0.08
+Nodes (24): addToTemporaryQueue, clearTemporaryQueue, init, _isOxStreamRemuxUrl, loadAudioPlaybackItem, loadPlaybackItem, mediaState, openPlayer (+16 more)
 
 ### Community 229 - "book_viewer_reader.dart"
-Cohesion: 0.06
-Nodes (32): @HostApi, AutoNextType, package:pigeon/pigeon.dart, newInstance, openNewWindow, BatteryOptimizationPigeon, isIgnoringBatteryOptimizations, openBatteryOptimizationSettings (+24 more)
+Cohesion: 0.11
+Nodes (18): AutoNextType, acceptedOrientations, AutoNextType, enableTunneling, fillScreen, PlayerOrientations, Screensaver, SegmentSkip (+10 more)
 
 ### Community 230 - "media_playback_model.dart"
 Cohesion: 0.08
 Nodes (23): AudioRepeatMode get, AudioRepeatMode, buffer, buffering, completed, copyWith, duration, errorPlaying (+15 more)
 
 ### Community 231 - "control_livetv_provider.dart"
-Cohesion: 0.05
-Nodes (39): _, class, ControlLiveTvModelPatterns, controlLiveTvProvider, liveTvOptions, _self, toString, ControlLiveTvModel (+31 more)
+Cohesion: 0.10
+Nodes (21): _, class, ControlLiveTvModelPatterns, controlLiveTvProvider, liveTvOptions, _self, toString, ControlLiveTvModel (+13 more)
 
 ### Community 232 - "oxplayer_seerr_feed.dart"
-Cohesion: 0.03
-Nodes (63): BorderRadius, Clip, CustomClipper, FocusNode, build, _closeButtonFocusNode, context, createState (+55 more)
+Cohesion: 0.11
+Nodes (18): CustomClipper, autoFocus, build, forceFocusOutline, getClip, item, MediaPlayButton, _PlayButton (+10 more)
 
 ### Community 233 - "identify_provider.dart"
 Cohesion: 0.09
 Nodes (23): api, body, clearFields, copyWith, externalIds, fetchInformation, id, IdentifyModel (+15 more)
 
 ### Community 234 - "package:fladder/models/syncing/sync_item.dart"
-Cohesion: 0.18
-Nodes (11): canDelete, canDownload, ItemPropertiesModelPatterns, toString, ItemPropertiesModel, _, ItemPropertiesModel, _ItemPropertiesModel (+3 more)
+Cohesion: 0.11
+Nodes (19): canDelete, canDownload, ItemPropertiesModelPatterns, toString, class, items, _self, _SyncSettignsModel (+11 more)
 
 ### Community 235 - "video_progress_bar.dart"
-Cohesion: 0.09
-Nodes (23): buffer, buffering, build, calculateEndOffset, calculateFractionWidth, calculateRightOffset, calculateStartOffset, chapterCard (+15 more)
+Cohesion: 0.05
+Nodes (36): buffer, buffering, build, calculateEndOffset, calculateFractionWidth, calculateRightOffset, calculateStartOffset, chapterCard (+28 more)
 
 ### Community 236 - "item_actions.dart"
 Cohesion: 0.09
 Nodes (23): backgroundColor, copyWith, foregroundColor, groupButtons, icon, ItemAction, ItemActionButton, ItemActionDivider (+15 more)
 
 ### Community 237 - "ItemBaseModel"
-Cohesion: 0.11
-Nodes (18): BookModel? get, ImagesData? get, BookModel, api, book, bookDetailsProvider, BookDetailsProviderNotifier, BookProviderModel (+10 more)
+Cohesion: 0.12
+Nodes (16): BookModel? get, ImagesData? get, api, book, bookDetailsProvider, BookDetailsProviderNotifier, BookProviderModel, chapters (+8 more)
 
 ### Community 238 - "my_application.cc"
 Cohesion: 0.11
 Nodes (18): FlPluginRegistry, GApplication, gboolean, gchar, GObject, GtkApplication, fl_register_plugins(), main() (+10 more)
 
 ### Community 239 - "refresh_metadata.dart"
-Cohesion: 0.13
-Nodes (14): actions, addDivider, backButton, barrierDismissible, build, _buildFooter, _buildHeader, closeButton (+6 more)
+Cohesion: 0.08
+Nodes (26): ExtendedPageController, build, controller, createState, currentIndex, currentPage, dispose, dragUpDelta (+18 more)
 
 ### Community 240 - "detail_scaffold.dart"
-Cohesion: 0.04
-Nodes (47): Alignment, ImageProvider?, ImageData, alignment, AnimatedFadeSize, build, child, duration (+39 more)
+Cohesion: 0.05
+Nodes (38): Alignment, ImageData, alignment, AnimatedFadeSize, build, child, duration, backDrops (+30 more)
 
 ### Community 241 - "focused_outlined_text_field.dart"
 Cohesion: 0.09
@@ -1703,24 +1724,24 @@ Cohesion: 0.10
 Nodes (21): AutoRoute, AutoRouteGuard, AuthGuard, controlPanelPageRoute, _controlPanelRoutes, _defaultRoutes, defaultRouteType, detailsRoutes (+13 more)
 
 ### Community 246 - "update_notifications_provider.dart"
-Cohesion: 0.06
-Nodes (36): connectivityStatusProvider, dart:isolate, build, checkConnectivity, checkLocalUrl, ConnectionState, ConnectivityStatus, connectivityStatusProvider (+28 more)
+Cohesion: 0.05
+Nodes (44): @AutoRouterConfig, dart:isolate, _fetchAndNotifyLatestItemsForAccount, _fetchAndNotifySeerrRequestsForAccount, updateTaskName, updateTaskNameDebug, updateWorkerPortName, autoRouter (+36 more)
 
 ### Community 247 - "oxplayer_playback_telemetry.dart"
-Cohesion: 0.15
-Nodes (13): build, context, controller, createState, error, loading, openQuickConnectDialog, QuickConnectDialog (+5 more)
+Cohesion: 0.09
+Nodes (20): blocksRootPop, handleRootBack, _lastPress, OxplayerDoubleBackExit, resetLastPress, window, _applyHttpScope, _lastVolumeAnomalyAt (+12 more)
 
 ### Community 248 - "oxplayer_seerr_search_people.dart"
-Cohesion: 0.07
-Nodes (26): baseUrl, limit, oxFetchItemRecommendations, token, uri, 99, addItems, api (+18 more)
+Cohesion: 0.05
+Nodes (39): episodeDetailsProvider, int get, displayTitle, episodeNumber, episodePrefix, _fromEpisode, fromItem, _fromMovie (+31 more)
 
 ### Community 249 - "oxplayer_splash_telemetry.dart"
-Cohesion: 0.04
-Nodes (51): beforeSend, beforeSendTransaction, _eventText, _framesText, _frameText, _isBenignAnr, _isBenignMissingPlugin, _isChannelCallbackNativeNoise (+43 more)
+Cohesion: 0.09
+Nodes (21): _afterInitialDelayMs, _authMethod, finishAndReport, _firstFrameMs, _hadAccount, kOxSlowSplashThresholdMs, markAccountContext, markAfterInitialDelay (+13 more)
 
 ### Community 250 - "State"
-Cohesion: 0.09
-Nodes (33): _OxOptionalUpdateDialog, _OxOptionalUpdateDialogState, OxUpdatePromptHost, _OxUpdatePromptHostState, OxSkeletonBox, _OxSkeletonBoxState, _NewTaskTrigger, _NewTaskTriggerState (+25 more)
+Cohesion: 0.08
+Nodes (37): _OxOptionalUpdateDialog, _OxOptionalUpdateDialogState, OxUpdatePromptHost, _OxUpdatePromptHostState, OxSkeletonBox, _OxSkeletonBoxState, _NewTaskTrigger, _NewTaskTriggerState (+29 more)
 
 ### Community 251 - "input_detector.dart"
 Cohesion: 0.10
@@ -1743,8 +1764,8 @@ Cohesion: 0.10
 Nodes (21): @HEAD, artistsNameImagesImageTypeImageIndexHead, audioItemIdMasterM3u8Head, audioItemIdStreamContainerHead, audioItemIdStreamHead, audioItemIdUniversalHead, genresNameImagesImageTypeHead, genresNameImagesImageTypeImageIndexHead (+13 more)
 
 ### Community 256 - "adaptive_layout_model.dart"
-Cohesion: 0.15
-Nodes (12): CustomPainter, activeColor, build, _GappedContainerPainter, GappedContainerShape, inActiveColor, paint, shouldRepaint (+4 more)
+Cohesion: 0.08
+Nodes (23): connectivityStatusProvider, base, decoded, message, oxPostSeerrIssue, response, toString, uri (+15 more)
 
 ### Community 257 - "credentials_model.dart"
 Cohesion: 0.10
@@ -1752,11 +1773,11 @@ Nodes (21): class, CredentialsModelPatterns, debugFillProperties, deviceId, loca
 
 ### Community 258 - "trick_play_model.dart"
 Cohesion: 0.10
-Nodes (20): class, height, images, interval, _self, thumbnailCount, tileHeight, tileWidth (+12 more)
+Nodes (19): class, height, images, interval, _self, thumbnailCount, tileHeight, tileWidth (+11 more)
 
 ### Community 259 - "package:riverpod_annotation/riverpod_annotation.dart"
-Cohesion: 0.03
-Nodes (83): _allTransitiveDependencies, call, combine, createElement, _dependencies, finish, getProviderOverride, name (+75 more)
+Cohesion: 0.04
+Nodes (54): seerrDashboardProvider, SeerrDashboardPosterModel, false, oxHasRequestableSeasons, oxIsRequestableSeasonNumber, oxMovieIsRequestable, oxRequestableSeasons, oxSeasonIsFullyAvailable (+46 more)
 
 ### Community 260 - "session_info_provider.dart"
 Cohesion: 0.11
@@ -1775,12 +1796,12 @@ Cohesion: 0.15
 Nodes (18): Error, FlutterStandardMessageCodec, FlutterStandardReaderWriter, DirectoryBookmark, DirectoryBookmarkPigeonCodec, DirectoryBookmarkPigeonCodecReaderWriter, DirectoryBookmarkSetup, isNullish() (+10 more)
 
 ### Community 264 - "package:fladder/jellyfin/jellyfin_open_api.enums.swagger.dart"
-Cohesion: 0.15
-Nodes (12): InheritedWidget, AdaptiveLayout, FocusProvider, PositionProvider, RefreshState, dark, light, maybeOf (+4 more)
+Cohesion: 0.08
+Nodes (24): _backToAccountGrid, _bootstrap, _bootstrapError, _bootstrapping, build, _consumeSystemBack, createState, _editUsersMode (+16 more)
 
 ### Community 265 - "oxplayer_sentry_filters.dart"
-Cohesion: 0.17
-Nodes (11): build, child, createState, lastScale, PinchPosterZoom, _PinchPosterZoomState, build, iconColor (+3 more)
+Cohesion: 0.10
+Nodes (20): beforeSend, beforeSendTransaction, _eventText, _framesText, _frameText, _isBenignAnr, _isBenignMissingPlugin, _isChannelCallbackNativeNoise (+12 more)
 
 ### Community 266 - "book_viewer_provider.dart"
 Cohesion: 0.10
@@ -1791,18 +1812,18 @@ Cohesion: 0.10
 Nodes (20): build, controller, createState, data, dragStart, extensions, FilePickerBar, _FilePickerBarState (+12 more)
 
 ### Community 268 - "transcode_music_download_model.dart"
-Cohesion: 0.10
-Nodes (19): aac,
+Cohesion: 0.07
+Nodes (27): aac,
   mp3,
-  opus,, DeviceProfile get, audioCodec, calculatedContentLength, container, copyWith, curlHeaders, deviceProfile (+11 more)
+  opus,, DeviceProfile get, audioCodec, calculatedContentLength, container, copyWith, curlHeaders, deviceProfile (+19 more)
 
 ### Community 269 - "CurrentTime"
 Cohesion: 0.12
 Nodes (14): ItemHeader(), Modifier, PlayableData, BlackScreensaver(), ScreenSaver(), Color, Dp, Modifier (+6 more)
 
 ### Community 270 - "last_seen_notifications_model.dart"
-Cohesion: 0.11
-Nodes (20): class, lastNotifications, lastSeen, LastSeenModelPatterns, LastSeenNotificationsModelPatterns, _self, toJson, toString (+12 more)
+Cohesion: 0.12
+Nodes (19): class, lastNotifications, lastSeen, LastSeenModelPatterns, LastSeenNotificationsModelPatterns, _self, toJson, toString (+11 more)
 
 ### Community 271 - "directory_browser_provider.dart"
 Cohesion: 0.12
@@ -1810,7 +1831,7 @@ Nodes (17): _, class, currentPath, DirectoryBrowserModelPatterns, directoryBrows
 
 ### Community 272 - "offline_playback_model.dart"
 Cohesion: 0.06
-Nodes (35): AudioUrlResolver, _directUrl, ref, resolve, audioStreams, chapters, copyWith, nextVideo (+27 more)
+Nodes (30): audioStreams, chapters, copyWith, nextVideo, playbackStarted, previousVideo, _progressFor, setAudio (+22 more)
 
 ### Community 273 - "key_listener.dart"
 Cohesion: 0.10
@@ -1837,28 +1858,28 @@ Cohesion: 0.12
 Nodes (18): class, filter, id, ids, isFavourite, LibraryFiltersModelPatterns, name, _self (+10 more)
 
 ### Community 279 - "notification_model.dart"
-Cohesion: 0.09
-Nodes (22): _, childCount, id, image, key, NotificationModelPatterns, payLoad, subtitle (+14 more)
+Cohesion: 0.11
+Nodes (18): _, childCount, id, image, key, NotificationModelPatterns, payLoad, subtitle (+10 more)
 
 ### Community 280 - "book_viewer_screen.dart"
-Cohesion: 0.05
-Nodes (35): dart:io, Directory, AppBootstrapResult, applicationDirectory, applicationInfo, argumentsModel, bootstrapApplication, crashProvider (+27 more)
+Cohesion: 0.06
+Nodes (33): ArgumentsModel, ArgumentsModelPatterns, toString, Directory, AppBootstrapResult, applicationDirectory, applicationInfo, argumentsModel (+25 more)
 
 ### Community 281 - "devDependencies"
 Cohesion: 0.11
 Nodes (19): eslint, eslint-config-next, sharp, tailwindcss, @tailwindcss/postcss, @types/node, @types/react, @types/react-dom (+11 more)
 
 ### Community 282 - "ox_subtitle_font.dart"
-Cohesion: 0.11
-Nodes (18): _assColor, assForceStyle, backgroundStyleFor, defaultSettings, family, _isArabicScriptRune, _isLatinLetterRune, isPersianOrArabicLanguage (+10 more)
+Cohesion: 0.08
+Nodes (24): dart:math, _assColor, assForceStyle, backgroundStyleFor, defaultSettings, family, _isArabicScriptRune, _isLatinLetterRune (+16 more)
 
 ### Community 283 - "theme.dart"
 Cohesion: 0.11
 Nodes (18): applyChineseFontToDarkTheme, applyChineseFontToTheme, base, defaultPosterDecoration, defaultScheme, defaultShape, FladderTheme, generateDynamicColourSchemes (+10 more)
 
 ### Community 284 - "resolution_checker.dart"
-Cohesion: 0.17
-Nodes (12): EditingImageModel, fromImage, Chapter, chaptersFromInfo, ImagesData, _episodeStillImage, _createAccountModel, fetchActivity (+4 more)
+Cohesion: 0.15
+Nodes (12): isOxMode, OxplayerSettingsVisibility, showClientSettingsAdvanced, showControlPanel, showProfileGroupedFolders, showProfileHomePreferencesSave, showProfileJellyfinNotifications, showProfileLibraryOrder (+4 more)
 
 ### Community 285 - "custom_tooltip.dart"
 Cohesion: 0.11
@@ -1877,36 +1898,36 @@ Cohesion: 0.11
 Nodes (17): ImageData? get, backDrop, copyWith, fromBaseItem, fromBaseItemParent, fromJson, fromMap, fromPersonDto (+9 more)
 
 ### Community 289 - "lock_screen.dart"
-Cohesion: 0.18
-Nodes (11): build, createState, expanded, initState, releaseInfo, SettingsUpdateInformation, _SettingsUpdateInformationState, UpdateInformation (+3 more)
+Cohesion: 0.07
+Nodes (30): ArtistDetailsNotifier get, ConsumerState, build, SubtitleText, artistDetailsProvider, subtitleSettingsProvider, _MusicDashboardScreenState, ArtistDetailScreen (+22 more)
 
 ### Community 290 - "ox_seerr_ratings.dart"
-Cohesion: 0.06
-Nodes (32): audienceRating, audienceScore, criticsRating, criticsScore, null, oxDoubleFromJson, oxIntFromJson, oxMergeSeerrImdb (+24 more)
+Cohesion: 0.11
+Nodes (17): audienceRating, audienceScore, criticsRating, criticsScore, null, oxDoubleFromJson, oxIntFromJson, oxMergeSeerrImdb (+9 more)
 
 ### Community 291 - "episode_details_provider.dart"
-Cohesion: 0.18
-Nodes (10): audioStreams, baseInformation, copyWith, fromResponse, mapToString, streamsToString, subStreams, toString (+2 more)
+Cohesion: 0.09
+Nodes (21): audioStreams, baseInformation, copyWith, fromResponse, mapToString, streamsToString, subStreams, toString (+13 more)
 
 ### Community 292 - "oxplayer_playback_diag_screen.dart"
-Cohesion: 0.13
-Nodes (14): build, context, controller, description, IntInputField, keyboardType, openSimpleTextInput, placeHolder (+6 more)
+Cohesion: 0.04
+Nodes (48): DeviceOrientation, OxplayerPlaybackDiagRunner, build, _cancel, _copy, createState, _DiagPhase, dispose (+40 more)
 
 ### Community 293 - "oxplayer_screen_telemetry.dart"
 Cohesion: 0.10
 Nodes (19): didPop, didPush, didRemove, didReplace, kOxSlowScreenFirstFrameMs, kOxSlowScreenLoadMs, _lastRoute, _lastRouteAt (+11 more)
 
 ### Community 294 - "oxplayer_share_deep_link.dart"
-Cohesion: 0.03
-Nodes (67): build, child, createState, force, initState, navigatePath, onDetails, oxplayerDeepLinkForRoute (+59 more)
+Cohesion: 0.12
+Nodes (17): build, child, createState, force, initState, navigatePath, onDetails, oxplayerDeepLinkForRoute (+9 more)
 
 ### Community 295 - "music_dashboard_provider.dart"
 Cohesion: 0.12
 Nodes (17): api, clear, copyWith, fetchMusicHome, fetchTrackQueue, loading, mostPlayed, MusicDashboardModel (+9 more)
 
 ### Community 296 - "navigation_button.dart"
-Cohesion: 0.12
-Nodes (17): badge, build, createState, customIcon, duration, expanded, hasFocus, horizontal (+9 more)
+Cohesion: 0.11
+Nodes (18): badge, build, createState, customIcon, duration, expanded, hasFocus, horizontal (+10 more)
 
 ### Community 297 - "win32_window.cpp"
 Cohesion: 0.18
@@ -1926,23 +1947,23 @@ Nodes (18): 1. Bump version (see top), 2. Prepare tag and fastlane changelog, 3.
 
 ### Community 301 - "oxplayer_playback_details_refresh.dart"
 Cohesion: 0.08
-Nodes (23): BuildContext? get, application, leanbackMode, os, oxplayerMediaBrowserHeaders, OxplayerRead, versionLabel, addNewUser (+15 more)
+Nodes (21): _accessToken, clear, OxplayerImageAuth, syncFromAccount, syncFromCredentials, application, leanbackMode, os (+13 more)
 
 ### Community 302 - "dart:convert"
-Cohesion: 0.17
-Nodes (11): build, child, DefaultVideoInformationBox, DisplayProfile, fromSize, fromStreams, fromVideoStream, fromVideoStreams (+3 more)
+Cohesion: 0.09
+Nodes (22): Curve, BookViewerScreen, _BookViewerScreenState, context, createState, extendedController, false, initialPage (+14 more)
 
 ### Community 303 - "update_checker.dart"
-Cohesion: 0.18
-Nodes (12): bR(), bw(), cS(), gaJ(), ge3(), i4(), jg(), ob() (+4 more)
+Cohesion: 0.12
+Nodes (16): capitalize, changelog, _compareVersions, DownloadLabelFormatter, downloads, downloadUrlFor, fetchRecentReleases, isNewerThanCurrent (+8 more)
 
 ### Community 304 - "hide_on_scroll.dart"
-Cohesion: 0.12
-Nodes (16): build, canHide, child, controller, createState, didUpdateWidget, dispose, duration (+8 more)
+Cohesion: 0.10
+Nodes (19): ensureVisible, EnsureVisibleHelper, build, canHide, child, controller, createState, didUpdateWidget (+11 more)
 
 ### Community 305 - "oxplayer_swr_http_client.dart"
-Cohesion: 0.04
-Nodes (48): Client?, Client get, http.BaseClient, _client, deleteAccount, _errorMessage, message, OxplayerAccountDeleteApi (+40 more)
+Cohesion: 0.11
+Nodes (17): http.BaseClient, _cloneRequest, close, _entryToStreamed, false, _inner, lower, OxplayerSwrHttpClient (+9 more)
 
 ### Community 306 - "k9"
 Cohesion: 0.20
@@ -1957,8 +1978,8 @@ Cohesion: 0.13
 Nodes (15): Axis, axis, build, childCount, children, createState, _offscreen, _OverflowDelegate (+7 more)
 
 ### Community 309 - "api_result.dart"
-Cohesion: 0.18
-Nodes (10): _defaultHeight, _defaultQuality, _defaultWidth, getBackdropImage, getBackdropOrigImage, getChapterUrl, getItemsImageUrl, getItemsOrigImageUrl (+2 more)
+Cohesion: 0.12
+Nodes (15): _, Future, ApiError, ApiResult, data, error, errorMessage, failure (+7 more)
 
 ### Community 310 - "dart:developer"
 Cohesion: 0.16
@@ -1969,8 +1990,8 @@ Cohesion: 0.14
 Nodes (11): Cocoa, desktop_multi_window, FlutterMacOS, FlutterPluginRegistry, FlutterViewController, RegisterGeneratedPlugins(), MainFlutterWindow, RunnerTests (+3 more)
 
 ### Community 312 - "mobile_app_wrapper.dart"
-Cohesion: 0.06
-Nodes (42): BaseAppWrapper, BaseAppWrapperState, createState, DesktopAppWrapper, _DesktopAppWrapperState, dispose, onWindowClose, onWindowMove (+34 more)
+Cohesion: 0.08
+Nodes (24): BaseAppWrapper, BaseAppWrapperState, PlatformAppBuilder, DesktopAppWrapper, _DesktopAppWrapperState, createState, MobileAppWrapper, _MobileAppWrapperState (+16 more)
 
 ### Community 313 - "recommended_model.dart"
 Cohesion: 0.17
@@ -1981,48 +2002,49 @@ Cohesion: 0.12
 Nodes (15): cleanServerUrl, needsSlash, resolveImageUrl, resolveServerUrl, serverUrl, tmdb, _tmdbBackdropBaseUrl, tmdbBackdropImages (+7 more)
 
 ### Community 315 - "return"
-Cohesion: 0.20
-Nodes (10): build, ChildSyncWidget, _ChildSyncWidgetState, createState, syncedChild, syncedItem, package:fladder/models/items/audio_model.dart, package:fladder/screens/syncing/widgets/synced_album_item.dart (+2 more)
+Cohesion: 0.03
+Nodes (68): info,
+  warning,, build, OxplayerHelpHeaderIconButton, build, label, onPressed, OxMovieRequestButton, prominent (+60 more)
 
 ### Community 316 - "package:fladder/providers/shared_provider.dart"
-Cohesion: 0.15
-Nodes (12): bindToState, buffer, buffering, completed, duration, PlayerStream, playing, position (+4 more)
+Cohesion: 0.09
+Nodes (21): build, context, _PlayerInformation, showDialog, showVideoPlaybackInformation, state, _VideoPlaybackInformation, bindToState (+13 more)
 
 ### Community 317 - "floating_player_bar.dart"
-Cohesion: 0.04
-Nodes (44): DeviceProfile, defaultProfile, musicDashboardModeProvider, pigeonPlayerSettingsSyncProvider, sendSettings, clearStack, _playTitle, ref (+36 more)
+Cohesion: 0.13
+Nodes (14): musicDashboardModeProvider, clearStack, _playTitle, ref, refreshTitle, removeTitle, setPlayTitle, _stackKeys (+6 more)
 
 ### Community 318 - "passcode_input.dart"
-Cohesion: 0.06
-Nodes (37): ConsumerState, build, SubtitleText, subtitleSettingsProvider, _PlayerSettingsPageState, build, SubtitleEditor, _SubtitleEditorState (+29 more)
+Cohesion: 0.09
+Nodes (21): addToPassCode, backSpace, build, createState, currentPasscode, dispose, iconSize, initState (+13 more)
 
 ### Community 319 - "fade_edges.dart"
-Cohesion: 0.12
-Nodes (15): alwaysNeedsCompositing, bottomFade, createRenderObject, FadeEdges, leftFade, _maskPaint, _needsFade, paint (+7 more)
+Cohesion: 0.09
+Nodes (20): double get, alwaysNeedsCompositing, bottomFade, createRenderObject, FadeEdges, leftFade, _maskPaint, _needsFade (+12 more)
 
 ### Community 320 - "animated_icon.dart"
 Cohesion: 0.13
 Nodes (15): AnimatedVisibilityIcon, AnimatedVisibilityIconState, _animateIconChange, build, createState, _currentFilledState, didUpdateWidget, displayDuration (+7 more)
 
 ### Community 321 - "poster_widget.dart"
-Cohesion: 0.03
-Nodes (63): dart:collection, build, context, false, options, PlaybackDialogue, playbackType, showDialog (+55 more)
+Cohesion: 0.08
+Nodes (22): build, ButtonGroupOption, child, ExpressiveButton, ExpressiveButtonGroup, icon, isSelected, label (+14 more)
 
 ### Community 322 - "translations_pigeon.dart"
-Cohesion: 0.18
-Nodes (10): build, context, _PlayerInformation, showDialog, showVideoPlaybackInformation, state, _VideoPlaybackInformation, PlayerState (+2 more)
+Cohesion: 0.20
+Nodes (9): allOrderableIds, dashboardRowIds, favoritesId, _insertRowIfMissing, isDashboardRowId, label, OxHomeDashboardOrder, tvViewId (+1 more)
 
 ### Community 323 - "FlutterWindow"
 Cohesion: 0.13
 Nodes (13): unique_ptr, DartProject, HWND, LPARAM, LRESULT, UINT, WPARAM, FlutterWindow (+5 more)
 
 ### Community 324 - "a7"
-Cohesion: 0.06
-Nodes (46): $0(), $4(), a7(), a8(), ag(), aL(), b1(), b8() (+38 more)
+Cohesion: 0.07
+Nodes (39): $0(), a7(), a8(), ag(), aL(), b8(), be(), bH() (+31 more)
 
 ### Community 325 - "NextUpOverlay"
-Cohesion: 0.27
-Nodes (8): conditional(), defaultSelected(), highlightOnFocus(), Color, Dp, Modifier, Shape, visible()
+Cohesion: 0.18
+Nodes (12): Modifier, MediaInfo(), NextUpOverlay(), showNextUp(), conditional(), defaultSelected(), highlightOnFocus(), Color (+4 more)
 
 ### Community 326 - "TrackHelper.kt"
 Cohesion: 0.20
@@ -2033,20 +2055,20 @@ Cohesion: 0.25
 Nodes (8): build, CollapseButton, _CollapseButtonState, createState, hovering, icon, keepVisible, label
 
 ### Community 328 - "ox_virtual_episode_images.dart"
-Cohesion: 0.14
-Nodes (13): _applyStillFromDto, copyWith, dtoById, episodes, external, id, null, oxApplyVirtualEpisodeImages (+5 more)
+Cohesion: 0.13
+Nodes (14): _applyStillFromDto, copyWith, dtoById, episodes, external, id, null, oxApplyVirtualEpisodeImages (+6 more)
 
 ### Community 329 - "oxplayer_route_env.dart"
-Cohesion: 0.04
-Nodes (49): ArgumentsModel, ArgumentsModelPatterns, toString, _, ArgumentsModel, htpcMode, leanBackMode, newWindow (+41 more)
+Cohesion: 0.09
+Nodes (21): _cForceEdge, _cGlobalApi, _cIranApi, _cIranEdgeAddr, _cIranStream, globalApiBaseUrl, hasIranRoute, iranApiBaseUrl (+13 more)
 
 ### Community 330 - "ox_labeled_iran_flag.dart"
 Cohesion: 0.25
 Nodes (8): build, child, createState, CustomShaderMask, CustomShaderMaskState, gradientImage, initState, _loadImage
 
 ### Community 331 - "list_extensions.dart"
-Cohesion: 0.08
-Nodes (21): firstWhereOrNull, oxplayerMediaSourceHasPlayableUrl, oxplayerResolvePlaybackMediaSource, path, requested, sources, uri, chunk (+13 more)
+Cohesion: 0.13
+Nodes (14): chunk, containsAny, ListExtensions, nextOrNull, nextWhereOrNull, previousOrNull, previousWhereOrNull, random (+6 more)
 
 ### Community 332 - "clickable_text.dart"
 Cohesion: 0.14
@@ -2054,7 +2076,7 @@ Nodes (14): build, _buildClickable, ClickableText, _ClickableTextState, createSt
 
 ### Community 333 - "modal_side_sheet.dart"
 Cohesion: 0.07
-Nodes (29): bookViewerProvider, bookViewerSettingsProvider, BookViewerChapters, BookViewerControls, _BookViewerControlsState, build, controls, loadNextBook (+21 more)
+Nodes (25): EdgeInsetsGeometry?, build, build, ControlPanelInfoItem, icon, info, label, addHeroTag (+17 more)
 
 ### Community 334 - "release-common.sh"
 Cohesion: 0.15
@@ -2069,8 +2091,8 @@ Cohesion: 0.19
 Nodes (7): BatteryOptimizationPigeon, BatteryOptimizationPigeonPigeonCodec, BatteryOptimizationPigeonPigeonUtils, BinaryMessenger, ByteBuffer, StandardMessageCodec, setUp()
 
 ### Community 337 - "BuildContext"
-Cohesion: 0.14
-Nodes (12): BuildContext, ColorScheme get, ClipboardHelper, BuildContextExtension, RefreshContextExtension, colors, textTheme, ThemeExtensions (+4 more)
+Cohesion: 0.11
+Nodes (16): BuildContext, ColorScheme get, build, NestedSliverAppBar, parent, route, ClipboardHelper, BuildContextExtension (+8 more)
 
 ### Community 338 - "download_stream.dart"
 Cohesion: 0.14
@@ -2078,7 +2100,7 @@ Nodes (13): DownloadTask?, copyWith, downloadSpeed, hasDownload, id, isEnqueuedO
 
 ### Community 339 - "Duration"
 Cohesion: 0.25
-Nodes (10): BackgroundImage, _backgroundImageProvider, _BackgroundImageState, build, createState, didUpdateWidget, images, initState (+2 more)
+Nodes (7): AudioPrefetchBuffer, bufferSize, _cache, getUrl, invalidate, prefetch, package:fladder/models/playback/audio_url_resolver.dart
 
 ### Community 340 - "بازگردانی Web و CI چندپلتفرمی"
 Cohesion: 0.11
@@ -2093,16 +2115,16 @@ Cohesion: 0.12
 Nodes (16): Android, Arch, Docker, Fedora, Installation instructions, Installer, iOS/iPadOS, Linux (+8 more)
 
 ### Community 343 - "grid_focus_traveler.dart"
-Cohesion: 0.31
-Nodes (8): class, items, _self, _SyncSettignsModel, SyncSettingsModelPatterns, toString, _, SyncSettingsModel
+Cohesion: 0.13
+Nodes (15): build, _childNodes, createState, crossAxisCount, currentIndex, gridDelegate, GridFocusTraveler, _GridFocusTravelerState (+7 more)
 
 ### Community 344 - "quick_connect_window.dart"
-Cohesion: 0.22
-Nodes (8): EdgeInsetsGeometry?, ActionContent, actions, build, child, padding, showDividers, title
+Cohesion: 0.09
+Nodes (20): AdaptiveFab, backgroundColor, child, context, heroTag, key, title, badge (+12 more)
 
 ### Community 345 - "package:fladder/screens/shared/animated_fade_size.dart"
-Cohesion: 0.22
-Nodes (8): Bitrate, calculatedBitRate, getVideoQualityOptions, label, maxBitRate, videoBitRate, videoCodec, VideoQualitySettings
+Cohesion: 0.15
+Nodes (13): backgroundColor, build, createState, focused, icon, iconColor, label, loading (+5 more)
 
 ### Community 346 - "Win32Window"
 Cohesion: 0.20
@@ -2121,20 +2143,20 @@ Cohesion: 0.18
 Nodes (10): AnimationController?, BorderRadiusGeometry?, borderRadius, build, _controller, createState, dispose, height (+2 more)
 
 ### Community 350 - "dart:io"
-Cohesion: 0.29
-Nodes (6): DynamicSchemeVariant, ColorExtensions, colorFromJson, DynamicSchemeVariantExtension, label, null
+Cohesion: 0.06
+Nodes (32): android, androidDev, DefaultFirebaseOptions, ensureAndroidResolved, _resolvedAndroid, _captureFlutterError, chainErrorHandlers, flushPersistedErrorLogs (+24 more)
 
 ### Community 351 - "aV"
-Cohesion: 0.29
-Nodes (6): of, position, PositionContext, PositionProviderExtension, updateShouldNotify, withPositionProvider
+Cohesion: 0.13
+Nodes (17): aV(), bF(), dB(), dc(), F(), fr(), geL(), gen() (+9 more)
 
 ### Community 352 - "ox_season_availability.dart"
-Cohesion: 0.04
-Nodes (46): childCount ??, 0, every, null, onDisk, oxSeasonAvailableEpisodeCount, oxSeasonPosterCountText, oxSeasonShowWatchedTick (+38 more)
+Cohesion: 0.05
+Nodes (38): childCount ??, 0, every, null, onDisk, oxSeasonAvailableEpisodeCount, oxSeasonPosterCountText, oxSeasonShowWatchedTick (+30 more)
 
 ### Community 353 - "dart:math"
-Cohesion: 0.33
-Nodes (5): addHeroTag, addVisiblity, padding, setKey, WidgetExtensions
+Cohesion: 0.25
+Nodes (7): firstWhereOrNull, oxplayerMediaSourceHasPlayableUrl, oxplayerResolvePlaybackMediaSource, path, requested, sources, uri
 
 ### Community 354 - "Upstream Fladder — setup & sync"
 Cohesion: 0.13
@@ -2145,16 +2167,16 @@ Cohesion: 0.40
 Nodes (5): DatabaseItem, DatabaseItemsCompanion, DataClass, Insertable, UpdateCompanion
 
 ### Community 356 - "oxplayer_settings_visibility.dart"
-Cohesion: 0.07
-Nodes (24): ensureLoaded, isLoaded, OxplayerDotenv, install, isInstalled, OxplayerPlaybackDiagHooks, probeCdnRange, probeVideoLoad (+16 more)
+Cohesion: 0.14
+Nodes (12): ensureLoaded, isLoaded, OxplayerDotenv, install, isInstalled, OxplayerPlaybackDiagHooks, probeCdnRange, probeVideoLoad (+4 more)
 
 ### Community 357 - "Timer?"
-Cohesion: 0.12
-Nodes (16): build, _cancelHold, child, createState, dispose, enabled, _holdTimer, onHoldComplete (+8 more)
+Cohesion: 0.17
+Nodes (12): build, _cancelHold, child, createState, dispose, enabled, _holdTimer, onHoldComplete (+4 more)
 
 ### Community 358 - "player_states.dart"
-Cohesion: 0.50
-Nodes (4): KeyCombinationPatterns, KeyCombination?, KeyCombination, _KeyCombination
+Cohesion: 0.40
+Nodes (5): JsonConverter, CredentialsConverter, StudioEncoder, LocaleConvert, SeerrJsonConverter
 
 ### Community 359 - "AppDelegate"
 Cohesion: 0.26
@@ -2165,8 +2187,8 @@ Cohesion: 0.15
 Nodes (12): browserslist, name, private, scripts, build, build:og-image, dev, dev:turbo (+4 more)
 
 ### Community 361 - "package:freezed_annotation/freezed_annotation.dart"
-Cohesion: 0.67
-Nodes (3): OxMediaVariantPreference, OxMediaVariantPreferenceNotifier, Notifier
+Cohesion: 0.11
+Nodes (18): DirectionalFocusIntent, actionButton, child, _contentScopeNode, currentIndex, currentLocation, destinations, false (+10 more)
 
 ### Community 362 - "wWinMain"
 Cohesion: 0.24
@@ -2181,20 +2203,20 @@ Cohesion: 0.18
 Nodes (11): build, child, createState, _lastTapAt, _onTap, onUnlocked, OxplayerVersionTapUnlock, _OxplayerVersionTapUnlockState (+3 more)
 
 ### Community 365 - "transcode_settings_popup.dart"
-Cohesion: 0.18
-Nodes (11): TranscodeMusicDownloadModel, build, createState, current, currentModel, onClosed, showDialog, showTranscodeMusicSettingsPopup (+3 more)
+Cohesion: 0.20
+Nodes (9): TranscodeMusicDownloadModel, build, createState, current, currentModel, onClosed, showDialog, showTranscodeMusicSettingsPopup (+1 more)
 
 ### Community 366 - "stream_value.dart"
-Cohesion: 0.17
-Nodes (11): add, addError, close, _controller, _hasInitialValue, _initialValue, _latestValue, listen (+3 more)
+Cohesion: 0.15
+Nodes (12): add, addError, close, _controller, _hasInitialValue, _initialValue, _latestValue, listen (+4 more)
 
 ### Community 367 - "Family"
 Cohesion: 0.24
 Nodes (10): LibrarySearchRouteExtension, ClientSettingsRoute, LibrarySearchRoute, LibrarySearchRouteArgs, SettingsRoute, build, build, build (+2 more)
 
 ### Community 368 - "SubtitlePicker"
-Cohesion: 0.13
-Nodes (17): AudioPicker(), ChapterSelectionSheet(), indexOfCurrent(), CustomModalBottomSheet(), Dp, hasUsableServerSubtitleList(), SubtitleTrack, muxedFallbackSubtitleRows() (+9 more)
+Cohesion: 0.70
+Nodes (4): hasUsableServerSubtitleList(), SubtitleTrack, muxedFallbackSubtitleRows(), SubtitlePicker()
 
 ### Community 369 - "DirectoryBookmarkImplementation"
 Cohesion: 0.27
@@ -2210,15 +2232,15 @@ Nodes (12): caveman-help, Example output, How to invoke, See also, What it does,
 
 ### Community 372 - "image_provider.dart"
 Cohesion: 0.04
-Nodes (55): dashboardProvider, FavouritesModel, _collect, concurrency, _generation, itemId, OxplayerHomeDetailPrefetch, _prefetchOne (+47 more)
+Nodes (63): dashboardProvider, FavouritesModel, _collect, concurrency, _generation, itemId, OxplayerHomeDetailPrefetch, _prefetchOne (+55 more)
 
 ### Community 373 - "ox_favorites_dashboard.dart"
 Cohesion: 0.50
 Nodes (4): SeerrDetailsRoute, SeerrDetailsRouteArgs, build, build
 
 ### Community 374 - "video_playback_information.dart"
-Cohesion: 0.67
-Nodes (3): oxMediaVariantPreferenceProvider, oxplayerApplyPreferredVersionStream, oxplayerRememberMediaStreamsSelection
+Cohesion: 0.11
+Nodes (16): appName, OxplayerBrand, _cEnabled, OxplayerConfig, _cApiBaseUrl, _cBotUsername, _cSentryDsn, _cSentryEnvironment (+8 more)
 
 ### Community 375 - "manifest.json"
 Cohesion: 0.18
@@ -2233,8 +2255,8 @@ Cohesion: 0.27
 Nodes (5): fromList(), ByteBuffer, StandardMessageCodec, PlayerSettings, PlayerSettingsHelperPigeonCodec
 
 ### Community 378 - "collections_provider.dart"
-Cohesion: 0.07
-Nodes (24): available, color, icon, oxCatalogAvailabilityOverlay, oxIsBoxSetShelfItem, _tagCatalogAvailable, _tagCatalogMissing, _tagCollectionComplete (+16 more)
+Cohesion: 0.08
+Nodes (25): available, color, icon, oxCatalogAvailabilityOverlay, oxIsBoxSetShelfItem, _tagCatalogAvailable, _tagCatalogMissing, _tagCollectionComplete (+17 more)
 
 ### Community 379 - "control_users_create.dart"
 Cohesion: 0.67
@@ -2249,8 +2271,8 @@ Cohesion: 0.15
 Nodes (12): 1. Correction, 2. Warning, 3. Temporary Ban, 4. Permanent Ban, Attribution, Contributor Covenant Code of Conduct, Enforcement, Enforcement Guidelines (+4 more)
 
 ### Community 382 - "package:fladder/models/items/item_shared_models.dart"
-Cohesion: 0.06
-Nodes (34): length, 1, oxMovieHasPlayableMedia, oxplayerShowMediaStreamHelper, oxplayerShowVersionStreamPicker, detailed, item, label (+26 more)
+Cohesion: 0.05
+Nodes (36): canonicalId, id, oxCanonicalTmdbPersonItemId, oxPersonHasNavigableTmdbId, oxPersonWithCanonicalId, oxTmdbPersonIdFromRawId, s, tmdbId (+28 more)
 
 ### Community 383 - "oxplayer_claim_code_login_panel.dart"
 Cohesion: 0.17
@@ -2273,8 +2295,12 @@ Cohesion: 0.17
 Nodes (11): Boundaries, Caveman Compress, Compress, Compression Rules, Pattern, Preserve EXACTLY (never modify), Preserve Structure, Process (+3 more)
 
 ### Community 388 - "book_viewer_reader.dart"
-Cohesion: 0.09
-Nodes (22): BookViewController, BookViewerReader, bookViewSettings, build, index, lastScale, pages, viewController (+14 more)
+Cohesion: 0.11
+Nodes (17): BookViewController, BookViewerReader, bookViewSettings, build, index, lastScale, pages, viewController (+9 more)
+
+### Community 389 - "bitrate_helper.dart"
+Cohesion: 0.12
+Nodes (17): build, _closeButtonFocusNode, context, createState, didChangeDependencies, dispose, _ensureCloseButtonFocus, openSeerrLink (+9 more)
 
 ### Community 390 - ".agents/skills/caveman/SKILL.md"
 Cohesion: 0.17
@@ -2304,9 +2330,17 @@ Nodes (10): caveman, Example output, How to invoke, See also, What it does, Auto
 Cohesion: 0.12
 Nodes (16): contains, deadline, header, _httpAccepted, _httpOk, _httpServiceUnavailable, _isPreparingStatus, lastRetryAfterSec (+8 more)
 
+### Community 397 - "settings_list_tile.dart"
+Cohesion: 0.12
+Nodes (16): autoFocus, build, contentColor, current, currentWidget, icon, label, leading (+8 more)
+
 ### Community 398 - "oxplayer_desktop_deep_link.dart"
-Cohesion: 0.07
-Nodes (28): @AutoRouterConfig, autoRouter, build, builder, dispose, enableNotifications, _hidden, _lastPaused (+20 more)
+Cohesion: 0.12
+Nodes (15): dispose, handleUrl, init, listener, null, onProtocolUrlReceived, oxplayerRememberWindowsStartupArgs, oxplayerSetupWindowsDeepLinks (+7 more)
+
+### Community 399 - "photo_view_settings_provider.dart"
+Cohesion: 0.13
+Nodes (15): autoPlay, copyWith, fromJson, fromMap, mute, PhotoViewSettingsModel, PhotoViewSettingsNotifier, ref (+7 more)
 
 ### Community 400 - "build-og-image.mjs"
 Cohesion: 0.25
@@ -2325,8 +2359,8 @@ Cohesion: 0.33
 Nodes (5): SubtitleSettings, PlayerSettingsObject, MutableStateFlow, PlayerSettings, PlayerSettingsPigeon
 
 ### Community 404 - "navigation_scaffold.dart"
-Cohesion: 0.07
-Nodes (31): Brightness?, brightness, build, createState, DefaultTitleBar, _DefaultTitleBarState, dispose, height (+23 more)
+Cohesion: 0.12
+Nodes (15): createState, currentIndex, currentLocation, currentRouteName, destinations, _key, nestedChild, nestedNavigatorKey (+7 more)
 
 ### Community 405 - "FlutterStandardReader"
 Cohesion: 0.38
@@ -2337,8 +2371,16 @@ Cohesion: 0.38
 Nodes (5): FlutterStandardWriter, ApplicationMenuPigeonCodecWriter, NSMutableData, DirectoryBookmarkPigeonCodecWriter, NSMutableData
 
 ### Community 407 - "translations_pigeon.dart"
-Cohesion: 0.09
-Nodes (23): @ConfigurePigeon, @FlutterApi, ApplicationMenu, PlayerSettings, chapters, close, decline, endsAt (+15 more)
+Cohesion: 0.12
+Nodes (15): chapters, close, decline, endsAt, hoursAndMinutes, next, nextUpInSeconds, nextVideo (+7 more)
+
+### Community 408 - "services/battery_optimization.dart"
+Cohesion: 0.29
+Nodes (6): _api, BatteryOptimization, isIgnoringBatteryOptimizations, openBatteryOptimizationSettings, package:fladder/src/battery_optimization_pigeon.g.dart, static final
+
+### Community 409 - "flat_button.dart"
+Cohesion: 0.13
+Nodes (14): BorderRadius, Clip, autoFocus, borderRadiusGeometry, build, child, clipBehavior, elevation (+6 more)
 
 ### Community 410 - "Paragraph.tsx"
 Cohesion: 0.29
@@ -2360,6 +2402,14 @@ Nodes (6): MediaSegmentType, COMMERCIAL, INTRO, OUTRO, PREVIEW, RECAP
 Cohesion: 0.40
 Nodes (6): @ChopperApi, ChopperService, FakeJellyfinOpenApi, JellyfinOpenApi, SeerrChopperService, JellyApiExtension
 
+### Community 415 - "SeerrUserModel"
+Cohesion: 0.33
+Nodes (6): SeerrUserModelPatterns, SeerrUserModel, _SeerrUserModel, SeerrUserLabelExtension, SeerrUserPermissions, SeerrUserModel
+
+### Community 416 - "double get"
+Cohesion: 0.14
+Nodes (14): FocusNode, autoFocus, build, contextRefresh, createState, displacement, focusNode, initState (+6 more)
+
 ### Community 417 - "caveman-commit"
 Cohesion: 0.18
 Nodes (9): caveman-commit, Example output, How to invoke, See also, What it does, Auto-Clarity, Boundaries, Examples (+1 more)
@@ -2377,16 +2427,23 @@ Cohesion: 0.18
 Nodes (9): caveman-review, Example output, How to invoke, See also, What it does, Auto-Clarity, Boundaries, Examples (+1 more)
 
 ### Community 421 - "lock_screen.dart"
-Cohesion: 0.08
-Nodes (27): didChangeAppLifecycleState, context, loggedInGoToHome, oxplayerTapSavedAccount, read, ref, sessionOk, switchFn (+19 more)
+Cohesion: 0.18
+Nodes (14): didChangeAppLifecycleState, initModel, build, createState, didChangeAppLifecycleState, hackyFixForBlackNavbar, handleLogin, initState (+6 more)
 
 ### Community 422 - "ox_labeled_iran_flag.dart"
-Cohesion: 0.15
-Nodes (12): MediaStreamsModel, build, label, maxLines, mediaStreams, OxLabeledIranFlag, playbackModel, showFlag (+4 more)
+Cohesion: 0.13
+Nodes (13): build, label, maxLines, mediaStreams, OxLabeledIranFlag, playbackModel, showFlag, style (+5 more)
 
 ### Community 423 - "sync_item_poster.dart"
-Cohesion: 0.08
-Nodes (23): saveChapterImages, saveExternalSubtitles, saveImageData, saveTrickPlayData, subtitleExtension, urlDataToFileData, audioCodec, audioStream (+15 more)
+Cohesion: 0.13
+Nodes (14): audioCodec, audioStream, bitrate, build, child, container, item, itemModel (+6 more)
+
+### Community 424 - "home_screen.dart"
+Cohesion: 0.14
+Nodes (13): dashboard,
+  library,
+  favorites,
+  seerr,, IconData get, GlobalHotKeys, HomeTabs, icon, label, navigate, selectedIcon (+5 more)
 
 ### Community 425 - "ofRaw"
 Cohesion: 0.40
@@ -2408,6 +2465,10 @@ Nodes (4): empty_item.dart, movie_detail_screen.dart, person_detail_screen.dart,
 Cohesion: 0.40
 Nodes (5): AudioAndSubStreamModel, AudioStreamModel, StreamModel, SubStreamModel, VideoStreamModel
 
+### Community 430 - "oxplayer_stream_log.dart"
+Cohesion: 0.07
+Nodes (25): baseUrl, limit, oxFetchItemRecommendations, token, uri, baseUrl, itemId, oxFetchMovieBoxSetSiblings (+17 more)
+
 ### Community 431 - "Flathub shared modules"
 Cohesion: 0.22
 Nodes (8): Adding, External data checker, Flathub shared modules, Inclusion criteria, Inclusion process, Removing, Updating, Usage
@@ -2417,12 +2478,24 @@ Cohesion: 0.40
 Nodes (4): guid, substring, uuid, package:uuid/uuid.dart
 
 ### Community 433 - "oxplayer_login_logo.dart"
-Cohesion: 0.12
-Nodes (14): build, _iconSize, OxplayerLoginLogo, channelRowHeight, GuideConstants, leftColumnWidth, padding, widthPerMinute (+6 more)
+Cohesion: 0.18
+Nodes (9): build, _iconSize, OxplayerLoginLogo, channelRowHeight, GuideConstants, leftColumnWidth, padding, widthPerMinute (+1 more)
 
 ### Community 434 - "Duration"
-Cohesion: 0.11
-Nodes (16): Duration, dateInDays, DurationExtensions, timeAgo, toLogicalDuration, canRun, duration, _lastActionTime (+8 more)
+Cohesion: 0.14
+Nodes (12): Duration, canRun, duration, _lastActionTime, run, Throttler, AnimatedVisibility, build (+4 more)
+
+### Community 435 - "video_subtitle_controls.dart"
+Cohesion: 0.15
+Nodes (13): FontWeight, activeKey, controller, createState, hideControls, label, lastSettings, setOpacity (+5 more)
+
+### Community 436 - "control_users_create.dart"
+Cohesion: 0.15
+Nodes (13): build, context, ControlUserCreate, _ControlUserCreateState, createState, dispose, enableAllLibraries, nameController (+5 more)
+
+### Community 437 - "default_title_bar.dart"
+Cohesion: 0.17
+Nodes (12): Brightness?, brightness, build, createState, DefaultTitleBar, _DefaultTitleBarState, dispose, height (+4 more)
 
 ### Community 438 - "prefetch_libmpv_android.sh"
 Cohesion: 0.83
@@ -2441,8 +2514,8 @@ Cohesion: 0.50
 Nodes (3): html, out404, websiteRoot
 
 ### Community 446 - "episode_details_provider.dart"
-Cohesion: 0.15
-Nodes (13): api, copyWith, episode, EpisodeDetailModel, EpisodeDetailsProvider, episodes, fetchDetails, guestActors (+5 more)
+Cohesion: 0.17
+Nodes (12): api, copyWith, episode, EpisodeDetailModel, EpisodeDetailsProvider, episodes, fetchDetails, guestActors (+4 more)
 
 ### Community 447 - "caveman-stats"
 Cohesion: 0.29
@@ -2452,6 +2525,18 @@ Nodes (5): caveman-stats, Example output, How to invoke, See also, What it does
 Cohesion: 0.17
 Nodes (12): build, checkResolution, child, createState, dispose, initState, lastResolution, ResolutionChecker (+4 more)
 
+### Community 469 - "splash_screen.dart"
+Cohesion: 0.18
+Nodes (11): build, createState, initState, _splashAuthMethodLabel, SplashScreen, _SplashScreenState, _splashTiming, package:fladder/oxplayer/ox_splash_brand.dart (+3 more)
+
+### Community 470 - "playback_options_dialogue.dart"
+Cohesion: 0.18
+Nodes (10): build, context, false, options, PlaybackDialogue, playbackType, showDialog, showPlaybackTypeSelection (+2 more)
+
+### Community 471 - "normalize_url.dart"
+Cohesion: 0.18
+Nodes (10): hasHttpScheme, hasNonAscii, host, lower, normalizeUrl, parsed, startsWith, trimmed (+2 more)
+
 ### Community 472 - "filled_button_await.dart"
 Cohesion: 0.22
 Nodes (9): ButtonStyle?, build, child, createState, FilledButtonAwait, FilledButtonAwaitState, loading, style (+1 more)
@@ -2460,9 +2545,29 @@ Nodes (9): ButtonStyle?, build, child, createState, FilledButtonAwait, FilledBut
 Cohesion: 0.22
 Nodes (9): build, child, createState, dispose, initState, OxplayerSeerrBootstrap, _OxplayerSeerrBootstrapState, _userSub (+1 more)
 
+### Community 474 - "oxplayer_sentry_user_sync.dart"
+Cohesion: 0.22
+Nodes (9): build, child, createState, dispose, initState, OxplayerSentryUserSync, _OxplayerSentryUserSyncState, _userSub (+1 more)
+
+### Community 475 - "settings_list_group.dart"
+Cohesion: 0.20
+Nodes (9): build, child, isFirst, isLast, label, SettingsListChild, settingsListGroup, SettingsListGroupTitle (+1 more)
+
+### Community 476 - "video_player_speed_indicator.dart"
+Cohesion: 0.22
+Nodes (9): build, createState, currentSpeed, dispose, showIndicator, speedIcon, timer, VideoPlayerSpeedIndicator (+1 more)
+
+### Community 477 - "GlobalKey?"
+Cohesion: 0.22
+Nodes (8): GlobalKey?, maybeOf, of, refresh, refreshAble, refreshData, refreshKey, updateShouldNotify
+
+### Community 478 - "small_detail_widgets.dart"
+Cohesion: 0.22
+Nodes (8): build, communityRating, details, Genres, officialRating, Ratings, Tags, package:fladder/screens/shared/media/components/chip_button.dart
+
 ### Community 479 - "fab_extended_anim.dart"
-Cohesion: 0.02
-Nodes (93): ConsumerWidget, PlatformAppBuilder, build, builder, PlatformAppWrapper, autoRouter, build, _FladderApp (+85 more)
+Cohesion: 0.25
+Nodes (7): alternate, build, FloatingActionButtonAnimated, icon, isExtended, label, tooltip
 
 ### Community 480 - "hover_widget.dart"
 Cohesion: 0.29
@@ -2476,6 +2581,14 @@ Nodes (5): caveman-stats, Example output, How to invoke, See also, What it does
 Cohesion: 0.33
 Nodes (5): Checklist, Issue Being Fixed, Pull Request Description, Screenshots / Recordings, Tested On
 
+### Community 699 - "seerr_json_converter.dart"
+Cohesion: 0.33
+Nodes (5): Item, _typeDeserializers, ResultType, seerr_models.dart, static Map
+
+### Community 700 - "watched_state.dart"
+Cohesion: 0.53
+Nodes (5): label, PartiallyPlayed, Played, Unplayed, WatchedState
+
 ### Community 701 - "How to Contribute"
 Cohesion: 0.40
 Nodes (4): How to Contribute, 🐛 Reporting Bugs, 🚀 Submitting Pull Requests, 🌐 Translations
@@ -2484,33 +2597,49 @@ Nodes (4): How to Contribute, 🐛 Reporting Bugs, 🚀 Submitting Pull Requests
 Cohesion: 0.40
 Nodes (4): Develop, OXPlayer marketing site, Privacy policy source, Production build (matches GitHub Pages)
 
+### Community 703 - "ClientSettingsModel"
+Cohesion: 0.33
+Nodes (5): assetPath, build, displaySize, OxSplashBrand, splashBackground
+
+### Community 704 - "VideoPlayerSettingsModel"
+Cohesion: 0.33
+Nodes (5): build, content, label, LabelTitleItem, title
+
+### Community 706 - "BoxFit"
+Cohesion: 0.40
+Nodes (4): build, content, SpacedListTile, title
+
+### Community 709 - "AllowedOrientations"
+Cohesion: 0.67
+Nodes (3): AllowedOrientations(), PlayerOrientations, toRequestedOrientation()
+
 ### Community 712 - "ox_media_play_button_skeleton.dart"
-Cohesion: 0.03
-Nodes (49): EditableText, oxLibraryDetailLabels, oxSeerrRatingLabels, adultEmoji, adultTag, chip, _hasAdultKeywords, isAdult (+41 more)
+Cohesion: 0.50
+Nodes (3): build, OxMediaPlayButtonSkeleton, package:fladder/oxplayer/widgets/ox_skeleton_box.dart
 
 ### Community 713 - "PhotoViewerRoute"
 Cohesion: 0.67
 Nodes (3): PhotoViewerRoute, PhotoViewerRouteArgs, onItemPressed
 
 ## Knowledge Gaps
-- **13304 isolated node(s):** `download_with_retry.sh script`, `retry_command.sh script`, `DISABLED`, `DVD`, `LOGO` (+13299 more)
+- **13214 isolated node(s):** `download_with_retry.sh script`, `retry_command.sh script`, `DISABLED`, `DVD`, `LOGO` (+13209 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **213 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **209 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `NextUpOverlay()` connect `SubtitlePicker` to `Text`, `FlutterError`, `NextUpOverlay`, `CustomVideoControls`?**
+- **Why does `NextUpOverlay()` connect `NextUpOverlay` to `Text`, `FlutterError`, `CustomVideoControls`?**
   _High betweenness centrality (0.007) - this node is a cross-community bridge._
-- **Why does `mediaPlaybackProvider` connect `video_player_controls.dart` to `video_player_queue.dart`, `video_player_provider.dart`, `package:fladder/util/adaptive_layout/adaptive_layout.dart`, `video_player_seek_indicator.dart`, `tv_playback_model.dart`, `video_player_settings_provider.dart`, `media_control_wrapper.dart`, `audio_player_full_screen.dart`, `offline_playback_model.dart`, `deep_link_helper.dart`, `floating_search_bar.dart`, `image_provider.dart`, `navigation_scaffold.dart`, `mobile_app_wrapper.dart`, `floating_player_bar.dart`, `video_player_guide_wrapper.dart`?**
-  _High betweenness centrality (0.005) - this node is a cross-community bridge._
 - **Why does `FlutterError` connect `FlutterError` to `VideoPlayerHelper.g.kt`?**
   _High betweenness centrality (0.003) - this node is a cross-community bridge._
+- **Why does `BaseItemKind` connect `library_model.dart` to `jellyfin_open_api.enums.swagger.dart`, `jellyfin_open_api.swagger.dart`, `item_base_model.dart`?**
+  _High betweenness centrality (0.002) - this node is a cross-community bridge._
 - **What connects `download_with_retry.sh script`, `retry_command.sh script`, `DISABLED` to the rest of the system?**
-  _13304 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _13214 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `jellyfin_open_api.swagger.dart` be split into smaller, more focused modules?**
-  _Cohesion score 0.0006140620202640467 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.0006138735420503376 - nodes in this community are weakly interconnected._
 - **Should `@GET` be split into smaller, more focused modules?**
   _Cohesion score 0.0078125 - nodes in this community are weakly interconnected._
 - **Should `seerr_models.dart` be split into smaller, more focused modules?**
-  _Cohesion score 0.007041057102406796 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.007475678443420379 - nodes in this community are weakly interconnected._
