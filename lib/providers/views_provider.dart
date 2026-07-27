@@ -163,7 +163,7 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
       loading: false,
       loaded: true,
     );
-    OxplayerHomeDetailPrefetch.schedule(ref);
+    OxplayerHomeDetailPrefetch.schedule(ref, dashboardViews: state.dashboardViews);
   }
 
   Future<ViewModel> _fetchRecentlyAdded(ViewModel view, {required bool showAllCollections}) async {

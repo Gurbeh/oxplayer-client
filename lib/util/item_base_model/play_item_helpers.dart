@@ -25,8 +25,10 @@ import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/tv_playback_model.dart';
 import 'package:fladder/models/video_stream_model.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_prepare.dart';
+import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_prefetch.dart';
 import 'package:fladder/oxplayer/oxplayer_native_playback.dart';
+import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/providers/api_provider.dart';
@@ -46,6 +48,16 @@ import 'package:fladder/util/refresh_state.dart';
 import 'package:fladder/widgets/full_screen_helpers/full_screen_wrapper.dart';
 
 part 'play_playlist_helpers.dart';
+
+/// List/detail play buttons dispose during async playback prep — keep root navigator context.
+BuildContext _playbackRootContext(BuildContext context) {
+  return Navigator.of(context, rootNavigator: true).context;
+}
+
+/// Survives widget dispose while loading dialog / createPlaybackModel runs.
+OxplayerRead _playbackRead(BuildContext context) {
+  return ProviderScope.containerOf(context, listen: false).read;
+}
 
 extension BookBaseModelExtension on BookModel? {
   Future<void> play(
@@ -146,29 +158,27 @@ extension ChannelModelExtension on ChannelModel? {
     BuildContext? parentContext,
   }) async {
     if (this == null) return;
+    final playContext = _playbackRootContext(context);
+    final read = _playbackRead(playContext);
 
-    await ref.read(videoPlayerProvider.notifier).init();
+    await read(videoPlayerProvider.notifier).init();
 
-    final op = CancelableOperation.fromFuture(ref.read(playbackModelHelper).createPlaybackModel(
-          context,
+    final op = CancelableOperation.fromFuture(read(playbackModelHelper).createPlaybackModel(
+          playContext,
           this,
           forcedPlaybackType: PlaybackType.tv,
           showPlaybackOptions: false,
           startPosition: Duration.zero,
         ));
 
-    _showLoadingIndicator(context, this!, op);
+    _showLoadingIndicator(playContext, this!, op);
 
     final model = await op.valueOrCancellation(null);
 
     if (op.isCanceled || model == null) {
       if (!op.isCanceled) {
-        try {
-          Navigator.of(context, rootNavigator: true).pop();
-        } catch (e) {
-          log('Error closing loading dialog: $e');
-        }
-        FladderSnack.show(context.localized.unableToPlayMedia, context: context);
+        _dismissPlaybackLoadingDialog(playContext);
+        FladderSnack.show(playContext.localized.unableToPlayMedia, context: playContext);
       }
       return;
     }
@@ -178,12 +188,12 @@ extension ChannelModelExtension on ChannelModel? {
     }
 
     await _playVideo(
-      context,
+      playContext,
       startPosition: Duration.zero,
       current: model.copyWith(
         channel: this,
       ),
-      ref: ref,
+      read: read,
       cancelOperation: op,
     );
   }
@@ -616,22 +626,27 @@ extension ItemBaseModelExtensions on ItemBaseModel? {
     bool showPlaybackOption = false,
   }) async {
     if (itemModel == null) return;
+    final playContext = _playbackRootContext(context);
+    final read = _playbackRead(playContext);
+
+    if (OxplayerEnv.isEnabled) {
+      OxplayerPlaybackPrefetch.scheduleForItem(read, itemModel.id, startPosition: startPosition);
+    }
 
     final op = CancelableOperation.fromFuture((() async {
-      if (OxplayerEnv.isEnabled) {
-        await oxplayerInitVideoPlayerIfNeeded(ref);
-      } else {
-        await ref.read(videoPlayerProvider.notifier).init();
+      // OX: defer MPV init to loadPlaybackItem — early init races provider bootstrap init().
+      if (!OxplayerEnv.isEnabled) {
+        await read(videoPlayerProvider.notifier).init();
       }
-      return await ref.read(playbackModelHelper).createPlaybackModel(
-            context,
+      return await read(playbackModelHelper).createPlaybackModel(
+            playContext,
             itemModel,
             showPlaybackOptions: showPlaybackOption,
             startPosition: startPosition,
           );
     })());
 
-    _showLoadingIndicator(context, itemModel, op);
+    _showLoadingIndicator(playContext, itemModel, op);
 
     final model = await op.valueOrCancellation(null);
     if (op.isCanceled || model == null) {
@@ -641,13 +656,9 @@ extension ItemBaseModelExtensions on ItemBaseModel? {
           reason: 'unable_to_create_playback_model',
           itemId: itemModel.id,
         ));
-        try {
-          Navigator.of(context, rootNavigator: true).pop();
-        } catch (e) {
-          log('Error closing loading dialog: $e');
-        }
+        _dismissPlaybackLoadingDialog(playContext);
         if (!showPlaybackOption) {
-          FladderSnack.show(context.localized.unableToPlayMedia, context: context);
+          FladderSnack.show(playContext.localized.unableToPlayMedia, context: playContext);
         }
       }
       return;
@@ -655,21 +666,30 @@ extension ItemBaseModelExtensions on ItemBaseModel? {
 
     final actualStartPosition = startPosition ?? await model.startDuration() ?? Duration.zero;
 
-    await _playVideo(context, startPosition: actualStartPosition, current: model, ref: ref, cancelOperation: op);
+    if (OxplayerEnv.isEnabled) {
+      OxplayerStreamLog.event('playback_model_ready', fields: {
+        'itemId': model.item.id,
+        'hasMedia': model.media != null,
+      });
+    }
+
+    await _playVideo(playContext, startPosition: actualStartPosition, current: model, read: read, cancelOperation: op);
   }
 }
 
 extension ItemBaseModelsBooleans on List<ItemBaseModel> {
   Future<void> playLibraryItems(BuildContext context, WidgetRef ref, {bool shuffle = false}) async {
     if (isEmpty) return;
+    final playContext = _playbackRootContext(context);
+    final read = _playbackRead(playContext);
 
-    await ref.read(videoPlayerProvider.notifier).init();
+    await read(videoPlayerProvider.notifier).init();
 
     final op = CancelableOperation.fromFuture(Future(() async {
       List<List<ItemBaseModel>> newList = await Future.wait(map((element) async {
         switch (element.type) {
           case FladderItemType.series:
-            return await ref.read(jellyApiProvider).fetchEpisodeFromShow(seriesId: element.id);
+            return await read(jellyApiProvider).fetchEpisodeFromShow(seriesId: element.id);
           default:
             return [element];
         }
@@ -684,8 +704,8 @@ extension ItemBaseModelsBooleans on List<ItemBaseModel> {
         expandedList.shuffle();
       }
 
-      PlaybackModel? model = await ref.read(playbackModelHelper).createPlaybackModel(
-            context,
+      PlaybackModel? model = await read(playbackModelHelper).createPlaybackModel(
+            playContext,
             expandedList.firstOrNull,
             libraryQueue: expandedList,
           );
@@ -693,7 +713,7 @@ extension ItemBaseModelsBooleans on List<ItemBaseModel> {
       return (model, expandedList);
     }));
 
-    _showLoadingIndicator(context, null, op);
+    _showLoadingIndicator(playContext, null, op);
 
     final result = await op.valueOrCancellation(null);
     if (op.isCanceled || result == null) {
@@ -703,12 +723,8 @@ extension ItemBaseModelsBooleans on List<ItemBaseModel> {
           reason: 'unable_to_create_playback_model',
           itemId: isNotEmpty ? first.id : null,
         ));
-        try {
-          Navigator.of(context, rootNavigator: true).pop();
-        } catch (e) {
-          log('Error closing loading dialog: $e');
-        }
-        FladderSnack.show(context.localized.unableToPlayMedia, context: context);
+        _dismissPlaybackLoadingDialog(playContext);
+        FladderSnack.show(playContext.localized.unableToPlayMedia, context: playContext);
       }
       return;
     }
@@ -716,11 +732,9 @@ extension ItemBaseModelsBooleans on List<ItemBaseModel> {
     final PlaybackModel? model = result.$1;
     final List<ItemBaseModel> expandedList = result.$2;
 
-    if (context.mounted) {
-      await _playVideo(context, ref: ref, queue: expandedList, current: model, cancelOperation: op);
-      if (context.mounted) {
-        RefreshState.maybeOf(context)?.refresh();
-      }
+    await _playVideo(playContext, read: read, queue: expandedList, current: model, cancelOperation: op);
+    if (playContext.mounted) {
+      RefreshState.maybeOf(playContext)?.refresh();
     }
   }
 
@@ -810,6 +824,15 @@ extension ItemBaseModelsBooleans on List<ItemBaseModel> {
   }
 }
 
+void _dismissPlaybackLoadingDialog(BuildContext context) {
+  final navigator = Navigator.maybeOf(context, rootNavigator: true);
+  if (navigator?.canPop() ?? false) {
+    try {
+      navigator!.pop();
+    } catch (_) {}
+  }
+}
+
 Future<void> _showLoadingIndicator(BuildContext context, ItemBaseModel? item, CancelableOperation op) async {
   return showDialog(
     barrierDismissible: false,
@@ -819,13 +842,39 @@ Future<void> _showLoadingIndicator(BuildContext context, ItemBaseModel? item, Ca
   );
 }
 
-class _LoadIndicatorCancelable extends StatelessWidget {
+class _LoadIndicatorCancelable extends StatefulWidget {
   final ItemBaseModel? item;
   final CancelableOperation op;
   const _LoadIndicatorCancelable({required this.op, this.item});
 
   @override
+  State<_LoadIndicatorCancelable> createState() => _LoadIndicatorCancelableState();
+}
+
+class _LoadIndicatorCancelableState extends State<_LoadIndicatorCancelable> {
+  bool _showColdStartHint = false;
+  Timer? _coldStartHintTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (OxplayerEnv.isEnabled) {
+      _coldStartHintTimer = Timer(const Duration(seconds: 5), () {
+        if (mounted) setState(() => _showColdStartHint = true);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _coldStartHintTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final item = widget.item;
+    final op = widget.op;
     final radius = const BorderRadius.all(Radius.circular(4));
 
     return Dialog(
@@ -869,7 +918,7 @@ class _LoadIndicatorCancelable extends StatelessWidget {
                                 ),
                                 clipBehavior: Clip.hardEdge,
                                 child: FladderImage(
-                                  image: item!.getPosters?.primary,
+                                  image: item.getPosters?.primary,
                                   fit: BoxFit.cover,
                                 ),
                               ),
@@ -897,10 +946,17 @@ class _LoadIndicatorCancelable extends StatelessWidget {
                         ),
                         if (item != null) ...[
                           Text(
-                            item!.title,
+                            item.title,
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ],
+                        if (_showColdStartHint && OxplayerEnv.isEnabled)
+                          Text(
+                            context.localized.oxplayerPlaybackColdStartHint,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
                       ],
                     ),
                   ),
@@ -930,22 +986,20 @@ Future<void> _playVideo(
   required PlaybackModel? current,
   Duration? startPosition,
   List<ItemBaseModel>? queue,
-  required WidgetRef ref,
+  required OxplayerRead read,
   VoidCallback? onPlayerExit,
   CancelableOperation? cancelOperation,
 }) async {
+  final playContext = context.mounted ? context : _playbackRootContext(context);
+
   if (current == null) {
-    if (context.mounted) {
+    if (playContext.mounted) {
       unawaited(OxplayerPlaybackTelemetry.reportFailure(
         stage: 'playback_model',
         reason: 'playback_model_null',
       ));
-      try {
-        Navigator.of(context, rootNavigator: true).pop();
-      } catch (e) {
-        log('Error closing loading dialog: $e');
-      }
-      FladderSnack.show(context.localized.unableToPlayMedia, context: context);
+      _dismissPlaybackLoadingDialog(playContext);
+      FladderSnack.show(playContext.localized.unableToPlayMedia, context: playContext);
     }
     return;
   }
@@ -953,13 +1007,38 @@ Future<void> _playVideo(
   if (cancelOperation?.isCanceled ?? false) return;
 
   final actualStartPosition = startPosition ?? await current.startDuration() ?? Duration.zero;
-  if (!context.mounted) return;
+  if (!playContext.mounted) {
+    if (OxplayerEnv.isEnabled) {
+      OxplayerStreamLog.event('play_video_aborted', fields: {
+        'reason': 'context_unmounted',
+        'itemId': current.item.id,
+      });
+    }
+    _dismissPlaybackLoadingDialog(playContext);
+    return;
+  }
+
+  if (OxplayerEnv.isEnabled) {
+    OxplayerStreamLog.event('play_video_start', fields: {
+      'itemId': current.item.id,
+      'startMs': actualStartPosition.inMilliseconds,
+    });
+  }
 
   final nativeOpenedEarly =
-      OxplayerEnv.isEnabled && context.mounted && await oxplayerOpenNativePlayerEarly(ref, context);
-  if (!context.mounted) return;
+      OxplayerEnv.isEnabled && playContext.mounted && await oxplayerOpenNativePlayerEarly(read, playContext);
+  if (!playContext.mounted) {
+    if (OxplayerEnv.isEnabled) {
+      OxplayerStreamLog.event('play_video_aborted', fields: {
+        'reason': 'context_unmounted_after_native_early',
+        'itemId': current.item.id,
+      });
+    }
+    _dismissPlaybackLoadingDialog(playContext);
+    return;
+  }
 
-  var loadedCorrectly = await ref.read(videoPlayerProvider.notifier).loadPlaybackItem(
+  var loadedCorrectly = await read(videoPlayerProvider.notifier).loadPlaybackItem(
         current,
         actualStartPosition,
       );
@@ -967,7 +1046,7 @@ Future<void> _playVideo(
   Timer? stuckWatch;
   if (loadedCorrectly && OxplayerEnv.isEnabled) {
     stuckWatch = oxplayerScheduleStuckPlaybackWatch(
-      ref: ref,
+      read: read,
       itemId: current.item.id,
       streamUrl: current.media?.url,
       catalogDuration: current.item.overview.runTime,
@@ -977,7 +1056,7 @@ Future<void> _playVideo(
 
   if (!loadedCorrectly && OxplayerEnv.isEnabled) {
     loadedCorrectly = await oxplayerMaybeRetryPlayAfterLoadFailure(
-      ref: ref,
+      read: read,
       current: current,
       startPosition: actualStartPosition,
     );
@@ -985,19 +1064,15 @@ Future<void> _playVideo(
 
   if (!loadedCorrectly) {
     stuckWatch?.cancel();
-    if (context.mounted) {
+    if (playContext.mounted) {
       unawaited(OxplayerPlaybackTelemetry.reportFailure(
         stage: 'player_load',
         reason: 'load_playback_item_failed',
         itemId: current.item.id,
         streamUrl: current.media?.url,
       ));
-      try {
-        Navigator.of(context, rootNavigator: true).pop();
-      } catch (e) {
-        log('Error closing loading dialog: $e');
-      }
-      FladderSnack.show(context.localized.errorOpeningMedia, context: context);
+      _dismissPlaybackLoadingDialog(playContext);
+      FladderSnack.show(playContext.localized.errorOpeningMedia, context: playContext);
     }
     return;
   }
@@ -1007,9 +1082,7 @@ Future<void> _playVideo(
     return;
   }
 
-  try {
-    Navigator.of(context, rootNavigator: true).pop();
-  } catch (_) {}
+  _dismissPlaybackLoadingDialog(playContext);
 
   if (cancelOperation?.isCanceled ?? false) {
     stuckWatch?.cancel();
@@ -1017,15 +1090,15 @@ Future<void> _playVideo(
   }
 
   if (!nativeOpenedEarly) {
-    await ref.read(videoPlayerProvider.notifier).openPlayer(context);
+    await read(videoPlayerProvider.notifier).openPlayer(playContext);
   }
-  if (AdaptiveLayout.of(context).isDesktop && defaultTargetPlatform != TargetPlatform.macOS) {
-    fullScreenHelper.closeFullScreen(ref);
+  if (playContext.mounted && AdaptiveLayout.of(playContext).isDesktop && defaultTargetPlatform != TargetPlatform.macOS) {
+    await fullScreenHelper.closeFullScreenRead(read);
   }
 
-  if (context.mounted) {
+  if (playContext.mounted) {
     if (cancelOperation?.isCanceled ?? false) return;
-    await context.refreshData();
+    await playContext.refreshData();
   }
 
   onPlayerExit?.call();

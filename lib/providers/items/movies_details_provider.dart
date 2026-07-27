@@ -9,6 +9,7 @@ import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
 import 'package:fladder/oxplayer/ox_staged_detail_load.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_prefetch.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_media_variant.dart';
@@ -57,6 +58,7 @@ class MovieDetails extends _$MovieDetails {
           if (core == null) return null;
           var playable = oxplayerPrepareMovieMediaStreams(core, ref) ?? core;
           apply(playable);
+          OxplayerPlaybackPrefetch.scheduleForMovie(ref.read, playable);
 
           oxPrefetchMovieSeerrRatings(ref, item.id, core.tmdbId);
 

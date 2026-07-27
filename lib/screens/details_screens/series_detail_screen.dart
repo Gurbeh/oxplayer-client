@@ -16,6 +16,7 @@ import 'package:fladder/oxplayer/oxplayer_media_variant.dart';
 import 'package:fladder/oxplayer/ox_series_episode_actions.dart';
 import 'package:fladder/oxplayer/ox_series_selected_episode.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/widgets/ox_series_detail_play_buttons.dart';
 import 'package:fladder/oxplayer/widgets/ox_series_episode_picker_button.dart';
 import 'package:fladder/oxplayer/widgets/ox_series_request_button.dart';
 import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
@@ -104,7 +105,35 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                           )
                         : currentEpisode != null &&
                                 (!OxplayerConfig.isEnabled || currentEpisode.playAble)
-                            ? MediaPlayButton(
+                            ? OxplayerConfig.isEnabled
+                                ? OxSeriesDetailPlayButtons(
+                                    series: details,
+                                    episode: currentEpisode,
+                                    onPlay: (restart) async {
+                                      await currentEpisode.play(
+                                        detailsContext,
+                                        ref,
+                                        startPosition: restart ? Duration.zero : null,
+                                      );
+                                      if (!mounted) return;
+                                      ref.read(providerId.notifier).fetchDetails(widget.item);
+                                    },
+                                    onLongPlay: (restart) async {
+                                      await currentEpisode.play(
+                                        detailsContext,
+                                        ref,
+                                        showPlaybackOption: true,
+                                        startPosition: restart ? Duration.zero : null,
+                                      );
+                                      if (!mounted) return;
+                                      ref.read(providerId.notifier).fetchDetails(widget.item);
+                                    },
+                                    onEpisodePlayed: () {
+                                      if (!mounted) return;
+                                      ref.read(providerId.notifier).fetchDetails(widget.item);
+                                    },
+                                  )
+                                : MediaPlayButton(
                             item: currentEpisode,
                             onPressed: (restart) async {
                               await currentEpisode.play(

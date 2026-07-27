@@ -12,6 +12,7 @@ import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
 import 'package:fladder/oxplayer/ox_series_details_loader.dart';
 import 'package:fladder/oxplayer/ox_staged_detail_load.dart';
 import 'package:fladder/providers/api_provider.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_prefetch.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
@@ -58,6 +59,7 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
               prefetchCatalog: catalogPrefetch,
             );
             apply(withCatalog);
+            OxplayerPlaybackPrefetch.scheduleForSeries(ref.read, withCatalog);
           }
 
           final core = await oxFetchSeriesCoreState(ref, seriesModel, state);

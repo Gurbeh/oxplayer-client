@@ -5,12 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/series_model.dart';
+import 'package:fladder/models/view_model.dart';
 import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
 import 'package:fladder/oxplayer/ox_series_details_loader.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
-import 'package:fladder/providers/views_provider.dart';
 
 /// After Home paints: warm detail SWR for slider + first posters of each shelf.
 ///
@@ -24,17 +24,24 @@ abstract final class OxplayerHomeDetailPrefetch {
   static int _generation = 0;
 
   /// Fire-and-forget; newer [schedule] cancels older work via generation.
-  static void schedule(Ref ref) {
+  ///
+  /// [dashboardViews] must be a snapshot — never read [viewsProvider] from
+  /// inside [viewsProvider] (Riverpod self-dependency).
+  static void schedule(Ref ref, {required List<ViewModel> dashboardViews}) {
     if (!OxplayerConfig.isEnabled) return;
     final gen = ++_generation;
-    unawaited(_run(ref, gen));
+    unawaited(_run(ref, gen, dashboardViews: dashboardViews));
   }
 
-  static Future<void> _run(Ref ref, int gen) async {
+  static Future<void> _run(
+    Ref ref,
+    int gen, {
+    required List<ViewModel> dashboardViews,
+  }) async {
     await Future<void>.delayed(_startDelay);
     if (gen != _generation) return;
 
-    final targets = _collect(ref);
+    final targets = _collect(ref, dashboardViews: dashboardViews);
     if (targets.isEmpty) return;
 
     final queue = List<_PrefetchTarget>.from(targets);
@@ -71,9 +78,11 @@ abstract final class OxplayerHomeDetailPrefetch {
     await oxFetchSeriesCatalogBySeason(api, seriesId);
   }
 
-  static List<_PrefetchTarget> _collect(Ref ref) {
+  static List<_PrefetchTarget> _collect(
+    Ref ref, {
+    required List<ViewModel> dashboardViews,
+  }) {
     final dashboard = ref.read(dashboardProvider);
-    final views = ref.read(viewsProvider);
     final seen = <String>{};
     final out = <_PrefetchTarget>[];
 
@@ -99,7 +108,7 @@ abstract final class OxplayerHomeDetailPrefetch {
     }
 
     // First posters of each home shelf.
-    for (final view in views.dashboardViews) {
+    for (final view in dashboardViews) {
       for (final item in view.recentlyAdded.take(shelfTake)) {
         add(item, wantSeriesCatalog: false);
       }

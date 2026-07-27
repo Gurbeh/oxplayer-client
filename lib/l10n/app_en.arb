@@ -2773,6 +2773,8 @@
   "@oxplayerHelpNavLabel": {},
   "oxplayerPreparingPlayback": "Preparing playback…",
   "@oxplayerPreparingPlayback": {},
+  "oxplayerPlaybackColdStartHint": "First play may take up to 30 seconds while the stream loads.",
+  "@oxplayerPlaybackColdStartHint": {},
   "oxplayerPressBackAgainToExit": "Press back again to exit",
   "@oxplayerPressBackAgainToExit": {},
   "oxplayerLoginOpenOnAndroid": "Open bot in Telegram",

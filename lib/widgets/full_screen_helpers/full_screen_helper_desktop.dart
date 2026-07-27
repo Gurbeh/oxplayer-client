@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/widgets/full_screen_helpers/full_screen_wrapper.dart';
 
@@ -10,6 +11,15 @@ class FullScreenHelper implements FullScreenWrapper {
   @override
   Future<void> closeFullScreen(WidgetRef ref) async {
     if (ref.watch(argumentsStateProvider.select((value) => value.htpcMode))) return;
+    final isFullScreen = await windowManager.isFullScreen();
+    if (isFullScreen) {
+      await windowManager.setFullScreen(false);
+    }
+  }
+
+  @override
+  Future<void> closeFullScreenRead(OxplayerRead read) async {
+    if (read(argumentsStateProvider).htpcMode) return;
     final isFullScreen = await windowManager.isFullScreen();
     if (isFullScreen) {
       await windowManager.setFullScreen(false);

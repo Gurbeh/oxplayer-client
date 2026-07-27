@@ -24,6 +24,8 @@ class PositionProvider extends InheritedWidget {
 
 extension PositionProviderExtension on List<Widget> {
   List<Widget> withPositionProvider({BuildContext? context, TextDirection? textDirection}) {
+    if (length <= 1) return this;
+
     final resolvedDirection = textDirection ?? (context != null ? Directionality.of(context) : TextDirection.ltr);
     final firstIndex = resolvedDirection == TextDirection.rtl ? length - 1 : 0;
     final lastIndex = resolvedDirection == TextDirection.rtl ? 0 : length - 1;

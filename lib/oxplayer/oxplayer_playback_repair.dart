@@ -74,7 +74,7 @@ Future<PlaybackModel?> oxplayerRefreshPlaybackWithForceRepair(
 
 /// One silent retry after initial player load failure (OX stream / missing URL).
 Future<bool> oxplayerMaybeRetryPlayAfterLoadFailure({
-  required WidgetRef ref,
+  required OxplayerRead read,
   required PlaybackModel current,
   required Duration startPosition,
 }) async {
@@ -82,13 +82,13 @@ Future<bool> oxplayerMaybeRetryPlayAfterLoadFailure({
   if (current is OfflinePlaybackModel) return false;
 
   final refreshed = await oxplayerRefreshPlaybackWithForceRepair(
-    ref.read,
+    read,
     current,
     startPosition: startPosition,
   );
   if (refreshed == null || refreshed.media?.url == null) return false;
 
-  return ref.read(videoPlayerProvider.notifier).loadPlaybackItem(refreshed, startPosition);
+  return read(videoPlayerProvider.notifier).loadPlaybackItem(refreshed, startPosition);
 }
 
 /// Called from lib_mpv when ox-stream load retries are exhausted; tries node failover then force-repair.

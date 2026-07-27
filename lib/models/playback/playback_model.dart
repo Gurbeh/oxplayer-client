@@ -464,15 +464,15 @@ class PlaybackModelHelper {
           ? await oxplayerResolveStreamPlaybackUrl(ref.read, mediaPath)
           : mediaPath;
 
-      OxplayerStreamLog.event('playback_url', fields: {
-        'itemId': item.id,
-        'apiMediaPath': OxplayerStreamLog.describeUrl(mediaPath),
-        'resolvedUrl': OxplayerStreamLog.describeUrl(resolvedMediaPath),
-        'startPosition': OxplayerStreamLog.formatDuration(startPosition),
-        'startTimeTicks': startPosition?.toRuntimeTicks,
-      });
-
       if (type == PlaybackType.tv && resolvedMediaPath != null) {
+        OxplayerStreamLog.event('playback_url', fields: {
+          'itemId': item.id,
+          'apiMediaPath': OxplayerStreamLog.describeUrl(mediaPath),
+          'resolvedUrl': OxplayerStreamLog.describeUrl(resolvedMediaPath),
+          'startPosition': OxplayerStreamLog.formatDuration(startPosition),
+          'startTimeTicks': startPosition?.toRuntimeTicks,
+          'model': 'tv',
+        });
         final tvModel = TvPlaybackModel(
           channel: item as ChannelModel,
           isNativePlayerBackend: isNativePlayer,
@@ -508,6 +508,15 @@ class PlaybackModelHelper {
           queryParameters: directOptions,
         );
 
+        OxplayerStreamLog.event('playback_url', fields: {
+          'itemId': item.id,
+          'apiMediaPath': OxplayerStreamLog.describeUrl(mediaPath),
+          'resolvedUrl': OxplayerStreamLog.describeUrl(resolvedMediaPath),
+          'startPosition': OxplayerStreamLog.formatDuration(startPosition),
+          'startTimeTicks': startPosition?.toRuntimeTicks,
+          'model': 'direct',
+        });
+
         return DirectPlaybackModel(
           item: item,
           queue: libraryQueue,
@@ -522,6 +531,14 @@ class PlaybackModelHelper {
           bitRateOptions: qualityOptions,
         );
       } else if ((mediaSource.supportsTranscoding ?? false) && mediaSource.transcodingUrl != null) {
+        OxplayerStreamLog.event('playback_url', fields: {
+          'itemId': item.id,
+          'apiMediaPath': OxplayerStreamLog.describeUrl(mediaPath),
+          'resolvedUrl': OxplayerStreamLog.describeUrl(resolvedMediaPath),
+          'startPosition': OxplayerStreamLog.formatDuration(startPosition),
+          'startTimeTicks': startPosition?.toRuntimeTicks,
+          'model': 'transcode',
+        });
         return TranscodePlaybackModel(
           item: item,
           queue: libraryQueue,

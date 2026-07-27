@@ -143,6 +143,18 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
   }
 
   Future<bool> loadPlaybackItem(PlaybackModel model, Duration startPosition) async {
+    if (OxplayerEnv.isEnabled) {
+      OxplayerStreamLog.event('player_load_start', fields: {
+        'itemId': model.item.id,
+        'hasMedia': model.media != null,
+        'hasPlayer': state.hasPlayer,
+      });
+    }
+
+    if (!state.hasPlayer) {
+      await init();
+    }
+
     ref.read(playBackModel)?.dispose();
     await state.stop();
     ref.read(playbackRateProvider.notifier).state = 1.0;
@@ -167,16 +179,14 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     final effectiveStartPosition = await model.resolvedStartPosition(startPosition);
 
     if (media != null) {
-      if (OxplayerEnv.isEnabled) {
-        OxplayerStreamNodeSession.reset();
-        OxplayerStreamLog.event('player_load', fields: {
-          'itemId': model.item.id,
-          'startPosition': OxplayerStreamLog.formatDuration(effectiveStartPosition),
-          'startMs': effectiveStartPosition.inMilliseconds,
-          'streamUrl': OxplayerStreamLog.describeUrl(media.url),
-          'streamHost': OxplayerStreamLog.describeHost(media.url),
-        });
-      }
+      OxplayerStreamNodeSession.reset();
+      OxplayerStreamLog.event('player_load', fields: {
+        'itemId': model.item.id,
+        'startPosition': OxplayerStreamLog.formatDuration(effectiveStartPosition),
+        'startMs': effectiveStartPosition.inMilliseconds,
+        'streamUrl': OxplayerStreamLog.describeUrl(media.url),
+        'streamHost': OxplayerStreamLog.describeHost(media.url),
+      });
       ref.read(playBackModel.notifier).update((state) => newPlaybackModel);
       await state.loadVideo(model, effectiveStartPosition, true);
       final settingsVolume = ref.read(videoPlayerSettingsProvider).volume;

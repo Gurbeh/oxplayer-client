@@ -10,6 +10,7 @@ import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
+import 'package:fladder/oxplayer/oxplayer_stream_warmup.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_http_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_nodes_api.dart';
 import 'package:fladder/providers/api_provider.dart';
@@ -59,6 +60,7 @@ Future<String> _finalizeStreamPlaybackUrl(String url, {required String via}) asy
     });
   }
   OxplayerStreamLog.probeRangeAsync(out);
+  unawaited(oxplayerWarmStreamUrl(out));
   return OxplayerStreamHttpAuth.stripAndRegister(out);
 }
 

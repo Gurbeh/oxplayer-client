@@ -5,13 +5,12 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/oxplayer/ox_series_episode_actions.dart';
-import 'package:fladder/oxplayer/widgets/ox_series_episode_picker_sheet.dart';
+import 'package:fladder/oxplayer/ox_series_episode_picker.dart';
 import 'package:fladder/screens/shared/animated_fade_size.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/focus_provider.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/position_provider.dart';
-import 'package:fladder/widgets/shared/modal_bottom_sheet.dart';
 
 class OxSeriesEpisodePickerButton extends ConsumerWidget {
   final SeriesModel series;
@@ -37,7 +36,7 @@ class OxSeriesEpisodePickerButton extends ConsumerWidget {
       child: PositionProvider(
         position: PositionContext.first,
         child: FocusButton(
-          onTap: () => _openPicker(context),
+          onTap: () => _openPicker(context, ref),
           autoFocus: AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad,
           borderRadius: radius,
           darkOverlay: false,
@@ -76,15 +75,12 @@ class OxSeriesEpisodePickerButton extends ConsumerWidget {
     );
   }
 
-  Future<void> _openPicker(BuildContext context) async {
-    await showBottomSheetPill(
+  Future<void> _openPicker(BuildContext context, WidgetRef ref) async {
+    await oxShowSeriesEpisodePicker(
       context: context,
-      item: series,
-      content: (context, scrollController) => OxSeriesEpisodePickerSheet(
-        series: series,
-        scrollController: scrollController,
-        onEpisodePlayed: onEpisodePlayed,
-      ),
+      ref: ref,
+      series: series,
+      onEpisodePlayed: onEpisodePlayed,
     );
   }
 }

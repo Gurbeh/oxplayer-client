@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/providers/settings/video_player_settings_provider.dart';
@@ -34,15 +35,17 @@ bool oxplayerUsesMpvPlayerOnAndroidRead(Ref ref) {
   return ref.read(videoPlayerSettingsProvider).wantedPlayer == PlayerOptions.libMPV;
 }
 
-bool _shouldScheduleStuckWatch(WidgetRef ref) {
-  return oxplayerUsesNativePlayer(ref) || oxplayerUsesMpvPlayerOnAndroid(ref);
+bool _shouldScheduleStuckWatch(OxplayerRead read) {
+  if (kIsWeb || !Platform.isAndroid || !OxplayerConfig.isEnabled) return false;
+  final player = read(videoPlayerSettingsProvider).wantedPlayer;
+  return player == PlayerOptions.nativePlayer || player == PlayerOptions.libMPV;
 }
 
 /// Intentionally disabled: launching the activity before [loadPlaybackItem] causes ExoPlayer
 /// to bind and sit idle while Dart finishes stop()/network work. The user sees a black screen
 /// and presses Back before the URL arrives. The standard flow (openPlayer after loadPlaybackItem)
 /// is correct: pendingOpenUrl is set by open(), then init() picks it up when ExoPlayer binds.
-Future<bool> oxplayerOpenNativePlayerEarly(WidgetRef ref, BuildContext context) async {
+Future<bool> oxplayerOpenNativePlayerEarly(OxplayerRead read, BuildContext context) async {
   return false;
 }
 
@@ -155,13 +158,13 @@ bool oxplayerPlaybackLooksFrozenMidStream({
 
 /// Periodically detects start-stuck and mid-stream freeze on Android native + MPV; auto-repairs.
 Timer? oxplayerScheduleStuckPlaybackWatch({
-  required WidgetRef ref,
+  required OxplayerRead read,
   required String itemId,
   required String? streamUrl,
   Duration? catalogDuration,
   Duration startPosition = Duration.zero,
 }) {
-  if (!_shouldScheduleStuckWatch(ref)) return null;
+  if (!_shouldScheduleStuckWatch(read)) return null;
 
   var retriesUsed = 0;
   var telemetrySentForIncident = false;
@@ -297,14 +300,14 @@ Timer? oxplayerScheduleStuckPlaybackWatch({
 
 /// Back-compat alias.
 Timer? oxplayerScheduleNativeStuckPlaybackWatch({
-  required WidgetRef ref,
+  required OxplayerRead read,
   required String itemId,
   required String? streamUrl,
   Duration? catalogDuration,
   Duration startPosition = Duration.zero,
 }) =>
     oxplayerScheduleStuckPlaybackWatch(
-      ref: ref,
+      read: read,
       itemId: itemId,
       streamUrl: streamUrl,
       catalogDuration: catalogDuration,
