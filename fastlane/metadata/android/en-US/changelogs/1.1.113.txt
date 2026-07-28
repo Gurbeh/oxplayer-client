@@ -1,0 +1,1 @@
+Fix Android TV review login: hold OK on the QR code for 5 seconds to sign in with the demo library.

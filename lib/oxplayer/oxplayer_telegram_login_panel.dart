@@ -324,6 +324,7 @@ class _OxplayerTelegramLoginPanelState extends ConsumerState<OxplayerTelegramLog
           if (link != null)
             Center(
               child: OxplayerTestAccountQrHold(
+                autofocus: isTv,
                 enabled: !_testSignInInProgress && !_waiting,
                 onHoldComplete: _signInAsTestAccount,
                 child: ClipRRect(
