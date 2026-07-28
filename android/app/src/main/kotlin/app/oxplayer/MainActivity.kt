@@ -10,10 +10,12 @@ import VideoPlayerControlsCallback
 import VideoPlayerListenerCallback
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.os.Bundle
 import android.os.PowerManager
 import android.net.Uri
 import android.util.Log
 import android.provider.Settings
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
@@ -29,6 +31,13 @@ class MainActivity : AudioServiceFragmentActivity(), NativeVideoActivity {
 
     private lateinit var videoPlayerLauncher: ActivityResultLauncher<Intent>
     private var videoPlayerCallback: ((Result<StartResult>) -> Unit)? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        // Android 15+ enforces edge-to-edge for SDK 35+ targets; enableEdgeToEdge()
+        // is the backward-compatible way to opt in across all supported API levels.
+        enableEdgeToEdge()
+        super.onCreate(savedInstanceState)
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

@@ -1,8 +1,11 @@
 package app.oxplayer
 
+import android.app.PictureInPictureParams
+import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Bundle
+import android.util.Rational
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,6 +23,8 @@ import app.oxplayer.utility.ScaledContent
 import app.oxplayer.utility.leanBackEnabled
 
 class VideoPlayerActivity : ComponentActivity() {
+    private var isInPip = false
+
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -42,13 +47,62 @@ class VideoPlayerActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        isInPip = false
         VideoPlayerObject.implementation.restoreAfterBackground()
     }
 
     override fun onPause() {
-        VideoPlayerObject.implementation.saveBackgroundState()
-        super.onPause()
-        VideoPlayerObject.implementation.pause()
+        // Skip pausing playback when entering/already in PiP so the mini window
+        // keeps playing while the user is in another app.
+        if (!isInPip) {
+            VideoPlayerObject.implementation.saveBackgroundState()
+            super.onPause()
+            VideoPlayerObject.implementation.pause()
+        } else {
+            super.onPause()
+        }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            tryEnterPip()
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration,
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        isInPip = isInPictureInPictureMode
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun tryEnterPip() {
+        val exo = VideoPlayerObject.implementation.player ?: return
+        // Only auto-enter PiP when there is media loaded and actively playing.
+        if (exo.mediaItemCount == 0) return
+        if (!exo.isPlaying && !exo.playWhenReady) return
+
+        val vs = exo.videoSize
+        val w = if (vs.width > 0) vs.width else 16
+        val h = if (vs.height > 0) vs.height else 9
+        // Android requires PiP aspect ratio in [0.418410, 2.39] (1/2.39 .. 2.39).
+        val ratio = w.toFloat() / h.toFloat()
+        val clamped = when {
+            ratio > 2.39f -> Rational(239, 100)
+            ratio < 1f / 2.39f -> Rational(100, 239)
+            else -> Rational(w, h)
+        }
+        val params = PictureInPictureParams.Builder()
+            .setAspectRatio(clamped)
+            .build()
+        try {
+            enterPictureInPictureMode(params)
+        } catch (_: IllegalStateException) {
+            // Activity not in foreground / PiP not allowed at this moment; ignore.
+        }
     }
 
     override fun onDestroy() {
