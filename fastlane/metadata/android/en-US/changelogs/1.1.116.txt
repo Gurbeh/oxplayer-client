@@ -1,0 +1,1 @@
+﻿Fix Crashlytics crashes: player settings sync, Seerr config, blurhash.
