@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:fladder/oxplayer/models/ox_media_issue_target.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/providers/seerr_api_provider.dart';
+import 'package:fladder/providers/user_provider.dart';
 
 part 'ox_media_issue_context.g.dart';
 
@@ -25,6 +26,10 @@ Future<OxMediaIssueContext> oxMediaIssueContext(
 ) async {
   if (!OxplayerConfig.isEnabled) {
     throw StateError('OXPlayer is disabled');
+  }
+
+  if (ref.read(userProvider)?.seerrCredentials?.isConfigured != true) {
+    throw StateError('Seerr is not configured');
   }
 
   final api = ref.watch(seerrApiProvider);

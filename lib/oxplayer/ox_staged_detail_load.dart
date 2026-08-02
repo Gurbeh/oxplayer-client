@@ -342,6 +342,7 @@ Future<({
 
 void oxPrefetchMovieSeerrRatings(Ref ref, String itemId, int? tmdbId) {
   if (!OxplayerEnv.isEnabled || tmdbId == null || tmdbId <= 0) return;
+  if (ref.read(userProvider)?.seerrCredentials?.isConfigured != true) return;
   if (!oxSeerrRatingsMissingRt(ref.read(oxLibraryItemRatingsProvider(itemId)))) return;
   unawaited(() async {
     try {

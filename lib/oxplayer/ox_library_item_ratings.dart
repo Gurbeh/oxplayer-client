@@ -34,6 +34,7 @@ void oxApplyLibraryItemRatings(Ref ref, String itemId, SeerrRatingsResponse? rat
 /// Loads Seerr TV RT scores in the background (does not block series detail load).
 void oxPrefetchSeerrTvRatings(Ref ref, String itemId, int? tmdbId) {
   if (!OxplayerEnv.isEnabled || tmdbId == null || tmdbId <= 0) return;
+  if (ref.read(userProvider)?.seerrCredentials?.isConfigured != true) return;
   unawaited(() async {
     try {
       final rt = await ref.read(seerrApiProvider).tvRatings(tmdbId);

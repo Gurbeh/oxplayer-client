@@ -127,6 +127,10 @@ abstract final class OxplayerSentryFilters {
     if (lower.contains('cannot use "ref" after the widget was disposed')) {
       return true;
     }
+    // Expected until /me/seerr configures proxy for VIP/admin.
+    if (lower.contains('seerr server not configured')) {
+      return true;
+    }
 
     return false;
   }
