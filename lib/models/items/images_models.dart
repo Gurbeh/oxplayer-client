@@ -171,8 +171,10 @@ class ImagesData {
     Size logo = const Size(1000, 1000),
     Size primary = const Size(500, 500),
   }) {
+    final blurHash = item.imageBlurHashes?.primary?[item.primaryImageTag ?? ''] ?? '';
     return ImagesData(
-      primary: (item.primaryImageTag != null && item.imageBlurHashes != null)
+      // PrimaryImageTag alone is enough; empty ImageBlurHashes stubs crash BlurHashImage.
+      primary: item.primaryImageTag != null
           ? ImageData(
               path: ref.read(imageUtilityProvider).getItemsImageUrl(
                     item.id ?? "",
@@ -181,7 +183,7 @@ class ImagesData {
                     maxWidth: primary.width.toInt(),
                   ),
               key: "${item.id ?? ""}_primary_${item.primaryImageTag ?? ''}",
-              hash: item.imageBlurHashes?.primary?[item.primaryImageTag] ?? '')
+              hash: blurHash.length >= 6 ? blurHash : '')
           : null,
       logo: null,
       backDrop: null,
