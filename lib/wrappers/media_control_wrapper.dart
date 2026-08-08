@@ -22,6 +22,7 @@ import 'package:fladder/models/playback/audio_url_resolver.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/playback_queue_state.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/live_tv_provider.dart';
@@ -474,6 +475,14 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
   Future<void> stop() async {
     final playbackModel = ref.read(playBackModel);
     if (playbackModel == null) return;
+
+    // mpv/mdk path only: ExoPlayer's own Activity teardown closes the TDLib client natively
+    // (VideoPlayerImplementation.clearSession) — this player runs inside the normal Flutter
+    // widget tree instead, so nothing else calls this. No-op for any non-Telegram url.
+    final sessionUrl = playbackModel.media?.url;
+    if (oxplayerIsTdlibHttpBridgeUrl(sessionUrl)) {
+      unawaited(OxplayerTdlibBridgeController.instance().stopPlaybackSession(sessionUrl!));
+    }
 
     ref.read(mediaPlaybackProvider.notifier).update((state) => state.copyWith(state: VideoPlayerState.disposed));
     WakelockPlus.disable();

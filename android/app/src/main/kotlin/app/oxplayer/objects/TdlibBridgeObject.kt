@@ -14,6 +14,7 @@ import app.oxplayer.tdlibbridge.auth.TdlibAuthState
 import app.oxplayer.tdlibbridge.auth.TdlibWebAppAuth
 import app.oxplayer.tdlibbridge.media.TdlibChannelResolver
 import app.oxplayer.tdlibbridge.media.TdlibFileFetcher
+import app.oxplayer.tdlibbridge.player.TdlibHttpBridgeServer
 import app.oxplayer.tdlibbridge.session.TdlibClient
 import app.oxplayer.tdlibbridge.session.TdlibException
 import app.oxplayer.tdlibbridge.session.TdlibSessionConfig
@@ -29,11 +30,13 @@ import kotlinx.coroutines.launch
  * classes, mirroring this app's PlayerSettingsObject/VideoPlayerObject convention of an object
  * implementing the generated Pigeon interface directly.
  *
- * The underlying TdlibClient is created lazily on the first [configure] call and kept alive
- * across playback sessions once authenticated (re-auth on every play would mean an unnecessary
- * network round trip — TDLib's local session makes that unnecessary). Only the per-playback file
- * download is torn down in [stopPlaybackSession], matching the module's "no persistent chat/dialog
- * state, but a live logged-in session is expected to persist" scope (README / plan doc B.2).
+ * The underlying TdlibClient is created lazily on the first [configure] call. It is deliberately
+ * NOT kept alive between playback sessions: reproduced against a real, chat-heavy account, TDLib
+ * keeps processing and persisting that account's entire update stream (every chat it belongs to,
+ * not just the one being played) for as long as the client is open — 100%+ CPU continuously, with
+ * nothing to do with whether the app is even in use. [onTelegramPlaybackEnded] closes it as soon
+ * as a Telegram-sourced playback session ends; the on-disk session persists so the next play just
+ * reconnects (~1s to Ready) rather than needing a fresh login.
  */
 object TdlibBridgeObject : OxTdlibBridgeApi {
 
@@ -53,6 +56,10 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
      *  [onTelegramPlaybackEnded] no-op for non-Telegram playback and know what to cancel. */
     @Volatile
     private var currentPlaybackFileId: Int? = null
+
+    /** mpv/mdk path (see TdlibHttpBridgeServer doc) — created once, outlives individual
+     *  TdlibClient instances; always reads whichever [fileFetcher] is live at request time. */
+    private val httpBridgeServer = TdlibHttpBridgeServer(fileFetcher = { fileFetcher })
 
     @Volatile
     private var lastAuthState: OxTdlibAuthState =
@@ -182,7 +189,7 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
                 Log.i("OXPLAY_TDLIB", "startPlaybackSession resolved fileId=${file.id}, requesting download")
                 fetcher.requestDownload(file.id, offset = 0, priority = 32)
                 currentPlaybackFileId = file.id
-                "tdlib-file://${file.id}"
+                if (source.preferHttpBridge) httpBridgeServer.urlFor(file.id) else "tdlib-file://${file.id}"
             }.fold(
                 onSuccess = { uri -> replyOnMain(callback, Result.success(uri)) },
                 onFailure = { error -> replyOnMain(callback, Result.failure(error)) },
@@ -190,28 +197,34 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
         }
     }
 
+    /**
+     * Called from mpv/mdk's wrapper (media_control_wrapper.dart) when a Telegram-sourced item
+     * finishes — mpv/mdk have no Activity-scoped teardown hook the way ExoPlayer does (see
+     * [onTelegramPlaybackEnded]), so that path must call this explicitly via Pigeon. sessionUri is
+     * either tdlib-file://{fileId} or http://127.0.0.1:{port}/{fileId} (TdlibHttpBridgeServer) —
+     * fileId is the last path segment either way.
+     */
     override fun stopPlaybackSession(sessionUri: String, callback: (Result<Unit>) -> Unit) {
-        val fetcher = fileFetcher
-        val fileId = sessionUri.removePrefix("tdlib-file://").toIntOrNull()
-        if (fetcher == null || fileId == null) {
-            callback(Result.success(Unit))
-            return
-        }
-        scope.launch {
-            runCatching { fetcher.cancelDownload(fileId) }
-                .fold(
-                    onSuccess = { replyOnMain(callback, Result.success(Unit)) },
-                    onFailure = { error -> replyOnMain(callback, Result.failure(error)) },
-                )
-        }
+        val fileId = sessionUri.substringAfterLast('/').toIntOrNull()
+        if (fileId != null) closeAfterPlayback(fileId)
+        callback(Result.success(Unit))
     }
 
     /**
      * Called from the native player's teardown (VideoPlayerImplementation.clearSession) once a
      * Telegram-sourced playback session actually ends — not via the Pigeon stopPlaybackSession
-     * path, since Dart never calls that today and this native hook already reliably fires exactly
-     * when ExoPlayer is released (including activity-finish/app-kill paths).
+     * path, since ExoPlayer runs in its own Activity with a reliable native-side onDispose hook
+     * that already fires exactly when ExoPlayer is released (including activity-finish/app-kill
+     * paths), so no Dart round-trip is needed for that backend.
      *
+     * No-op if the just-ended playback wasn't Telegram-sourced (currentPlaybackFileId unset).
+     */
+    fun onTelegramPlaybackEnded() {
+        val fileId = currentPlaybackFileId ?: return
+        closeAfterPlayback(fileId)
+    }
+
+    /**
      * Closes the whole TDLib client rather than just cancelling the download: reproduced against
      * a chat-heavy real account, TDLib keeps processing and persisting that account's *entire*
      * update stream (every chat/channel it belongs to, not just the one playback used) for as
@@ -219,11 +232,8 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
      * even in use. Re-auth isn't needed on the next play (the session persists on disk) and
      * reconnect-to-ready is ~1s after the SharedFlow overflow fix, so eagerly closing between
      * playback sessions trades that small reconnect cost for not draining battery/CPU 24/7.
-     *
-     * No-op if the just-ended playback wasn't Telegram-sourced (currentPlaybackFileId unset).
      */
-    fun onTelegramPlaybackEnded() {
-        val fileId = currentPlaybackFileId ?: return
+    private fun closeAfterPlayback(fileId: Int) {
         currentPlaybackFileId = null
         val fetcher = fileFetcher
         val activeClient = client

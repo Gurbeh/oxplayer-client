@@ -115,16 +115,23 @@ class OxTdlibPlaybackSource {
   OxTdlibPlaybackSource({
     required this.channelUsername,
     required this.messageId,
+    required this.preferHttpBridge,
   });
 
   String channelUsername;
 
   int messageId;
 
+  /// True when the target player is mpv/mdk (no DataSource-style hook for a custom scheme) —
+  /// returns a http://127.0.0.1:{port}/{fileId} url served by TdlibHttpBridgeServer instead of
+  /// tdlib-file://{fileId}. False (default) keeps the existing ExoPlayer DataSource path.
+  bool preferHttpBridge;
+
   List<Object?> _toList() {
     return <Object?>[
       channelUsername,
       messageId,
+      preferHttpBridge,
     ];
   }
 
@@ -136,6 +143,7 @@ class OxTdlibPlaybackSource {
     return OxTdlibPlaybackSource(
       channelUsername: result[0]! as String,
       messageId: result[1]! as int,
+      preferHttpBridge: result[2]! as bool,
     );
   }
 
@@ -385,8 +393,10 @@ class OxTdlibBridgeApi {
     }
   }
 
-  /// Resolves [source] and starts downloading via TDLib, returning a
-  /// tdlib-file://{fileId} uri for the Dart resolver to hand to the player.
+  /// Resolves [source] and starts downloading via TDLib, returning either a
+  /// tdlib-file://{fileId} uri (ExoPlayer DataSource path) or, when
+  /// source.preferHttpBridge is true, a http://127.0.0.1:{port}/{fileId} uri served by
+  /// TdlibHttpBridgeServer (mpv/mdk path — see that class for why).
   /// Throws if no MTProto/TDLib session is logged in yet — callers should
   /// check currentAuthState() first and prompt login if not ready.
   Future<String> startPlaybackSession(OxTdlibPlaybackSource source) async {
@@ -417,7 +427,11 @@ class OxTdlibBridgeApi {
     }
   }
 
-  /// Stops the active playback session's download (does not log out).
+  /// Stops the active playback session's download and closes the TDLib client (does not log
+  /// out — the on-disk session persists, next play just reconnects). Callers on every backend
+  /// (ExoPlayer's own hook is native-side via VideoPlayerImplementation.clearSession; mpv/mdk
+  /// have no equivalent Activity-scoped teardown, so their wrapper must call this explicitly
+  /// when a Telegram-sourced item finishes) — see TdlibBridgeObject.onTelegramPlaybackEnded.
   Future<void> stopPlaybackSession(String sessionUri) async {
     final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.stopPlaybackSession$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(

@@ -14,7 +14,9 @@ import 'package:fladder/oxplayer/oxplayer_stream_warmup.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_http_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_nodes_api.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
+import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/providers/api_provider.dart';
+import 'package:fladder/providers/settings/video_player_settings_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 
 /// Session-scoped stream node selection state for a single playback.
@@ -89,7 +91,11 @@ Future<String?> oxplayerResolveStreamPlaybackUrl(
   // own TDLib session, not ox-stream — none of the node discovery/warmup/instrumentation below
   // applies, so this returns early rather than falling through to _finalizeStreamPlaybackUrl.
   if (oxplayerIsTelegramProviderLink(apiMintedUrl)) {
-    return oxplayerResolveTdlibPlaybackUrl(apiMintedUrl!);
+    final wantedPlayer = read(videoPlayerSettingsProvider).wantedPlayer;
+    return oxplayerResolveTdlibPlaybackUrl(
+      apiMintedUrl!,
+      preferHttpBridge: wantedPlayer != PlayerOptions.nativePlayer,
+    );
   }
 
   if (!OxplayerEnv.isEnabled || apiMintedUrl == null || !oxplayerIsOxStreamUrl(apiMintedUrl)) {

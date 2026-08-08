@@ -33,20 +33,38 @@ bool oxplayerIsTelegramProviderLink(String? url) {
 /// native (ExoPlayer) backend for this url regardless of the user's player preference.
 bool oxplayerIsTdlibFileUrl(String? url) => url != null && url.startsWith('tdlib-file://');
 
+/// True for a resolved TdlibHttpBridgeServer url (mpv/mdk path) — a plain http url on the
+/// loopback address, which no other part of this app ever serves media from, so the host alone is
+/// a safe, simple signal. mpv/mdk play this like any other network stream (no special player
+/// forcing needed, unlike [oxplayerIsTdlibFileUrl]), but it still needs the same
+/// stopPlaybackSession cleanup as the ExoPlayer path once playback ends — see
+/// TdlibBridgeObject.stopPlaybackSession/onTelegramPlaybackEnded.
+bool oxplayerIsTdlibHttpBridgeUrl(String? url) {
+  if (url == null) return false;
+  final uri = Uri.tryParse(url);
+  return uri != null && (uri.host == '127.0.0.1' || uri.host == 'localhost');
+}
+
 /// Resolves a `t.me/{username}/{messageId}` PlaybackInfo link to a `tdlib-file://{fileId}` uri by
 /// starting a TDLib download session (see TelegramFileDataSource on the Android side, which reads
 /// from that uri). Requires an already-logged-in Telegram user session — callers should check
 /// OxplayerTdlibBridgeController.instance().state.kind == ready and prompt login otherwise
 /// (OxplayerTdlibLoginPanel / OxplayerTdlibQrLoginPanel) before reaching this resolver.
-Future<String> oxplayerResolveTdlibPlaybackUrl(String url) async {
+Future<String> oxplayerResolveTdlibPlaybackUrl(String url, {bool preferHttpBridge = false}) async {
   final uri = Uri.parse(url);
   final channelUsername = uri.pathSegments[0];
   final messageId = int.parse(uri.pathSegments[1]);
-  _oxplayTdlibLog('startPlaybackSession channel=$channelUsername messageId=$messageId');
+  _oxplayTdlibLog(
+    'startPlaybackSession channel=$channelUsername messageId=$messageId preferHttpBridge=$preferHttpBridge',
+  );
   final controller = OxplayerTdlibBridgeController.instance();
   try {
     final session = await controller.startPlaybackSession(
-      OxTdlibPlaybackSource(channelUsername: channelUsername, messageId: messageId),
+      OxTdlibPlaybackSource(
+        channelUsername: channelUsername,
+        messageId: messageId,
+        preferHttpBridge: preferHttpBridge,
+      ),
     );
     _oxplayTdlibLog('startPlaybackSession ok -> $session');
     return session;

@@ -135,20 +135,28 @@ data class OxTdlibAuthState (
  */
 data class OxTdlibPlaybackSource (
   val channelUsername: String,
-  val messageId: Long
+  val messageId: Long,
+  /**
+   * True when the target player is mpv/mdk (no DataSource-style hook for a custom scheme) —
+   * returns a http://127.0.0.1:{port}/{fileId} url served by TdlibHttpBridgeServer instead of
+   * tdlib-file://{fileId}. False (default) keeps the existing ExoPlayer DataSource path.
+   */
+  val preferHttpBridge: Boolean
 )
  {
   companion object {
     fun fromList(pigeonVar_list: List<Any?>): OxTdlibPlaybackSource {
       val channelUsername = pigeonVar_list[0] as String
       val messageId = pigeonVar_list[1] as Long
-      return OxTdlibPlaybackSource(channelUsername, messageId)
+      val preferHttpBridge = pigeonVar_list[2] as Boolean
+      return OxTdlibPlaybackSource(channelUsername, messageId, preferHttpBridge)
     }
   }
   fun toList(): List<Any?> {
     return listOf(
       channelUsername,
       messageId,
+      preferHttpBridge,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -230,13 +238,21 @@ interface OxTdlibBridgeApi {
   /** Server-side session invalidation + local TDLib session wipe. */
   fun logOut(callback: (Result<Unit>) -> Unit)
   /**
-   * Resolves [source] and starts downloading via TDLib, returning a
-   * tdlib-file://{fileId} uri for the Dart resolver to hand to the player.
+   * Resolves [source] and starts downloading via TDLib, returning either a
+   * tdlib-file://{fileId} uri (ExoPlayer DataSource path) or, when
+   * source.preferHttpBridge is true, a http://127.0.0.1:{port}/{fileId} uri served by
+   * TdlibHttpBridgeServer (mpv/mdk path — see that class for why).
    * Throws if no MTProto/TDLib session is logged in yet — callers should
    * check currentAuthState() first and prompt login if not ready.
    */
   fun startPlaybackSession(source: OxTdlibPlaybackSource, callback: (Result<String>) -> Unit)
-  /** Stops the active playback session's download (does not log out). */
+  /**
+   * Stops the active playback session's download and closes the TDLib client (does not log
+   * out — the on-disk session persists, next play just reconnects). Callers on every backend
+   * (ExoPlayer's own hook is native-side via VideoPlayerImplementation.clearSession; mpv/mdk
+   * have no equivalent Activity-scoped teardown, so their wrapper must call this explicitly
+   * when a Telegram-sourced item finishes) — see TdlibBridgeObject.onTelegramPlaybackEnded.
+   */
   fun stopPlaybackSession(sessionUri: String, callback: (Result<Unit>) -> Unit)
   /**
    * Fetches a Telegram-signed Mini App `initData` payload for [botUsername] via TDLib's
