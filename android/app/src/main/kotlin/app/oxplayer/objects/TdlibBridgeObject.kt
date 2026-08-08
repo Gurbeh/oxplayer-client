@@ -49,6 +49,11 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
     private var fileFetcher: TdlibFileFetcher? = null
     private var webAppAuth: TdlibWebAppAuth? = null
 
+    /** fileId of the in-flight/just-finished Telegram-sourced playback session, if any — lets
+     *  [onTelegramPlaybackEnded] no-op for non-Telegram playback and know what to cancel. */
+    @Volatile
+    private var currentPlaybackFileId: Int? = null
+
     @Volatile
     private var lastAuthState: OxTdlibAuthState =
         OxTdlibAuthState(kind = OxTdlibAuthStateKind.UNINITIALIZED)
@@ -176,6 +181,7 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
                 val file = resolver.resolveVideoFile(source.channelUsername, source.messageId)
                 Log.i("OXPLAY_TDLIB", "startPlaybackSession resolved fileId=${file.id}, requesting download")
                 fetcher.requestDownload(file.id, offset = 0, priority = 32)
+                currentPlaybackFileId = file.id
                 "tdlib-file://${file.id}"
             }.fold(
                 onSuccess = { uri -> replyOnMain(callback, Result.success(uri)) },
@@ -198,6 +204,34 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
                     onFailure = { error -> replyOnMain(callback, Result.failure(error)) },
                 )
         }
+    }
+
+    /**
+     * Called from the native player's teardown (VideoPlayerImplementation.clearSession) once a
+     * Telegram-sourced playback session actually ends — not via the Pigeon stopPlaybackSession
+     * path, since Dart never calls that today and this native hook already reliably fires exactly
+     * when ExoPlayer is released (including activity-finish/app-kill paths).
+     *
+     * Closes the whole TDLib client rather than just cancelling the download: reproduced against
+     * a chat-heavy real account, TDLib keeps processing and persisting that account's *entire*
+     * update stream (every chat/channel it belongs to, not just the one playback used) for as
+     * long as the client stays open — 100%+ CPU continuously, unrelated to whether the app is
+     * even in use. Re-auth isn't needed on the next play (the session persists on disk) and
+     * reconnect-to-ready is ~1s after the SharedFlow overflow fix, so eagerly closing between
+     * playback sessions trades that small reconnect cost for not draining battery/CPU 24/7.
+     *
+     * No-op if the just-ended playback wasn't Telegram-sourced (currentPlaybackFileId unset).
+     */
+    fun onTelegramPlaybackEnded() {
+        val fileId = currentPlaybackFileId ?: return
+        currentPlaybackFileId = null
+        val fetcher = fileFetcher
+        val activeClient = client
+        if (fetcher != null) {
+            scope.launch { runCatching { fetcher.cancelDownload(fileId) } }
+        }
+        activeClient?.close()
+        clearNativeSession()
     }
 
     override fun fetchWebAppInitData(

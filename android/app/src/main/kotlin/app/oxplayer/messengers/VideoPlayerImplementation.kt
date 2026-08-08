@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import app.oxplayer.objects.PlayerSettingsObject
+import app.oxplayer.objects.TdlibBridgeObject
 import app.oxplayer.objects.VideoPlayerObject
 import app.oxplayer.utility.clearAudioTrack
 import app.oxplayer.utility.clearSubtitleTrack
@@ -127,6 +128,8 @@ class VideoPlayerImplementation(
         wasPlayingBeforeBackground = false
         pendingOpenUrl = null
         initialPositionLogPosted = false
+        // No-op unless this session's video actually came from Telegram — see doc there.
+        TdlibBridgeObject.onTelegramPlaybackEnded()
     }
 
     private fun publishPlaybackState(exo: ExoPlayer) {
