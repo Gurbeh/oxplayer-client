@@ -1,0 +1,53 @@
+plugins {
+    id "com.android.library"
+    id "kotlin-android"
+}
+
+android {
+    namespace = "app.oxplayer.tdlibbridge"
+
+    // This module does not apply dev.flutter.flutter-gradle-plugin, so it can't read the
+    // `flutter.*` extension app/build.gradle uses. Keep these in sync with
+    // /flutter/packages/flutter_tools/gradle/src/main/kotlin/FlutterExtension.kt (checked at
+    // scaffold time: compileSdk 36, minSdk 24, targetSdk 36, ndk 28.2.13676358).
+    compileSdk = 36
+    ndkVersion = "28.2.13676358"
+
+    defaultConfig {
+        minSdkVersion 24
+        targetSdk = 36
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+}
+
+dependencies {
+    // org.drinkless.tdlib.{Client,TdApi} + libtdjni.so are vendored directly under
+    // src/main/java/org/drinkless/tdlib/ and src/main/jniLibs/{abi}/ — built via TDLib's official
+    // Docker build (github.com/tdlib/td/tree/master/example/android, `docker build --output
+    // tdlib .`, default args: TDLIB_INTERFACE=Java, ANDROID_STL=c++_static). Picked up
+    // automatically by AGP's default source sets, no extra dependency declaration needed. To
+    // rebuild against a newer TDLib commit, rerun that Docker build and replace both directories.
+    // See README.md for details and provenance.
+
+    implementation "androidx.core:core-ktx:1.15.0"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0"
+    implementation "androidx.security:security-crypto:1.1.0"
+    implementation "androidx.media3:media3-exoplayer:1.8.0"
+
+    testImplementation "junit:junit:4.13.2"
+    testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0"
+}

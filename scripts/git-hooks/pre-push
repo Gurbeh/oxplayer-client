@@ -2,5 +2,11 @@
 # Required before every git push — same static checks as CI (scripts/verify-all.sh).
 set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
+
+# git-lfs (vendored TDLib .so files under android/ox_tdlib_bridge/src/main/jniLibs/) — added by
+# `git lfs install`; must run before the push, not after, so LFS objects upload with it.
+command -v git-lfs >/dev/null 2>&1 || { printf >&2 "\n%s\n\n" "This repository is configured for Git LFS but 'git-lfs' was not found on your path. If you no longer wish to use Git LFS, remove this line from scripts/git-hooks/pre-push."; exit 2; }
+git lfs pre-push "$@"
+
 echo "pre-push (required): running scripts/verify-all.sh ..."
 bash "${ROOT}/scripts/verify-all.sh"

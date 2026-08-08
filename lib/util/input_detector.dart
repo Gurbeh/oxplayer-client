@@ -3,18 +3,24 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/focus_helper.dart';
 
 class InputDetector extends StatefulWidget {
   final bool isDesktop;
   final bool htpcMode;
+  /// Android TV / Leanback — keep dPad switching. Phone/tablet OX must not, or
+  /// one arrow key + default `useSystemIME=false` makes OutlinedTextField readOnly
+  /// and IgnorePointer blocks the login phone field.
+  final bool leanBackMode;
   final Widget Function(InputDevice input) child;
 
   const InputDetector({
     super.key,
     required this.isDesktop,
     required this.htpcMode,
+    this.leanBackMode = false,
     required this.child,
   });
 
@@ -23,11 +29,15 @@ class InputDetector extends StatefulWidget {
 }
 
 class _InputDetectorState extends State<InputDetector> {
-  late InputDevice _currentInput = widget.htpcMode
+  late InputDevice _currentInput = widget.htpcMode || widget.leanBackMode
       ? InputDevice.dPad
       : (widget.isDesktop || kIsWeb)
           ? InputDevice.pointer
           : InputDevice.touch;
+
+  /// OX phone/tablet/emulator: stay on touch/pointer so login TextFields stay editable.
+  bool get _oxLockTouchInput =>
+      OxplayerConfig.isEnabled && !widget.htpcMode && !widget.leanBackMode;
 
   @override
   void initState() {
@@ -46,6 +56,8 @@ class _InputDetectorState extends State<InputDetector> {
   }
 
   bool _handleKeyPress(KeyEvent event) {
+    if (_oxLockTouchInput) return false;
+
     if (event is KeyDownEvent) {
       if (isEditableTextFocused() &&
           (event.logicalKey == LogicalKeyboardKey.arrowUp ||
@@ -77,8 +89,12 @@ class _InputDetectorState extends State<InputDetector> {
   }
 
   void _updateInputDevice(InputDevice device) {
+    if (_oxLockTouchInput && device == InputDevice.dPad) return;
     if (_currentInput != device) {
-      if (device != InputDevice.dPad) {
+      // Only clear focus when leaving D-pad (TV) mode.
+      // touch↔pointer switches are common on Android emulators (mouse click) — unfocusing
+      // there steals TextField focus so the laptop keyboard never types into the field.
+      if (_currentInput == InputDevice.dPad && device != InputDevice.dPad) {
         FocusManager.instance.primaryFocus?.unfocus();
       }
       setState(() {
@@ -93,7 +109,7 @@ class _InputDetectorState extends State<InputDetector> {
       onPointerDown: _handlePointerEvent,
       behavior: HitTestBehavior.translucent,
       child: IgnorePointer(
-        ignoring: _currentInput == InputDevice.dPad,
+        ignoring: _currentInput == InputDevice.dPad && !_oxLockTouchInput,
         child: Builder(
           builder: (context) => widget.child(_currentInput),
         ),

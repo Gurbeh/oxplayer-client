@@ -228,6 +228,7 @@ class _AdaptiveLayoutBuilderState extends ConsumerState<AdaptiveLayoutBuilder> {
         return InputDetector(
           isDesktop: isDesktop,
           htpcMode: htpcMode,
+          leanBackMode: isAndroidTV,
           child: (input) => MediaQuery(
             data: mediaQuery.copyWith(
               navigationMode: input == InputDevice.dPad ? NavigationMode.directional : NavigationMode.traditional,

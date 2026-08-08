@@ -129,7 +129,10 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     final lastPosition = currentState.lastPosition;
     final diff = (position.inMilliseconds - lastPosition.inMilliseconds).abs();
 
-    if (diff > const Duration(seconds: 10).inMilliseconds) {
+    final progressThreshold = OxplayerEnv.isEnabled
+        ? const Duration(seconds: 30)
+        : const Duration(seconds: 10);
+    if (diff > progressThreshold.inMilliseconds) {
       mediaState.update((value) => value.copyWith(
             position: event,
             lastPosition: position,

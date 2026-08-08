@@ -31,11 +31,13 @@ import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/models/syncing/sync_item.dart';
 import 'package:fladder/models/video_stream_model.dart';
 import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
+import 'package:fladder/oxplayer/oxplayer_force_repair_interceptor.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_media_source.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_subtitle.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
 import 'package:fladder/profiles/default_profile.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/connectivity_provider.dart';
@@ -361,8 +363,9 @@ class PlaybackModelHelper {
               queueSource: effectiveQueueSource,
             );
       }
-    } catch (e) {
+    } catch (e, st) {
       log("Error creating playback model: ${e.toString()}");
+      debugPrint('createPlaybackModel error: $e\n$st');
       return null;
     }
   }
@@ -411,32 +414,38 @@ class PlaybackModelHelper {
           ref.read(videoPlayerSettingsProvider.select((value) => value.wantedPlayer == PlayerOptions.nativePlayer));
       final isExternalSub = newStreamModel?.currentSubStream?.isExternal == true;
 
-      final Response<PlaybackInfoResponse> response = await api.itemsItemIdPlaybackInfoPost(
-        itemId: item.id,
-        body: PlaybackInfoDto(
-          startTimeTicks: startPosition?.toRuntimeTicks,
-          audioStreamIndex: audioStreamIndex,
-          subtitleStreamIndex: subStreamIndex,
-          enableTranscoding: true,
-          autoOpenLiveStream: true,
-          deviceProfile: type != PlaybackType.tv ? ref.read(videoProfileProvider) : null,
-          userId: userId,
-          enableDirectPlay: type != PlaybackType.transcode,
-          enableDirectStream: type != PlaybackType.transcode,
-          alwaysBurnInSubtitleWhenTranscoding: isNativePlayer && isExternalSub,
-          maxStreamingBitrate: qualityOptions.enabledFirst.keys.firstOrNull?.bitRate,
-          mediaSourceId: newStreamModel?.currentVersionStream?.id,
-        ),
-      );
+      final requestedMediaSourceId = newStreamModel?.currentVersionStream?.id;
 
-      PlaybackInfoResponse? playbackInfo = response.body;
+      Future<PlaybackInfoResponse?> fetchPlaybackInfo({required bool forceRepair}) async {
+        if (forceRepair) {
+          oxplayerArmForceRepairPlayback(ref);
+        }
+        final response = await api.itemsItemIdPlaybackInfoPost(
+          itemId: item.id,
+          body: PlaybackInfoDto(
+            startTimeTicks: startPosition?.toRuntimeTicks,
+            audioStreamIndex: audioStreamIndex,
+            subtitleStreamIndex: subStreamIndex,
+            enableTranscoding: true,
+            autoOpenLiveStream: true,
+            deviceProfile: type != PlaybackType.tv ? ref.read(videoProfileProvider) : null,
+            userId: userId,
+            enableDirectPlay: type != PlaybackType.transcode,
+            enableDirectStream: type != PlaybackType.transcode,
+            alwaysBurnInSubtitleWhenTranscoding: isNativePlayer && isExternalSub,
+            maxStreamingBitrate: qualityOptions.enabledFirst.keys.firstOrNull?.bitRate,
+            mediaSourceId: newStreamModel?.currentVersionStream?.id,
+          ),
+        );
+        return response.body;
+      }
 
+      var playbackInfo = await fetchPlaybackInfo(forceRepair: false);
       if (playbackInfo == null) {
         return null;
       }
 
-      final requestedMediaSourceId = newStreamModel?.currentVersionStream?.id;
-      final mediaSource = oxplayerResolvePlaybackMediaSource(
+      var mediaSource = oxplayerResolvePlaybackMediaSource(
         playbackInfo,
         requestedMediaSourceId: requestedMediaSourceId,
       );
@@ -445,7 +454,41 @@ class PlaybackModelHelper {
         return null;
       }
 
-      final resolvedVersionIndex = playbackInfo.mediaSources?.indexWhere((s) => s.id == mediaSource.id) ?? -1;
+      var mediaPath = isValidVideoUrl(mediaSource.path ?? "");
+      String? resolvedMediaPath;
+      if (mediaPath != null && OxplayerEnv.isEnabled) {
+        try {
+          resolvedMediaPath = await oxplayerResolveStreamPlaybackUrl(ref.read, mediaPath);
+        } catch (e) {
+          // The public Telegram pool purges daily; a link can go dead between hydrate and this
+          // play attempt. Force-repair sends a brand new copyMessage and retry once, silently,
+          // rather than surfacing an error — see oxplayerIsTdlibFileMissingError.
+          if (!oxplayerIsTelegramProviderLink(mediaPath) || !oxplayerIsTdlibFileMissingError(e)) {
+            rethrow;
+          }
+          debugPrint(
+            '$oxplayTdlibLogTag: file missing ($e) for itemId=${item.id} — force-repair retry',
+          );
+          final repairedInfo = await fetchPlaybackInfo(forceRepair: true);
+          final repairedSource = repairedInfo == null
+              ? null
+              : oxplayerResolvePlaybackMediaSource(repairedInfo, requestedMediaSourceId: requestedMediaSourceId);
+          final repairedPath = isValidVideoUrl(repairedSource?.path ?? "");
+          if (repairedInfo == null || repairedSource == null || repairedPath == null) {
+            debugPrint('$oxplayTdlibLogTag: force-repair produced no usable media source, giving up');
+            return null;
+          }
+          resolvedMediaPath = await oxplayerResolveStreamPlaybackUrl(ref.read, repairedPath);
+          debugPrint('$oxplayTdlibLogTag: force-repair retry succeeded');
+          playbackInfo = repairedInfo;
+          mediaSource = repairedSource;
+          mediaPath = repairedPath;
+        }
+      } else {
+        resolvedMediaPath = mediaPath;
+      }
+
+      final resolvedVersionIndex = playbackInfo.mediaSources?.indexWhere((s) => s.id == mediaSource!.id) ?? -1;
       final mediaStreamsWithUrls = MediaStreamsModel.fromMediaStreamsList(playbackInfo.mediaSources, ref).copyWith(
         versionStreamIndex: resolvedVersionIndex >= 0 ? resolvedVersionIndex : newStreamModel?.versionStreamIndex,
         defaultAudioStreamIndex: audioStreamIndex,
@@ -458,11 +501,6 @@ class PlaybackModelHelper {
 
       final trickPlay = trickPlayResp?.body;
       final chapters = item.overview.chapters ?? [];
-
-      final mediaPath = isValidVideoUrl(mediaSource.path ?? "");
-      final resolvedMediaPath = mediaPath != null && OxplayerEnv.isEnabled
-          ? await oxplayerResolveStreamPlaybackUrl(ref.read, mediaPath)
-          : mediaPath;
 
       if (type == PlaybackType.tv && resolvedMediaPath != null) {
         OxplayerStreamLog.event('playback_url', fields: {
@@ -554,8 +592,9 @@ class PlaybackModelHelper {
         );
       }
       return null;
-    } catch (e) {
+    } catch (e, st) {
       log(e.toString());
+      debugPrint('_createServerPlaybackModel error: $e\n$st');
       return null;
     }
   }

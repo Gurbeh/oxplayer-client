@@ -95,13 +95,11 @@ internal fun ExoPlayer(
     }
 
     val dataSourceFactory = remember {
-        // Must match Cloudflare stream Worker X-OX-Client-Signature gate
-        // (oxplayer-client OxplayerStreamHttpAuth.clientSignatureValue).
-        val httpFactory = DefaultHttpDataSource.Factory()
-            .setDefaultRequestProperties(
-                mapOf("X-OX-Client-Signature" to "YourSuperSecureStaticClientKey123"),
-            )
-        DefaultDataSource.Factory(context, httpFactory)
+        // Video comes from the user's own TDLib session (tdlib-file:// URIs) — no server byte
+        // relay in this build. The HTTP branch here only ever serves subtitle delivery from the
+        // OX API, never video, so no ox-stream-specific auth header is needed.
+        val httpFactory = DefaultDataSource.Factory(context, DefaultHttpDataSource.Factory())
+        OxRoutingDataSource.Factory(httpFactory)
     }
 
     val audioAttributes = AudioAttributes.Builder()
@@ -159,6 +157,15 @@ internal fun ExoPlayer(
                 context,
                 renderersFactory = renderersFactory,
                 extractorsFactory = extractorsFactory,
+                // Without this, buildWithAssSupport builds its own internal MediaSource pipeline
+                // (needed to wrap ASS subtitle rendering around playback) using ITS OWN default
+                // DataSource.Factory instead of the OxRoutingDataSource one set two lines up via
+                // .setMediaSourceFactory(...) — silently discarding tdlib-file:// routing, so
+                // ExoPlayer tries to open it as a plain HTTP URL and fails with
+                // "MalformedURLException: unknown protocol: tdlib-file". Confirmed via javap on
+                // ass-media 0.3.0's compiled AssPlayerKt: dataSourceFactory is a real (optional,
+                // defaulted) parameter here, just never wired up before this fix.
+                dataSourceFactory = dataSourceFactory,
                 renderType = AssRenderType.LEGACY
             )
     }

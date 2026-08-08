@@ -22,6 +22,7 @@ import 'package:fladder/models/playback/audio_url_resolver.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/playback_queue_state.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/live_tv_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
@@ -166,6 +167,20 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
   }
 
   Future<void> loadVideo(PlaybackModel model, Duration startPosition, bool play) async {
+    final url = model.media?.url;
+    if (oxplayerIsTdlibFileUrl(url)) {
+      // Telegram-direct-play bytes only exist behind ExoPlayer's DataSource pipeline
+      // (OxRoutingDataSource/TelegramFileDataSource) — mpv/mdk can't resolve tdlib-file://
+      // (it's not a protocol either of them understands, they just no-op), so this must run on
+      // the native backend regardless of the user's player preference. Restored on the next
+      // non-Telegram playback (see below).
+      if (_player is! NativePlayer) {
+        _previousPlayer ??= _player;
+        await setup(NativePlayer());
+      }
+    } else if (_previousPlayer != null) {
+      await _restorePreviousPlayer();
+    }
     if (_player is NativePlayer) {
       final context = ref.read(localizationContextProvider);
       await (_player as NativePlayer).sendPlaybackDataToNative(context, model, startPosition);

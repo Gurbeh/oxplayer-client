@@ -13,6 +13,7 @@ import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_warmup.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_http_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_nodes_api.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 
@@ -83,6 +84,14 @@ Future<String?> oxplayerResolveStreamPlaybackUrl(
   String? apiMintedUrl, {
   bool forceRefreshNodes = false,
 }) async {
+  // MTProto direct play: PlaybackInfo returned a t.me/{username}/{messageId} link instead of an
+  // ox-stream URL (TELEGRAM_NATIVE_PLAYBACK_ENABLED on the backend). Bytes come from the device's
+  // own TDLib session, not ox-stream — none of the node discovery/warmup/instrumentation below
+  // applies, so this returns early rather than falling through to _finalizeStreamPlaybackUrl.
+  if (oxplayerIsTelegramProviderLink(apiMintedUrl)) {
+    return oxplayerResolveTdlibPlaybackUrl(apiMintedUrl!);
+  }
+
   if (!OxplayerEnv.isEnabled || apiMintedUrl == null || !oxplayerIsOxStreamUrl(apiMintedUrl)) {
     OxplayerStreamLog.event('resolve_skip', fields: {
       'reason': apiMintedUrl == null ? 'null_url' : 'not_ox_stream',
@@ -184,6 +193,10 @@ Future<String?> oxplayerFailoverStreamUrl(
   String currentUrl, {
   Duration budget = const Duration(milliseconds: 1500),
 }) async {
+  // oxplayerIsOxStreamUrl is false for tdlib-file:// and t.me/... urls, so this already
+  // short-circuits for MTProto direct play without a separate guard: node-based failover has no
+  // meaning there — retry belongs inside TdlibFileFetcher (TDLib's own flood-wait/CDN handling),
+  // not this stream-node selection path.
   if (!OxplayerEnv.isEnabled || !oxplayerIsOxStreamUrl(currentUrl)) return null;
   if (kIsWeb) return null;
 

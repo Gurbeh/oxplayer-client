@@ -2,6 +2,7 @@ package app.oxplayer
 
 import BatteryOptimizationPigeon
 import NativeVideoActivity
+import OxTdlibBridgeApi
 import PlayerSettingsPigeon
 import StartResult
 import TranslationsPigeon
@@ -22,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.ryanheise.audioservice.AudioServiceFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import app.oxplayer.objects.PlayerSettingsObject
+import app.oxplayer.objects.TdlibBridgeObject
 import app.oxplayer.objects.TranslationsMessenger
 import app.oxplayer.objects.VideoPlayerObject
 import app.oxplayer.utility.leanBackEnabled
@@ -63,6 +65,12 @@ class MainActivity : AudioServiceFragmentActivity(), NativeVideoActivity {
         PlayerSettingsPigeon.setUp(
             flutterEngine.dartExecutor.binaryMessenger,
             api = PlayerSettingsObject
+        )
+
+        TdlibBridgeObject.attach(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
+        OxTdlibBridgeApi.setUp(
+            flutterEngine.dartExecutor.binaryMessenger,
+            api = TdlibBridgeObject,
         )
 
         BatteryOptimizationPigeon.setUp(

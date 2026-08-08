@@ -66,9 +66,6 @@ class VideoPlayerImplementation(
     /** Whether playback was active when the activity went to background. */
     var wasPlayingBeforeBackground: Boolean = false
 
-    /** One-shot listener: Ox loopback + resume must load from t=0 first, then seek (see [open]). */
-    private var loopbackResumeListener: Player.Listener? = null
-
     private var playbackErrorListener: Player.Listener? = null
 
     private var initialPositionLogPosted = false
@@ -248,11 +245,6 @@ class VideoPlayerImplementation(
                     ".m3u8",
                     ignoreCase = true
                 )
-                val isOxLoopback =
-                    url.contains("127.0.0.1", ignoreCase = true) && url.contains("/stream", ignoreCase = true)
-                val isOxStreamCdn = url.contains("/v/", ignoreCase = true) ||
-                    url.contains("oxstream", ignoreCase = true) ||
-                    url.contains("cdn.ir", ignoreCase = true)
                 val subTitles = playbackData.value?.subtitleTracks ?: listOf()
                 val externalSubs = subTitles.filter { it.external && !it.url.isNullOrEmpty() }
                 Log.d(
@@ -285,68 +277,14 @@ class VideoPlayerImplementation(
                 exo.stop()
                 exo.clearMediaItems()
 
-                loopbackResumeListener?.let { old ->
-                    try {
-                        exo.removeListener(old)
-                    } catch (_: Exception) {
-                    }
-                }
-                loopbackResumeListener = null
-
-                val deferSeekForLoopbackResume = isOxLoopback && !isHls && startPosition > 0L
-
-                if (deferSeekForLoopbackResume) {
-                    Log.d(
-                        OX_NATIVE_PLY_TAG,
-                        "open Ox loopback: resumeMs=$startPosition → prepare at 0 then seek on STATE_READY",
-                    )
-                    oxStreamLog(
-                        "phase=native_open deferSeek=true resumeMs=$startPosition " +
-                            "host=${Uri.parse(url).host} isHls=$isHls isOxStreamCdn=$isOxStreamCdn",
-                    )
-                    val resumeMs = startPosition
-                    val shouldPlay = play
-                    val listener = object : Player.Listener {
-                        override fun onPlaybackStateChanged(playbackState: Int) {
-                            if (playbackState != Player.STATE_READY) return
-                            if (loopbackResumeListener !== this) return
-                            exo.removeListener(this)
-                            loopbackResumeListener = null
-                            try {
-                                exo.seekTo(resumeMs)
-                            } catch (t: Throwable) {
-                                Log.e(OX_NATIVE_PLY_TAG, "Ox loopback deferred seek failed", t)
-                            }
-                            exo.playWhenReady = shouldPlay
-                            oxStreamLog(
-                                "phase=native_seek_done resumeMs=$resumeMs " +
-                                    "actualMs=${exo.currentPosition} bufferedMs=${exo.bufferedPosition}",
-                            )
-                            Log.d(OX_NATIVE_PLY_TAG, "open deferred seek done resumeMs=$resumeMs play=$shouldPlay")
-                        }
-
-                        override fun onPlayerError(error: PlaybackException) {
-                            if (loopbackResumeListener !== this) return
-                            exo.removeListener(this)
-                            loopbackResumeListener = null
-                        }
-                    }
-                    loopbackResumeListener = listener
-                    exo.addListener(listener)
-                    exo.setMediaItem(mediaItem, 0L)
-                    exo.prepare()
-                    exo.playWhenReady = false
-                } else {
-                    exo.setMediaItem(mediaItem, startPosition)
-                    exo.prepare()
-                    exo.playWhenReady = play
-                    oxStreamLog(
-                        "phase=native_open deferSeek=false startMs=$startPosition " +
-                            "host=${Uri.parse(url).host} isHls=$isHls isOxStreamCdn=$isOxStreamCdn " +
-                            "url=${redactStreamUrl(url)}",
-                    )
-                }
-                Log.d(OX_NATIVE_PLY_TAG, "open prepared playWhenReady=$play startPositionMs=$startPosition deferSeek=$deferSeekForLoopbackResume")
+                exo.setMediaItem(mediaItem, startPosition)
+                exo.prepare()
+                exo.playWhenReady = play
+                oxStreamLog(
+                    "phase=native_open startMs=$startPosition " +
+                        "host=${Uri.parse(url).host} isHls=$isHls url=${redactStreamUrl(url)}",
+                )
+                Log.d(OX_NATIVE_PLY_TAG, "open prepared playWhenReady=$play startPositionMs=$startPosition")
                 callback(Result.success(true))
                 subsInitialized = false
                 scheduleInitialPositionLog(exo, startPosition)
@@ -389,13 +327,6 @@ class VideoPlayerImplementation(
     }
 
     override fun stop() {
-        loopbackResumeListener?.let { old ->
-            try {
-                player?.removeListener(old)
-            } catch (_: Exception) {
-            }
-        }
-        loopbackResumeListener = null
         player?.stop()
         player?.clearMediaItems()
         clearSession()

@@ -11,8 +11,12 @@ import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_route.dart';
 import 'package:fladder/oxplayer/oxplayer_route_selector.dart';
 import 'package:fladder/oxplayer/oxplayer_pending_route.dart';
-import 'package:fladder/oxplayer/oxplayer_telegram_login_panel.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_login_panel.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_qr_login_panel.dart';
+import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/auth_provider.dart';
+import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/screens/login/login_screen_credentials.dart';
 import 'package:fladder/oxplayer/oxplayer_login_edit_user.dart';
 import 'package:fladder/screens/login/login_user_grid.dart';
@@ -34,6 +38,8 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
   bool _bootstrapping = true;
   String? _bootstrapError;
   bool _editUsersMode = false;
+  /// TV only: false = QR-first, true = phone panel after remote select.
+  bool _tvUsePhone = false;
 
   @override
   void initState() {
@@ -87,11 +93,36 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
       return;
     }
 
+    // Warm TDLib during the same splash — do not show login UI until past setTdlibParameters.
+    try {
+      final phoneFirst = !_isTv(context);
+      await OxplayerTdlibBridgeController.instance().prepareForLoginScreen(
+        phoneFirst: phoneFirst,
+      );
+      // TV defaults to QR; kick off token while splash still covers the screen.
+      if (!phoneFirst) {
+        await OxplayerTdlibBridgeController.instance().requestQrLogin();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _bootstrapping = false;
+        _bootstrapError = '$e';
+      });
+      return;
+    }
+
+    if (!mounted) return;
     setState(() => _bootstrapping = false);
   }
 
   Future<void> _onLoginSuccess() async {
     await loggedInGoToHome(context, ref);
+  }
+
+  bool _isTv(BuildContext context) {
+    final leanBack = ref.read(argumentsStateProvider).leanBackMode;
+    return leanBack || AdaptiveLayout.viewSizeOf(context) == ViewSize.television;
   }
 
   void _openUserEditDialogue(AccountModel user) {
@@ -235,9 +266,35 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
                                             ),
                                             const SizedBox(height: 8),
                                           ],
-                                          OxplayerTelegramLoginPanel(
-                                            onSuccess: _onLoginSuccess,
-                                          ),
+                                          _isTv(context)
+                                              ? (_tvUsePhone
+                                                  ? OxplayerTdlibLoginPanel(
+                                                      onSuccess: _onLoginSuccess,
+                                                      showQrShortcut: false,
+                                                      onBackToQr: () async {
+                                                        final tdlib =
+                                                            OxplayerTdlibBridgeController.instance();
+                                                        await tdlib.resetForPhoneLogin();
+                                                        await tdlib.requestQrLogin();
+                                                        if (mounted) {
+                                                          setState(() => _tvUsePhone = false);
+                                                        }
+                                                      },
+                                                    )
+                                                  : OxplayerTdlibQrLoginPanel(
+                                                      onSuccess: _onLoginSuccess,
+                                                      onUsePhoneNumber: () async {
+                                                        await OxplayerTdlibBridgeController
+                                                            .instance()
+                                                            .resetForPhoneLogin();
+                                                        if (mounted) {
+                                                          setState(() => _tvUsePhone = true);
+                                                        }
+                                                      },
+                                                    ))
+                                              : OxplayerTdlibLoginPanel(
+                                                  onSuccess: _onLoginSuccess,
+                                                ),
                                         ],
                                       ),
                               ),
