@@ -17,9 +17,18 @@ import (
 const (
 	httpBridgeReadChunk = 64 * 1024
 	// Larger chunks = fewer reconnects on seek (Telegram MTProto TTFB is expensive).
-	httpBridgeReadAhead   = 8 * 1024 * 1024
-	httpBridgeOpenRange   = 8 * 1024 * 1024
+	httpBridgeReadAhead = 8 * 1024 * 1024
+	httpBridgeOpenRange = 8 * 1024 * 1024
+	// Idle-only guard for the request-line/header read — a slow/dead client gets reaped quickly.
 	httpBridgeConnTimeout = 30 * time.Second
+	// Idle-only guard once we're streaming a response body. Must exceed EnsureAvailable's own
+	// per-call ctx timeout (2min below) with margin, since it is re-armed after every chunk
+	// written AND before every blocking EnsureAvailable call — it is not a total-connection cap.
+	// A fixed 30s cap here previously killed the TCP connection mid-response whenever Telegram
+	// throttled (deep-file offsets, FILE_MIGRATE/CDN redirects), producing truncated HTTP
+	// responses that mpv/libmpv surfaced as stalls, random stops, and audio dropouts.
+	httpBridgeStreamIdleTimeout = 150 * time.Second
+	httpBridgeEnsureAvailableTimeout = 2 * time.Minute
 	// mpv closes old Range conn then opens new within ~ms; cancel must wait or it kills the seek.
 	httpBridgeCancelGrace = 300 * time.Millisecond
 )
@@ -240,6 +249,14 @@ func (s *HttpBridgeServer) handleConn(conn net.Conn) {
 	s.serveFile(conn, src, rangeHeader, method == "HEAD")
 }
 
+// resetStreamDeadline re-arms the connection's idle deadline. Called after every unit of
+// progress (a completed EnsureAvailable wait, a completed Write) so a connection that is
+// actively making progress — however slowly — is never killed mid-response; only a connection
+// that goes fully idle for httpBridgeStreamIdleTimeout gets reaped.
+func resetStreamDeadline(conn net.Conn) {
+	_ = conn.SetDeadline(time.Now().Add(httpBridgeStreamIdleTimeout))
+}
+
 func parseRangeStart(rangeHeader string) int64 {
 	if rangeHeader == "" {
 		return 0
@@ -272,7 +289,7 @@ func parseRangeEnd(rangeHeader string, lastByte int64) (end int64, ok bool) {
 	return n, true
 }
 
-func (s *HttpBridgeServer) serveFile(w io.Writer, src ByteSource, rangeHeader string, headOnly bool) {
+func (s *HttpBridgeServer) serveFile(w net.Conn, src ByteSource, rangeHeader string, headOnly bool) {
 	start := parseRangeStart(rangeHeader)
 
 	// Hold active before EnsureAvailable so a concurrent Connection-close cancel cannot
@@ -290,11 +307,13 @@ func (s *HttpBridgeServer) serveFile(w io.Writer, src ByteSource, rangeHeader st
 		}()
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-
+	resetStreamDeadline(w)
+	ctx, cancel := context.WithTimeout(context.Background(), httpBridgeEnsureAvailableTimeout)
 	probeWant := int64(httpBridgeReadAhead)
-	if err := src.EnsureAvailable(ctx, start, probeWant); err != nil {
+	err := src.EnsureAvailable(ctx, start, probeWant)
+	cancel()
+	resetStreamDeadline(w)
+	if err != nil {
 		writeStatusOnly(w, 500, "Internal Server Error")
 		return
 	}
@@ -340,7 +359,7 @@ func (s *HttpBridgeServer) serveFile(w io.Writer, src ByteSource, rangeHeader st
 	_ = streamRange(w, src, start, end, src.AvailableUpTo(), src.IsComplete())
 }
 
-func streamRange(w io.Writer, src ByteSource, start, end, knownUpTo int64, complete bool) error {
+func streamRange(w net.Conn, src ByteSource, start, end, knownUpTo int64, complete bool) error {
 	f, err := os.Open(src.LocalPath())
 	if err != nil {
 		return err
@@ -363,7 +382,8 @@ func streamRange(w io.Writer, src ByteSource, start, end, knownUpTo int64, compl
 			if rem := end - pos + 1; rem > prefetch {
 				prefetch = rem
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			resetStreamDeadline(w)
+			ctx, cancel := context.WithTimeout(context.Background(), httpBridgeEnsureAvailableTimeout)
 			err := src.EnsureAvailable(ctx, pos, prefetch)
 			cancel()
 			if err != nil {
@@ -371,6 +391,7 @@ func streamRange(w io.Writer, src ByteSource, start, end, knownUpTo int64, compl
 			}
 			knownUpTo = src.AvailableUpTo()
 			complete = src.IsComplete()
+			resetStreamDeadline(w)
 		}
 		n, err := f.Read(buf[:want])
 		if n > 0 {
@@ -378,6 +399,7 @@ func streamRange(w io.Writer, src ByteSource, start, end, knownUpTo int64, compl
 				return werr
 			}
 			pos += int64(n)
+			resetStreamDeadline(w)
 		}
 		if err == io.EOF {
 			break

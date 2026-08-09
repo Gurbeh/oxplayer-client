@@ -66,6 +66,10 @@ class LibMPV extends BasePlayer {
   bool _isFading = false;
   bool _subtitleTextSeen = false;
   int _externalSubtitleLoadGen = 0;
+  // Keyed by DeliveryUrl. Server-side extraction is a fresh ffmpeg pass every request
+  // (Cache-Control: no-store, no server cache) taking 30-90s, so toggling a subtitle track
+  // off/on repeatedly without this looks broken/unresponsive rather than merely slow.
+  final Map<String, String> _externalSubtitleCache = {};
 
   void _logAudio(String phase, {Map<String, Object?> fields = const {}}) {
     OxplayerAudioLog.event(phase, fields: {
@@ -160,6 +164,7 @@ class LibMPV extends BasePlayer {
     _retryTimer = null;
     _subtitleTextSeen = false;
     _externalSubtitleLoadGen++;
+    _externalSubtitleCache.clear();
   }
 
   void setState(PlayerState state) {
@@ -331,6 +336,7 @@ class LibMPV extends BasePlayer {
     _firstLoadAttempt = DateTime.now();
     _subtitleTextSeen = false;
     _externalSubtitleLoadGen++;
+    _externalSubtitleCache.clear();
 
     final isOxStreamTs = _isOxStreamRemuxUrl(url);
     // Progressive ox-stream TS: long-lived HTTP read — no 5s reopen on web or Android mpv.
@@ -638,6 +644,22 @@ class LibMPV extends BasePlayer {
 
     await _configureMpvForTextSubtitle(wanted.codec);
 
+    final cached = _externalSubtitleCache[url];
+    if (cached != null) {
+      if (loadGen != _externalSubtitleLoadGen || _player == null) return;
+      await _player!.setSubtitleTrack(
+        mpv.SubtitleTrack.data(cached, title: wanted.displayTitle, language: wanted.language),
+      );
+      await _syncLibassSubtitleStyle();
+      OxplayerStreamLog.event('subtitle_track_external', fields: {
+        'url': OxplayerStreamLog.describeUrl(url),
+        'index': wanted.index,
+        'bytes': cached.length,
+        'via': 'cache',
+      });
+      return;
+    }
+
     if (OxplayerConfig.isEnabled) {
       OxplayerStreamLog.event('subtitle_track_external_start', fields: {
         'url': OxplayerStreamLog.describeUrl(url),
@@ -665,7 +687,9 @@ class LibMPV extends BasePlayer {
         return;
       }
       final text = response.body.trim();
-      if (text.isEmpty || loadGen != _externalSubtitleLoadGen || _player == null) return;
+      if (text.isEmpty) return;
+      _externalSubtitleCache[url] = text;
+      if (loadGen != _externalSubtitleLoadGen || _player == null) return;
 
       await _player!.setSubtitleTrack(
         mpv.SubtitleTrack.data(
@@ -851,6 +875,9 @@ class LibMPV extends BasePlayer {
     if (wantedSubtitle == null || wantedSubtitle.index == SubStreamModel.no().index) {
       _currentSubtitleCodec = '';
       _currentSubtitleLanguage = '';
+      // Invalidate any in-flight external-subtitle fetch so it can't land after "off" and
+      // silently re-show subtitles the user just turned off.
+      _externalSubtitleLoadGen++;
       await _player?.setSubtitleTrack(mpv.SubtitleTrack.no());
       await _syncLibassSubtitleStyle();
       return -1;
