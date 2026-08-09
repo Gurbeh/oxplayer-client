@@ -1,5 +1,6 @@
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
 
 /// HTTP progressive ox-stream MKV (not remux TS).
 bool oxplayerStreamDirectMkvUrl(String url) {
@@ -7,9 +8,16 @@ bool oxplayerStreamDirectMkvUrl(String url) {
   return !url.contains('/stream.ts') && !url.contains('stream.ts?');
 }
 
-/// Large client-side resume seek on ox-stream MKV needs long MPV load grace (CDN Range).
+/// Progressive byte-range sources that must not get MPV's short reopen-retry loop.
+/// Includes Telegram loopback HTTP bridge (gotd) — same seek/buffer semantics as ox-stream MKV.
+bool oxplayerStreamProgressiveHttpUrl(String url) {
+  if (!OxplayerEnv.isEnabled) return false;
+  return oxplayerStreamDirectMkvUrl(url) || oxplayerIsTdlibHttpBridgeUrl(url);
+}
+
+/// Large client-side resume/seek on progressive HTTP needs long MPV load grace.
 bool oxplayerStreamMpvResumeSeekGrace(String url, Duration startPosition) {
-  return oxplayerStreamDirectMkvUrl(url) &&
+  return oxplayerStreamProgressiveHttpUrl(url) &&
       startPosition > const Duration(seconds: 30);
 }
 

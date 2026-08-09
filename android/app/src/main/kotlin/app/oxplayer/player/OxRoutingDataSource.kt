@@ -9,15 +9,17 @@ import app.oxplayer.tdlibbridge.player.TelegramFileDataSource
 
 /**
  * Routes ExoPlayer's DataSource.open by URI scheme: `tdlib-file://{fileId}` goes to
- * [TelegramFileDataSource] (bytes fetched live from the user's Telegram session via TDLib),
- * anything else falls through to a plain HTTP DataSource — used for subtitle delivery from the
- * OX API, not for video. There is no server-side video byte relay in this build: PlaybackInfo
- * only ever mints `tdlib-file://` URIs for video (see writePlaybackInfoOK /
- * TELEGRAM_NATIVE_PLAYBACK_ENABLED), so the HTTP branch here never serves video content.
+ * [TelegramFileDataSource] (bytes fetched live from the user's own Telegram session via the
+ * gomobile-bound github.com/gotd/td facade, go/oxtelegram), anything else falls through to a
+ * plain HTTP DataSource — used for subtitle delivery from the OX API, not for video. There is no
+ * server-side video byte relay in this build: PlaybackInfo only ever mints `tdlib-file://` URIs
+ * for video (see writePlaybackInfoOK / TELEGRAM_NATIVE_PLAYBACK_ENABLED), so the HTTP branch here
+ * never serves video content.
  *
- * The TDLib delegate is looked up fresh on every [open] via [TdlibBridgeObject.currentFileFetcher]
- * rather than captured once — the underlying TdlibFileFetcher instance is swapped out across
- * login/logout, and a composable-remember-captured reference would go stale.
+ * The delegate is looked up fresh on every [open] via [TdlibBridgeObject.currentFileFetcher]
+ * rather than captured once — the underlying OxTelegramFileFetcher instance is swapped out across
+ * login/logout and per playback session, and a composable-remember-captured reference would go
+ * stale.
  */
 @UnstableApi
 class OxRoutingDataSource(

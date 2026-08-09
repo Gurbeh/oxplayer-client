@@ -35,18 +35,17 @@ android {
 }
 
 dependencies {
-    // org.drinkless.tdlib.{Client,TdApi} + libtdjni.so are vendored directly under
-    // src/main/java/org/drinkless/tdlib/ and src/main/jniLibs/{abi}/ — built via TDLib's official
-    // Docker build (github.com/tdlib/td/tree/master/example/android, `docker build --output
-    // tdlib .`, default args: TDLIB_INTERFACE=Java, ANDROID_STL=c++_static). Picked up
-    // automatically by AGP's default source sets, no extra dependency declaration needed. To
-    // rebuild against a newer TDLib commit, rerun that Docker build and replace both directories.
-    // See README.md for details and provenance.
+    // TDLib (org.drinkless / libtdjni) removed — MTProto is gotd-only via oxtelegram.aar.
 
     implementation "androidx.core:core-ktx:1.15.0"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0"
     implementation "androidx.security:security-crypto:1.1.0"
     implementation "androidx.media3:media3-exoplayer:1.8.0"
+
+    // go/oxtelegram gomobile facade (github.com/gotd/td). Regenerate:
+    //   gomobile bind -target=android -androidapi 24 -o oxtelegram.aar ./mobile
+    // (from go/oxtelegram/). `api` so app module sees mobile.* types.
+    api files('libs/oxtelegram.aar')
 
     testImplementation "junit:junit:4.13.2"
     testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0"

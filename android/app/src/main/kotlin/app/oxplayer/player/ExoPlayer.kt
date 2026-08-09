@@ -90,8 +90,11 @@ internal fun ExoPlayer(
                 false -> TsExtractor.DEFAULT_TIMESTAMP_SEARCH_BYTES
             }
         )
+        // CBR as fallback only (MP3/AAC without seek tables). AlwaysEnabled forces estimated
+        // byte offsets even when MKV cues exist — mid-element seeks → "No valid varint length
+        // mask found" and playback stops on Telegram tdlib-file:// progressive MKV.
         setConstantBitrateSeekingEnabled(true)
-        setConstantBitrateSeekingAlwaysEnabled(true)
+        setConstantBitrateSeekingAlwaysEnabled(false)
     }
 
     val dataSourceFactory = remember {

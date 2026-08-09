@@ -106,3 +106,12 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
 install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
+
+# gotd/oxtelegram progressive Telegram playback (Windows DLL).
+set(OXTELEGRAM_DLL "${CMAKE_CURRENT_SOURCE_DIR}/oxtelegram/oxtelegram.dll")
+if(EXISTS "${OXTELEGRAM_DLL}")
+  install(FILES "${OXTELEGRAM_DLL}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+    COMPONENT Runtime)
+else()
+  message(WARNING "oxtelegram.dll missing at ${OXTELEGRAM_DLL} — rebuild via go/oxtelegram (see windows/oxtelegram/README.md)")
+endif()

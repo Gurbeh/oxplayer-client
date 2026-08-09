@@ -1,71 +1,113 @@
 package app.oxplayer.tdlibbridge.player
 
 import android.net.Uri
+import android.util.Log
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.BaseDataSource
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
-import app.oxplayer.tdlibbridge.media.TdlibFileFetcher
+import app.oxplayer.tdlibbridge.media.OxFileInfo
+import app.oxplayer.tdlibbridge.media.OxTelegramFileFetcher
 import kotlinx.coroutines.runBlocking
-import org.drinkless.tdlib.TdApi
+import java.io.IOException
 import java.io.RandomAccessFile
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * media3 DataSource reading directly from a TDLib-downloaded file, requesting bytes from TDLib
- * (TdApi.DownloadFile) as ExoPlayer reads/seeks rather than pre-downloading the whole file.
- * Preferred over a localhost HTTP loopback server (plan doc B.4) — more idiomatic media3
- * integration, no TCP/HTTP framing overhead, and this module is Android-only so there's no
- * cross-platform reason to force an HTTP layer.
- *
- * DataSource.read is a synchronous, off-main-thread call in media3's loading pipeline; blocking
- * here with runBlocking on TdlibFileFetcher's suspend functions is the correct fit (same shape as
- * any other synchronous DataSource backed by blocking I/O), not something to work around.
+ * media3 DataSource reading directly from a file downloaded on demand via the gotd/td-backed
+ * facade (go/oxtelegram), as ExoPlayer reads/seeks rather than pre-downloading the whole file.
  */
 @UnstableApi
 class TelegramFileDataSource(
-    private val fileFetcher: TdlibFileFetcher,
+    private val fileFetcher: OxTelegramFileFetcher,
 ) : BaseDataSource(/* isNetwork= */ true) {
 
     private var randomAccessFile: RandomAccessFile? = null
     private var dataSpec: DataSpec? = null
     private var bytesRemaining: Long = 0
     private var currentFileId: Int = -1
+    private var holdsStreamRef: Boolean = false
+    /** True only after [transferStarted] — [transferEnded] must not run otherwise (NPE in BandwidthMeter). */
+    private var transferOpen: Boolean = false
 
-    // Tracks the contiguous range TDLib has already confirmed available, so read() (called once
-    // per small extractor chunk, sometimes tens of thousands of times per seek) only round-trips
-    // into TDLib via awaitBytesAvailable when it's about to read past that range, instead of on
-    // every call. Reproduced: a tight read loop over an already-downloaded prefix generated ~25k
-    // GetFile requests in ~50s, which saturated TDLib's single request thread and stalled playback.
+    // gotd/td exposes a single contiguous window [windowStart, windowEnd] that resets on
+    // non-adjacent seek — NOT "everything from 0 to windowEnd".
+    private var knownAvailableFrom: Long = 0
     private var knownAvailableUpTo: Long = 0
     private var fullyDownloaded: Boolean = false
 
     override fun open(dataSpec: DataSpec): Long {
         this.dataSpec = dataSpec
         transferInitializing(dataSpec)
+        transferOpen = false
 
         val fileId = fileIdFromUri(dataSpec.uri)
         currentFileId = fileId
         val position = dataSpec.position
+        knownAvailableFrom = 0
         knownAvailableUpTo = 0
         fullyDownloaded = false
 
         val requestedLength = dataSpec.length.takeIf { it != C.LENGTH_UNSET.toLong() }
         val initialChunk = minOf(READ_AHEAD_BYTES, requestedLength ?: READ_AHEAD_BYTES)
 
-        val file = runBlocking {
-            fileFetcher.requestDownload(fileId, position, priority = 32)
-            fileFetcher.awaitBytesAvailable(fileId, position, initialChunk)
+        activeStreams.incrementAndGet()
+        holdsStreamRef = true
+
+        val file = try {
+            runBlocking {
+                fileFetcher.requestDownload(fileId, position, priority = 32)
+                fileFetcher.awaitBytesAvailable(fileId, position, initialChunk)
+            }
+        } catch (e: Exception) {
+            releaseStreamRef()
+            throw IOException("Telegram ensureAvailable failed at $position", e)
         }
         updateAvailability(file)
 
-        val raf = RandomAccessFile(file.local.path, "r")
+        if (!windowCovers(position, 1)) {
+            Log.w(
+                TAG,
+                "open window miss fileId=$fileId position=$position " +
+                    "window=[$knownAvailableFrom,$knownAvailableUpTo) — waiting again",
+            )
+            try {
+                val retry = runBlocking {
+                    fileFetcher.awaitBytesAvailable(fileId, position, initialChunk)
+                }
+                updateAvailability(retry)
+            } catch (e: Exception) {
+                releaseStreamRef()
+                throw IOException("Telegram ensureAvailable retry failed at $position", e)
+            }
+        }
+        if (!windowCovers(position, 1)) {
+            Log.e(
+                TAG,
+                "open still uncovered fileId=$fileId position=$position " +
+                    "window=[$knownAvailableFrom,$knownAvailableUpTo) — refusing sparse read",
+            )
+            releaseStreamRef()
+            throw IOException(
+                "Telegram bytes not available at $position " +
+                    "(window=[$knownAvailableFrom,$knownAvailableUpTo))",
+            )
+        }
+
+        val raf = RandomAccessFile(file.localPath, "r")
         raf.seek(position)
         randomAccessFile = raf
 
         bytesRemaining = requestedLength ?: (file.size - position)
 
         transferStarted(dataSpec)
+        transferOpen = true
+        Log.i(
+            TAG,
+            "open fileId=$fileId position=$position want=$initialChunk " +
+                "window=[$knownAvailableFrom,$knownAvailableUpTo) size=${file.size} active=${activeStreams.get()}",
+        )
         return bytesRemaining
     }
 
@@ -77,11 +119,17 @@ class TelegramFileDataSource(
         val position = raf.filePointer
         val readLength = minOf(length.toLong(), bytesRemaining).toInt()
 
-        if (!fullyDownloaded && position + readLength > knownAvailableUpTo) {
+        if (!fullyDownloaded && !windowCovers(position, readLength.toLong())) {
             val file = runBlocking {
                 fileFetcher.awaitBytesAvailable(currentFileId, position, readLength.toLong())
             }
             updateAvailability(file)
+            if (!windowCovers(position, readLength.toLong())) {
+                throw IOException(
+                    "Telegram read uncovered at $position+$readLength " +
+                        "(window=[$knownAvailableFrom,$knownAvailableUpTo))",
+                )
+            }
         }
 
         val bytesRead = raf.read(buffer, offset, readLength)
@@ -93,9 +141,15 @@ class TelegramFileDataSource(
         return bytesRead
     }
 
-    private fun updateAvailability(file: TdApi.File) {
-        knownAvailableUpTo = file.local.downloadOffset + file.local.downloadedPrefixSize
-        fullyDownloaded = file.local.isDownloadingCompleted
+    private fun windowCovers(position: Long, length: Long): Boolean {
+        if (fullyDownloaded && knownAvailableFrom == 0L) return true
+        return position >= knownAvailableFrom && position + length <= knownAvailableUpTo
+    }
+
+    private fun updateAvailability(file: OxFileInfo) {
+        knownAvailableFrom = file.windowStart
+        knownAvailableUpTo = file.windowEnd
+        fullyDownloaded = file.isDownloadingCompleted && file.windowStart == 0L
     }
 
     override fun getUri(): Uri? = dataSpec?.uri
@@ -103,27 +157,39 @@ class TelegramFileDataSource(
     override fun close() {
         randomAccessFile?.let { runCatching { it.close() } }
         randomAccessFile = null
-        // Deliberately does not cancel the TDLib download here — ExoPlayer opens/closes
-        // DataSource instances more often than a playback session actually ends (e.g. internal
-        // buffering resets). Download cancellation belongs to whoever owns the playback session
-        // lifecycle (the Pigeon bridge's start/stopPlaybackSession), not this DataSource.
-        transferEnded()
+        releaseStreamRef()
+        if (transferOpen) {
+            transferOpen = false
+            transferEnded()
+        }
+    }
+
+    private fun releaseStreamRef() {
+        if (!holdsStreamRef) return
+        holdsStreamRef = false
+        // Do not cancelDownload when other DataSources still active (MKV cue + cluster).
+        // Also: cancelling on every last-close races the next open's EnsureAvailable.
+        if (activeStreams.decrementAndGet() <= 0) {
+            // Leave in-flight bytes; session Close() on playback end cancels. Cancelling here
+            // made cue→cluster handoff fail and killed startup after the complete-flag fix.
+            Log.d(TAG, "last DataSource closed fileId=$currentFileId (download left running)")
+        }
     }
 
     private fun fileIdFromUri(uri: Uri): Int {
-        // Caller mints tdlib-file://{fileId} once TdlibChannelResolver has resolved the message
-        // to a TdApi.File — see the Pigeon bridge's startPlaybackSession.
         return uri.host?.toIntOrNull()
             ?: uri.lastPathSegment?.toIntOrNull()
             ?: error("Invalid Telegram file uri: $uri (expected tdlib-file://{fileId})")
     }
 
     companion object {
-        private const val READ_AHEAD_BYTES = 256L * 1024
+        private const val TAG = "OXPLAY_TDLIB"
+        private const val READ_AHEAD_BYTES = 512L * 1024
+        private val activeStreams = AtomicInteger(0)
     }
 
     @UnstableApi
-    class Factory(private val fileFetcher: TdlibFileFetcher) : DataSource.Factory {
+    class Factory(private val fileFetcher: OxTelegramFileFetcher) : DataSource.Factory {
         override fun createDataSource(): DataSource = TelegramFileDataSource(fileFetcher)
     }
 }

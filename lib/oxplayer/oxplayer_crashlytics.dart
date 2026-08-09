@@ -17,8 +17,10 @@ abstract final class OxplayerCrashlytics {
   static bool get isEnabled => _initialized;
 
   /// Initializes Firebase + Crashlytics when Android/iOS options are configured.
+  /// Windows/desktop: skip — no Crashlytics native plugin constants (assert spam / exit noise).
   static Future<void> init() async {
     if (kIsWeb || _initialized) return;
+    if (!Platform.isAndroid && !Platform.isIOS) return;
 
     try {
       final options = await DefaultFirebaseOptions.ensureAndroidResolved();

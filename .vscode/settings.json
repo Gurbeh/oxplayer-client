@@ -25,5 +25,10 @@
     "packages",
     "lib/jellyfin",
     "lib/l10n"
-  ]
+  ],
+  "terminal.integrated.env.windows": {
+    "JAVA_HOME": "C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.12.8-hotspot",
+    "CMAKE_GENERATOR": "Visual Studio 17 2022",
+    "FLUTTER_ROOT": "C:\\flutter"
+  }
 }

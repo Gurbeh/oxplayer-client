@@ -9,6 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_login_attempt_api.dart' show OxplayerLoginAttemptPollResult;
 import 'package:fladder/oxplayer/oxplayer_telegram_webapp_auth_api.dart';
+import 'package:fladder/oxplayer/oxplayer_telegram_windows_bridge_stub.dart'
+    if (dart.library.io) 'package:fladder/oxplayer/oxplayer_telegram_windows_bridge.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
 
 const _kOxTdlibDeviceIdPrefsKey = 'oxplayer_td_device_id';
@@ -67,13 +69,16 @@ String oxTdlibAuthUserMessage(Object error) {
   return cleaned.isEmpty ? 'Something went wrong. Try again.' : cleaned;
 }
 
-/// Thin controller wrapping the generated OxTdlibBridgeApi/-Events pigeon surface: configures the
-/// native TDLib client once (see TdlibBridgeObject.kt), exposes auth state as a Listenable, and
-/// forwards login actions. One instance per app process — mirrors the native side's one-client
-/// design (see ox_tdlib_bridge module README).
+/// Thin controller wrapping OxTdlibBridgeApi (Android Pigeon) or Windows gotd FFI host.
+/// One instance per app process.
 class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBridgeEvents {
   OxplayerTdlibBridgeController._() {
-    OxTdlibBridgeEvents.setUp(this);
+    if (!oxTelegramUseWindowsHost()) {
+      OxTdlibBridgeEvents.setUp(this);
+    }
+    if (oxTelegramUseWindowsHost()) {
+      _windows = OxTelegramWindowsBridge(onAuthStateChanged: onAuthStateChanged);
+    }
   }
 
   static OxplayerTdlibBridgeController? _instance;
@@ -83,8 +88,11 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
   }
 
   final _api = OxTdlibBridgeApi();
+  OxTelegramWindowsBridge? _windows;
   OxTdlibAuthState _state = OxTdlibAuthState(kind: OxTdlibAuthStateKind.uninitialized);
   bool _configured = false;
+
+  bool get _useWindows => _windows != null;
 
   OxTdlibAuthState get state => _state;
 
@@ -136,7 +144,7 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
       // while native's auth state regresses to uninitialized, with nothing left to call
       // configure() again and drive it forward — waitUntilReadyForAuthInput then polls a dead
       // state for the full timeout instead of failing fast or self-healing.
-      final polled = await _api.currentAuthState();
+      final polled = _useWindows ? _windows!.currentAuthState() : await _api.currentAuthState();
       if (polled.kind != OxTdlibAuthStateKind.uninitialized) {
         _state = polled;
         _log('ensureConfigured: already configured kind=${_state.kind.name}');
@@ -154,9 +162,14 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
       );
     }
     _log('ensureConfigured: calling native configure apiId=$apiId');
-    await _api.configure(apiId, apiHash);
+    if (_useWindows) {
+      await _windows!.configure(apiId, apiHash);
+      _state = _windows!.currentAuthState();
+    } else {
+      await _api.configure(apiId, apiHash);
+      _state = await _api.currentAuthState();
+    }
     _configured = true;
-    _state = await _api.currentAuthState();
     _log('ensureConfigured: currentAuthState=${_state.kind.name}');
     notifyListeners();
     await waitUntilReadyForAuthInput(timeout: readyTimeout);
@@ -175,7 +188,7 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
     _log('waitUntilReadyForAuthInput: polling (now=${_state.kind.name})');
     final deadline = DateTime.now().add(timeout);
     while (DateTime.now().isBefore(deadline)) {
-      final polled = await _api.currentAuthState();
+      final polled = _useWindows ? _windows!.currentAuthState() : await _api.currentAuthState();
       if (polled.kind != _state.kind) {
         _log('waitUntilReadyForAuthInput: polled ${polled.kind.name}');
       }
@@ -208,7 +221,11 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
       _log('prepareForLoginScreen: stuck — forcing logOut + recreate');
       _configured = false;
       try {
-        await _api.logOut();
+        if (_useWindows) {
+          await _windows!.logOut();
+        } else {
+          await _api.logOut();
+        }
       } catch (logoutErr) {
         _log('prepareForLoginScreen: logOut during recover: $logoutErr');
       }
@@ -281,7 +298,7 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
       );
     }
     await _awaitAuthRpc(
-      _api.submitPhoneNumber(trimmed),
+      _useWindows ? _windows!.submitPhoneNumber(trimmed) : _api.submitPhoneNumber(trimmed),
       until: _isPastPhoneStep,
       timeoutMessage:
           'Could not reach Telegram (timed out). Check internet / VPN and try again.',
@@ -290,7 +307,7 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
 
   Future<void> submitCode(String code) async {
     await _awaitAuthRpc(
-      _api.submitCode(code),
+      _useWindows ? _windows!.submitCode(code) : _api.submitCode(code),
       until: (kind) =>
           kind == OxTdlibAuthStateKind.waitingForPassword ||
           kind == OxTdlibAuthStateKind.ready,
@@ -301,7 +318,7 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
 
   Future<void> submitTwoFactorPassword(String password) async {
     await _awaitAuthRpc(
-      _api.submitTwoFactorPassword(password),
+      _useWindows ? _windows!.submitTwoFactorPassword(password) : _api.submitTwoFactorPassword(password),
       until: (kind) => kind == OxTdlibAuthStateKind.ready,
       timeoutMessage:
           'Could not verify password (timed out). Check internet / VPN and try again.',
@@ -317,17 +334,19 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
         'Cannot start QR login from state=${_state.kind.name}',
       );
     }
+    if (_useWindows) {
+      return _windows!.requestQrLogin();
+    }
     return _api.requestQrLogin();
   }
 
-  Future<void> logOut() => _api.logOut();
+  Future<void> logOut() => _useWindows ? _windows!.logOut() : _api.logOut();
 
-  /// Abort QR (or any mid-auth) and recreate TDLib client so phone login works again.
-  /// TDLib cannot leave WaitOtherDeviceConfirmation without logOut + new client.
+  /// Abort QR (or any mid-auth) and recreate client so phone login works again.
   Future<void> resetForPhoneLogin() async {
     _log('resetForPhoneLogin from kind=${_state.kind.name}');
     try {
-      await _api.logOut();
+      await logOut();
     } catch (e) {
       _log('resetForPhoneLogin logOut error (continuing): $e');
     }
@@ -337,34 +356,30 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
     await ensureConfigured();
   }
 
-  /// Resolves a PlaybackInfo Telegram source and starts the TDLib download, returning a
-  /// tdlib-file://{fileId} uri for the stream URL resolver to hand to the player.
-  ///
-  /// ensureConfigured() first: a restored OX session (valid refresh token) skips the login
-  /// screen entirely, so `configure()` — normally called from every login panel's initState —
-  /// may never have run natively this app run. Without it, startPlaybackSession throws
-  /// IllegalStateException("OxTdlibBridgeApi.configure() must be called before this method")
-  /// even when a valid Telegram session already exists on disk from a previous login.
-  ///
-  /// Longer timeout than the login screen's default (45s): reconnecting an existing, actively
-  /// used Telegram account can require a real getDifference resync before reaching Ready — on a
-  /// chat-heavy account this measured 90s+. TdlibSessionConfig.useChatInfoDatabase now persists
-  /// chat metadata specifically so this is only slow the first time after that change (or after
-  /// data is cleared), not every app restart — but give it room rather than fail fast.
+  /// Resolves a PlaybackInfo Telegram source and starts progressive download.
   Future<String> startPlaybackSession(OxTdlibPlaybackSource source) async {
     await ensureConfigured(readyTimeout: const Duration(seconds: 180));
+    if (_useWindows) {
+      return _windows!.startPlaybackSession(source);
+    }
     return _api.startPlaybackSession(source);
   }
 
-  Future<void> stopPlaybackSession(String sessionUri) => _api.stopPlaybackSession(sessionUri);
+  Future<void> stopPlaybackSession(String sessionUri) =>
+      _useWindows ? _windows!.stopPlaybackSession(sessionUri) : _api.stopPlaybackSession(sessionUri);
 
-  /// Fetches a Telegram-signed Mini App initData payload for OXPLAYER_BOT_USERNAME — only valid
-  /// once [state].kind == ready (a real Telegram login already completed). See
-  /// TdlibWebAppAuth.kt / TELEGRAM_WEBAPP_SHORT_NAME / TELEGRAM_HOSTED_WEBAPP_HTTPS_URL.
+  /// Fetches a Telegram-signed Mini App initData payload for OXPLAYER_BOT_USERNAME.
   Future<String> fetchWebAppInitData() {
     final botUsername = OxplayerEnv.botUsername;
     if (botUsername == null) {
       throw OxplayerTdlibBridgeException('OXPLAYER_BOT_USERNAME not configured');
+    }
+    if (_useWindows) {
+      return _windows!.fetchWebAppInitData(
+        botUsername,
+        OxplayerEnv.telegramWebAppShortName,
+        OxplayerEnv.telegramHostedWebAppHttpsUrl,
+      );
     }
     return _api.fetchWebAppInitData(
       botUsername,

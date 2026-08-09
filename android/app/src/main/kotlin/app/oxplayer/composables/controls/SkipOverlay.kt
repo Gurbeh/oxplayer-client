@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -41,6 +42,7 @@ import app.oxplayer.objects.Translate
 import app.oxplayer.objects.VideoPlayerObject
 import app.oxplayer.utility.defaultSelected
 import app.oxplayer.utility.leanBackEnabled
+import kotlin.math.absoluteValue
 import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
@@ -57,6 +59,7 @@ internal fun BoxScope.SegmentSkipOverlay(
     val player = VideoPlayerObject.implementation.player
     val skipMap by PlayerSettingsObject.skipMap.collectAsState(mapOf())
     val skippedSegments = remember { mutableStateListOf<String>() }
+    val previousPositionMs = remember { mutableLongStateOf(position) }
 
     LaunchedEffect(segments, skipMap) { }
 
@@ -74,7 +77,13 @@ internal fun BoxScope.SegmentSkipOverlay(
     }
 
     LaunchedEffect(activeSegment, position, skipMap) {
+        val deltaMs = (position - previousPositionMs.longValue).absoluteValue
+        previousPositionMs.longValue = position
+
         if (skipMap.isEmpty()) return@LaunchedEffect
+        // Forward/back/scrub seeks jump position by seconds — only auto-skip when playback
+        // crosses a segment boundary naturally (~1s ticks), not after user-initiated seek.
+        if (deltaMs > 5_000) return@LaunchedEffect
         if (activeSegment != null && currentSegmentId != null) {
             if (skip == SegmentSkip.SKIP || (skip == SegmentSkip.SKIP_ONCE && !skippedSegments.contains(
                     currentSegmentId

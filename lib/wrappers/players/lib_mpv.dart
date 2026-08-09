@@ -27,6 +27,7 @@ import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_mpv.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
 import 'package:fladder/oxplayer/oxplayer_audio_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_http_auth.dart';
@@ -334,7 +335,8 @@ class LibMPV extends BasePlayer {
     final isOxStreamTs = _isOxStreamRemuxUrl(url);
     // Progressive ox-stream TS: long-lived HTTP read — no 5s reopen on web or Android mpv.
     final progressiveOxStream = isOxStreamTs;
-    final oxStreamDirectMkv = oxplayerStreamDirectMkvUrl(url);
+    // Telegram loopback bridge + ox-stream MKV: same progressive Range seek path.
+    final oxStreamDirectMkv = oxplayerStreamProgressiveHttpUrl(url);
     final oxStreamResumeSeek = oxplayerStreamMpvResumeSeekGrace(url, startPosition);
     final serverSeek = isOxStreamTs && url.contains('start=');
     _remuxTimelineBase = serverSeek ? startPosition : Duration.zero;
@@ -359,6 +361,20 @@ class LibMPV extends BasePlayer {
     }
 
     url = OxplayerStreamHttpAuth.stripAndRegister(url);
+
+    // Telegram loopback progressive: bigger demuxer cache so forward seek doesn't underrun
+    // while MTProto fills the next Range window.
+    if (OxplayerEnv.isEnabled &&
+        oxplayerIsTdlibHttpBridgeUrl(url) &&
+        _player?.platform is mpv.NativePlayer) {
+      final native = _player!.platform as dynamic;
+      try {
+        await native.setProperty('cache', 'yes');
+        await native.setProperty('demuxer-max-bytes', '150MiB');
+        await native.setProperty('demuxer-max-back-bytes', '50MiB');
+        await native.setProperty('demuxer-readahead-secs', '20');
+      } catch (_) {/* older libmpv */}
+    }
 
     // OX stream: always send Worker client signature; optional Bearer when enabled.
     if (OxplayerEnv.isEnabled && oxplayerIsOxStreamUrl(url) && _player?.platform is mpv.NativePlayer) {
@@ -404,8 +420,9 @@ class LibMPV extends BasePlayer {
     _retryTimer?.cancel();
     _retryTimer = null;
 
-    // Progressive remux is a long-lived HTTP read; reopening every 5s kills ffmpeg mid-pipe.
-    if (!progressiveOxStream) {
+    // Progressive remux / Telegram HTTP / ox-stream MKV: long-lived Range reads —
+    // reopening every few seconds kills mid-seek buffering (jump-to-start / stall).
+    if (!progressiveOxStream && !oxStreamDirectMkv) {
       final retryEvery =
           oxStreamResumeSeek ? oxplayerStreamMpvResumeRetryInterval : _currentRetryDuration;
       final maxRetry = oxStreamResumeSeek ? oxplayerStreamMpvResumeMaxRetry : _maxRetryDuration;
@@ -629,11 +646,20 @@ class LibMPV extends BasePlayer {
     }
 
     try {
-      final response = await http.get(Uri.parse(url)).timeout(const Duration(minutes: 3));
-      if (loadGen != _externalSubtitleLoadGen || _player == null) return;
-      if (response.statusCode != 200) {
+      http.Response? response;
+      for (var attempt = 0; attempt < 3; attempt++) {
+        response = await http.get(Uri.parse(url)).timeout(const Duration(minutes: 3));
+        if (loadGen != _externalSubtitleLoadGen || _player == null) return;
+        if (response.statusCode == 200) break;
+        // API returns 502 when ffmpeg extract from probe source flaps — retry briefly.
+        if (response.statusCode != 502 && response.statusCode != 503 && response.statusCode != 504) {
+          break;
+        }
+        await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+      }
+      if (response == null || response.statusCode != 200) {
         OxplayerStreamLog.event('subtitle_track_external_fail', fields: {
-          'status': response.statusCode,
+          'status': response?.statusCode,
           'index': wanted.index,
         });
         return;

@@ -92,9 +92,13 @@ Future<String?> oxplayerResolveStreamPlaybackUrl(
   // applies, so this returns early rather than falling through to _finalizeStreamPlaybackUrl.
   if (oxplayerIsTelegramProviderLink(apiMintedUrl)) {
     final wantedPlayer = read(videoPlayerSettingsProvider).wantedPlayer;
+    // TEMP (Windows bridge parity test): prefer HTTP bridge + libmpv on all platforms,
+    // including Android. Product default was Android → tdlib-file:// + Exo; restore later
+    // by gating Android to preferHttpBridge=false again. gotd-only either way.
+    final useHttpBridge = wantedPlayer != PlayerOptions.nativePlayer;
     return oxplayerResolveTdlibPlaybackUrl(
       apiMintedUrl!,
-      preferHttpBridge: wantedPlayer != PlayerOptions.nativePlayer,
+      preferHttpBridge: useHttpBridge,
     );
   }
 

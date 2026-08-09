@@ -1,20 +1,29 @@
 package app.oxplayer.tdlibbridge.player
 
 import android.util.Log
-import app.oxplayer.tdlibbridge.media.TdlibFileFetcher
+import app.oxplayer.tdlibbridge.media.OxFileInfo
+import app.oxplayer.tdlibbridge.media.OxTelegramFileFetcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.drinkless.tdlib.TdApi
 import java.io.OutputStream
 import java.io.RandomAccessFile
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 private const val TAG = "OXPLAY_TDLIB"
 private const val READ_CHUNK_BYTES = 64 * 1024
+/** Prefetch enough for mkv after seek — match open-ended chunk so first Range is ready to stream. */
+private const val READ_AHEAD_BYTES = 2L * 1024 * 1024
+/**
+ * Cap open-ended `Range: bytes=N-` responses. Serving to EOF (~600MB+) races with concurrent cue
+ * fetches (mpv opens start + near-EOF together for MKV): finishing one stream called
+ * cancelDownload and killed the other → seek hang / jump-to-end / Connection reset.
+ */
+private const val OPEN_RANGE_CHUNK_BYTES = 2L * 1024 * 1024
 private const val CRLF = "\r\n"
 
 /**
@@ -33,11 +42,13 @@ private const val CRLF = "\r\n"
  * next range on a seek, which is negligible overhead on loopback and avoids implementing
  * HTTP/1.1 keep-alive/pipelining for a server with exactly one real client.
  */
-class TdlibHttpBridgeServer(private val fileFetcher: () -> TdlibFileFetcher?) {
+class TdlibHttpBridgeServer(private val fileFetcher: () -> OxTelegramFileFetcher?) {
     @Volatile private var serverSocket: ServerSocket? = null
     @Volatile private var port: Int = -1
     private val running = AtomicBoolean(false)
     private val scope = CoroutineScope(Dispatchers.IO)
+    /** Active HTTP bodies for the current playback session — only cancelDownload when last leaves. */
+    private val activeStreams = AtomicInteger(0)
 
     /** Starts the accept loop if not already running; returns the bound port. Idempotent. */
     @Synchronized
@@ -91,6 +102,7 @@ class TdlibHttpBridgeServer(private val fileFetcher: () -> TdlibFileFetcher?) {
             val fileId = path.removePrefix("/").substringBefore('?').toIntOrNull()
             val fetcher = fileFetcher()
             val output = sock.getOutputStream()
+            Log.i(TAG, "HTTP request method=$method path=$path range=$rangeHeader fileId=$fileId")
             if (fileId == null || fetcher == null) {
                 writeStatusOnly(output, 404, "Not Found")
                 return
@@ -108,35 +120,50 @@ class TdlibHttpBridgeServer(private val fileFetcher: () -> TdlibFileFetcher?) {
         return spec.substringBefore('-').toLongOrNull() ?: 0L
     }
 
-    private fun parseRangeEnd(rangeHeader: String?, lastByte: Long): Long {
-        val spec = rangeHeader?.removePrefix("bytes=") ?: return lastByte
-        val endPart = spec.substringAfter('-', "")
-        return endPart.toLongOrNull()?.coerceAtMost(lastByte) ?: lastByte
+    private fun parseRangeEnd(rangeHeader: String?, lastByte: Long): Long? {
+        if (rangeHeader == null) return null
+        val spec = rangeHeader.removePrefix("bytes=")
+        val endPart = spec.substringAfter('-', missingDelimiterValue = "")
+        if (endPart.isEmpty()) return null
+        return endPart.toLongOrNull()?.coerceAtMost(lastByte)
     }
 
     private suspend fun serveFile(
         output: OutputStream,
-        fetcher: TdlibFileFetcher,
+        fetcher: OxTelegramFileFetcher,
         fileId: Int,
         rangeHeader: String?,
         headOnly: Boolean,
     ) {
         val start = parseRangeStart(rangeHeader)
-        // Learn total size + confirm the requested start is actually reachable before committing
-        // to response headers — same "probe with a tiny want, then stream" shape as
-        // TelegramFileDataSource.open().
+        // Prefetch enough for mkv/ffmpeg after seek (same READ_AHEAD as TelegramFileDataSource).
+        val probeStartedAt = System.currentTimeMillis()
         fetcher.requestDownload(fileId, offset = start, priority = 32)
-        val probe = fetcher.awaitBytesAvailable(fileId, start, minBytesAvailable = 1L)
+        val probeWant = READ_AHEAD_BYTES
+        val probe = fetcher.awaitBytesAvailable(fileId, start, minBytesAvailable = probeWant)
+        Log.i(
+            TAG,
+            "HTTP probe fileId=$fileId start=$start want=$probeWant " +
+                "tookMs=${System.currentTimeMillis() - probeStartedAt} size=${probe.size} windowEnd=${probe.windowEnd}",
+        )
         val size = probe.size
         if (size <= 0L || start >= size) {
             writeStatusOnly(output, 416, "Range Not Satisfiable")
             return
         }
-        val end = parseRangeEnd(rangeHeader, size - 1)
+        val lastByte = size - 1
+        val explicitEnd = parseRangeEnd(rangeHeader, lastByte)
+        // Open-ended (or no Range): serve a bounded chunk so concurrent cue/seek ranges are not
+        // cancelled when this connection finishes or resets mid-file.
+        val end = when {
+            explicitEnd != null -> explicitEnd
+            else -> minOf(lastByte, start + OPEN_RANGE_CHUNK_BYTES - 1)
+        }
         val contentLength = end - start + 1
+        val isPartial = rangeHeader != null || end < lastByte
 
         val writer = StringBuilder()
-        if (rangeHeader != null) {
+        if (isPartial) {
             writer.append("HTTP/1.1 206 Partial Content").append(CRLF)
             writer.append("Content-Range: bytes $start-$end/$size").append(CRLF)
         } else {
@@ -153,22 +180,43 @@ class TdlibHttpBridgeServer(private val fileFetcher: () -> TdlibFileFetcher?) {
             return
         }
 
-        streamRange(output, fetcher, fileId, probe.local.path, start, end)
+        activeStreams.incrementAndGet()
+        try {
+            streamRange(
+                output,
+                fetcher,
+                fileId,
+                probe.localPath,
+                start,
+                end,
+                probe.windowEnd,
+                probe.isDownloadingCompleted,
+            )
+        } finally {
+            if (activeStreams.decrementAndGet() <= 0) {
+                // Last concurrent range left — safe to cancel in-flight chunk for this session.
+                runCatching { fetcher.cancelDownload(fileId) }
+            }
+        }
     }
 
-    /** Mirrors TelegramFileDataSource's known-available-window cache: only round-trips into
-     *  TDLib when a chunk is about to read past what was last confirmed available, instead of on
-     *  every chunk (see that class's doc for the GetFile-flood bug this avoids). */
+    /** Mirrors TelegramFileDataSource's known-available-window cache: only round-trips into the
+     *  facade when a chunk is about to read past what was last confirmed available, instead of
+     *  on every chunk (see that class's doc for the GetFile-flood bug this avoids). */
     private suspend fun streamRange(
         output: OutputStream,
-        fetcher: TdlibFileFetcher,
+        fetcher: OxTelegramFileFetcher,
         fileId: Int,
         localPath: String,
         start: Long,
         end: Long,
+        initialKnownAvailableUpTo: Long,
+        initialFullyDownloaded: Boolean,
     ) {
-        var knownAvailableUpTo = 0L
-        var fullyDownloaded = false
+        var knownAvailableUpTo = initialKnownAvailableUpTo
+        var fullyDownloaded = initialFullyDownloaded
+        val streamStartedAt = System.currentTimeMillis()
+        var totalWritten = 0L
         val raf = RandomAccessFile(localPath, "r")
         raf.use {
             raf.seek(start)
@@ -177,18 +225,34 @@ class TdlibHttpBridgeServer(private val fileFetcher: () -> TdlibFileFetcher?) {
             while (position <= end) {
                 val wantLength = minOf(READ_CHUNK_BYTES.toLong(), end - position + 1)
                 if (!fullyDownloaded && position + wantLength > knownAvailableUpTo) {
-                    val file: TdApi.File = fetcher.awaitBytesAvailable(fileId, position, wantLength)
-                    knownAvailableUpTo = file.local.downloadOffset + file.local.downloadedPrefixSize
-                    fullyDownloaded = file.local.isDownloadingCompleted
+                    val waitStartedAt = System.currentTimeMillis()
+                    val file: OxFileInfo = fetcher.awaitBytesAvailable(fileId, position, wantLength)
+                    val waitMs = System.currentTimeMillis() - waitStartedAt
+                    if (waitMs > 500) {
+                        Log.w(
+                            TAG,
+                            "HTTP stream fileId=$fileId slow awaitBytesAvailable position=$position " +
+                                "wantLength=$wantLength tookMs=$waitMs windowEnd=${file.windowEnd} " +
+                                "complete=${file.isDownloadingCompleted}",
+                        )
+                    }
+                    knownAvailableUpTo = file.windowEnd
+                    fullyDownloaded = file.isDownloadingCompleted
                 }
                 val readLength = wantLength.toInt()
                 val bytesRead = raf.read(buffer, 0, readLength)
                 if (bytesRead <= 0) break
                 output.write(buffer, 0, bytesRead)
                 position += bytesRead
+                totalWritten += bytesRead
             }
             output.flush()
         }
+        Log.i(
+            TAG,
+            "HTTP stream fileId=$fileId range=$start-$end totalWritten=$totalWritten " +
+                "tookMs=${System.currentTimeMillis() - streamStartedAt} active=${activeStreams.get()}",
+        )
     }
 
     private fun writeStatusOnly(output: OutputStream, code: Int, reason: String) {
