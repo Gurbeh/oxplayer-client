@@ -131,6 +131,8 @@ class LibMPV extends BasePlayer {
       configuration: mpv.PlayerConfiguration(
         title: "nl.jknaapen.fladder",
         libassAndroidFont: OxSubtitleFont.libassFontForPlayer,
+        // media_kit only applies libassAndroidFont when name is also set (Android).
+        libassAndroidFontName: OxplayerConfig.isEnabled ? OxSubtitleFont.family : null,
         libass: !kIsWeb && settings.useLibass,
         bufferSize: settings.bufferSize * 1024 * 1024, // MPV uses buffer size in bytes
         // mpv's own protocol/demuxer errors (e.g. a custom stream_cb protocol failing to open)
@@ -156,6 +158,7 @@ class LibMPV extends BasePlayer {
       final nativePlayer = _player!.platform as dynamic;
       await nativePlayer.setProperty('force-seekable', 'yes');
       await nativePlayer.setProperty('gapless-audio', 'weak');
+      await _applyOxLibassFontDir(nativePlayer);
 
       if (defaultTargetPlatform == TargetPlatform.android) {
         // Use audiotrack as it is generally more stable on modern Android
@@ -328,6 +331,7 @@ class LibMPV extends BasePlayer {
       configuration: mpv.PlayerConfiguration(
         title: "nl.jknaapen.fladder",
         libassAndroidFont: OxSubtitleFont.libassFontForPlayer,
+        libassAndroidFontName: OxplayerConfig.isEnabled ? OxSubtitleFont.family : null,
         libass: !kIsWeb && _settings.useLibass,
         bufferSize: _settings.bufferSize * 1024 * 1024,
       ),
@@ -337,6 +341,7 @@ class LibMPV extends BasePlayer {
       final native = incomingPlayer.platform as dynamic;
       await native.setProperty('force-seekable', 'yes');
       await native.setProperty('gapless-audio', 'weak');
+      await _applyOxLibassFontDir(native);
       if (defaultTargetPlatform == TargetPlatform.android) {
         await native.setProperty('ao', 'audiotrack');
       }
@@ -1087,6 +1092,17 @@ class LibMPV extends BasePlayer {
     unawaited(_syncLibassSubtitleStyle());
   }
 
+  /// Desktop libass has no Android asset loader — point mpv at extracted Vazirmatn.
+  Future<void> _applyOxLibassFontDir(dynamic nativePlayer) async {
+    if (!OxplayerConfig.isEnabled) return;
+    final dir = await OxSubtitleFont.ensureLibassFontsDir();
+    if (dir == null || dir.isEmpty) return;
+    try {
+      await nativePlayer.setProperty('sub-fonts-dir', dir);
+      await nativePlayer.setProperty('sub-font', OxSubtitleFont.family);
+    } catch (_) {}
+  }
+
   Future<void> _syncLibassSubtitleStyle() async {
     if (!OxplayerConfig.isEnabled || _player?.platform is! mpv.NativePlayer) return;
     final native = _player!.platform as dynamic;
@@ -1103,6 +1119,7 @@ class LibMPV extends BasePlayer {
         await native.setProperty('sub-visibility', 'yes');
         return;
       }
+      await _applyOxLibassFontDir(native);
       await native.setProperty('sub-ass-override', 'force');
       await native.setProperty(
         'sub-ass-force-style',

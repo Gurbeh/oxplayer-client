@@ -1,4 +1,9 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:path_provider/path_provider.dart';
 
 import 'package:fladder/models/settings/subtitle_settings_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
@@ -11,9 +16,64 @@ abstract final class OxSubtitleFont {
 
   /// Used by mpv/libass when a Persian or Arabic subtitle track is active.
   static const libassFontAsset = 'assets/fonts/vazirmatn/Vazirmatn-Regular.ttf';
+  static const _libassBoldFontAsset = 'assets/fonts/vazirmatn/Vazirmatn-Bold.ttf';
 
   static String get libassFontForPlayer =>
       OxplayerConfig.isEnabled ? libassFontAsset : libassFallbackFont;
+
+  static String? _cachedLibassFontsDir;
+  static Future<String?>? _libassFontsDirFuture;
+
+  /// Extract bundled Vazirmatn TTFs to a real filesystem dir for mpv/libass.
+  ///
+  /// media_kit only wires [PlayerConfiguration.libassAndroidFont] on Android.
+  /// Desktop (Windows/macOS/Linux) burns subs via libass but never gets that
+  /// asset path — without [sub-fonts-dir], `FontName=Vazirmatn` falls back.
+  static Future<String?> ensureLibassFontsDir() {
+    if (kIsWeb || !OxplayerConfig.isEnabled) {
+      return Future<String?>.value(null);
+    }
+    if (_cachedLibassFontsDir != null) {
+      return Future<String?>.value(_cachedLibassFontsDir);
+    }
+    return _libassFontsDirFuture ??= _extractLibassFontsDir();
+  }
+
+  static Future<String?> _extractLibassFontsDir() async {
+    try {
+      final support = await getApplicationSupportDirectory();
+      final dir = Directory(
+        '${support.path}${Platform.pathSeparator}ox_libass_fonts'
+        '${Platform.pathSeparator}$version',
+      );
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+
+      await _copyAssetIfNeeded(libassFontAsset, dir, 'Vazirmatn-Regular.ttf');
+      await _copyAssetIfNeeded(_libassBoldFontAsset, dir, 'Vazirmatn-Bold.ttf');
+
+      _cachedLibassFontsDir = dir.path;
+      return dir.path;
+    } catch (_) {
+      _libassFontsDirFuture = null;
+      return null;
+    }
+  }
+
+  static Future<void> _copyAssetIfNeeded(
+    String asset,
+    Directory dir,
+    String fileName,
+  ) async {
+    final out = File('${dir.path}${Platform.pathSeparator}$fileName');
+    if (await out.exists() && await out.length() > 0) return;
+    final data = await rootBundle.load(asset);
+    await out.writeAsBytes(
+      data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+      flush: true,
+    );
+  }
 
   /// OXPlayer default subtitle appearance (white fill + thin black outline).
   static const defaultSettings = SubtitleSettingsModel(
