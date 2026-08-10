@@ -66,10 +66,14 @@ class LibMPV extends BasePlayer {
   bool _isFading = false;
   bool _subtitleTextSeen = false;
   int _externalSubtitleLoadGen = 0;
-  // Keyed by DeliveryUrl. Server-side extraction is a fresh ffmpeg pass every request
-  // (Cache-Control: no-store, no server cache) taking 30-90s, so toggling a subtitle track
-  // off/on repeatedly without this looks broken/unresponsive rather than merely slow.
-  final Map<String, String> _externalSubtitleCache = {};
+  // Keyed by DeliveryUrl (path only). Server-side extraction is a fresh ffmpeg pass every
+  // request (Cache-Control: no-store, no server cache) taking 30-90s, so toggling a subtitle
+  // track off/on repeatedly without this looks broken/unresponsive rather than merely slow.
+  // static: something in the app's settings/init plumbing can recreate the LibMPV instance
+  // mid-session (observed via live device logs — no full video reload, yet a fresh empty cache
+  // on the very next lookup) without this cache surviving that recreation, an instance field
+  // would silently start missing again despite the URL being identical.
+  static final Map<String, String> _externalSubtitleCache = {};
 
   void _logAudio(String phase, {Map<String, Object?> fields = const {}}) {
     OxplayerAudioLog.event(phase, fields: {
@@ -345,6 +349,15 @@ class LibMPV extends BasePlayer {
     final oxStreamDirectMkv = oxplayerStreamProgressiveHttpUrl(url);
     final oxStreamResumeSeek = oxplayerStreamMpvResumeSeekGrace(url, startPosition);
     final serverSeek = isOxStreamTs && url.contains('start=');
+    // TdlibHttpBridgeServer is purely reactive to whatever byte range mpv's first request asks
+    // for (see its serveFile()) — it never independently fetches byte 0. Pre-setting mpv's
+    // native `start` property makes mpv jump straight to the target byte offset on open and
+    // skip the container header entirely, so it never learns any track/codec info (confirmed
+    // live: mpvTrackCount stayed 0 for the whole session, HTTP bridge only ever opened one
+    // connection at the resume offset) — playback looks "stuck" forever even though bytes are
+    // streaming in fine. Open at 0 like a normal load instead and let the deferred
+    // `_player?.seek(startPosition)` below (after the file is actually ready) do the seek.
+    final tdlibBridge = oxplayerIsTdlibHttpBridgeUrl(url);
     _remuxTimelineBase = serverSeek ? startPosition : Duration.zero;
 
     if (oxStreamResumeSeek) {
@@ -355,7 +368,7 @@ class LibMPV extends BasePlayer {
       });
     }
 
-    await setStartPosition(serverSeek ? Duration.zero : startPosition);
+    await setStartPosition((serverSeek || tdlibBridge) ? Duration.zero : startPosition);
 
     if (OxplayerEnv.isEnabled && oxplayerIsOxStreamUrl(url)) {
       if (OxplayerIranStreamEdge.isIranVanityStreamUrl(url)) {
@@ -636,15 +649,34 @@ class LibMPV extends BasePlayer {
     _retryTimer = null;
   }
 
+  /// Scheme+host+path only — drops the auth token/api_key query params DeliveryUrl carries,
+  /// which rotate on every PlaybackInfo re-fetch and would otherwise defeat the cache.
+  static String _externalSubtitleCacheKey(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return url;
+    return uri.replace(query: '').toString();
+  }
+
   /// OX: fetch Jellyfin DeliveryUrl in background — prod API ffmpeg-extracts full SRT (30–90s).
   /// Never await on playback path (was blocking video for 45s+).
   Future<void> _loadExternalSubtitleInBackground(SubStreamModel wanted, int loadGen) async {
     final url = wanted.url;
     if (url == null || url.isEmpty || _player == null) return;
+    // Cache key must drop the query string: DeliveryUrl carries a per-request auth
+    // token/api_key that changes on every PlaybackInfo re-fetch, so keying on the raw URL
+    // missed on every single re-toggle (looked like a fresh URL each time) — path alone
+    // uniquely identifies the subtitle stream.
+    final cacheKey = _externalSubtitleCacheKey(url);
 
     await _configureMpvForTextSubtitle(wanted.codec);
 
-    final cached = _externalSubtitleCache[url];
+    final cached = _externalSubtitleCache[cacheKey];
+    OxplayerStreamLog.event('subtitle_cache_lookup', fields: {
+      'cacheKey': cacheKey,
+      'hit': cached != null,
+      'cacheSize': _externalSubtitleCache.length,
+      'cachedKeys': _externalSubtitleCache.keys.join(' | '),
+    });
     if (cached != null) {
       if (loadGen != _externalSubtitleLoadGen || _player == null) return;
       await _player!.setSubtitleTrack(
@@ -688,7 +720,7 @@ class LibMPV extends BasePlayer {
       }
       final text = response.body.trim();
       if (text.isEmpty) return;
-      _externalSubtitleCache[url] = text;
+      _externalSubtitleCache[cacheKey] = text;
       if (loadGen != _externalSubtitleLoadGen || _player == null) return;
 
       await _player!.setSubtitleTrack(

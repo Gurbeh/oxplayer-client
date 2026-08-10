@@ -53,6 +53,11 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
       return;
     }
 
+    OxplayerStreamLog.event('video_player_reinit', fields: {
+      'hasPlayer': state.hasPlayer,
+      'stack': StackTrace.current.toString().split('\n').take(8).join(' <- '),
+    });
+
     await state.dispose();
     await state.init();
 
@@ -213,7 +218,16 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
         subStreams: model.subStreams,
       );
       final resolvedSub = model.subStreams?.firstWhereOrNull((s) => s.index == resolvedSubIndex);
-      await state.setSubtitleTrack(resolvedSub, model);
+      // Route through PlaybackModel.setSubtitle (not state.setSubtitleTrack directly) so
+      // mediaStreams.defaultSubStreamIndex reflects what auto-selection (e.g. preferred Persian
+      // track) actually applied to the player — otherwise the subtitle picker UI keeps showing
+      // "Off" as selected while a real subtitle is playing, since nothing ever wrote the resolved
+      // index back onto the model the UI reads.
+      final subtitleAppliedModel = await newPlaybackModel.setSubtitle(resolvedSub, state);
+      if (subtitleAppliedModel != null) {
+        newPlaybackModel = subtitleAppliedModel;
+        ref.read(playBackModel.notifier).update((state) => newPlaybackModel);
+      }
 
       final runtime = model.item.overview.runTime;
       final deferCatalogDuration = OxplayerEnv.isEnabled && oxplayerUsesNativePlayerRead(ref);
