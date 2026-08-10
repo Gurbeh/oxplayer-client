@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +16,8 @@ import 'package:fladder/oxplayer/oxplayer_pending_route.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_login_panel.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_qr_login_panel.dart';
+import 'package:fladder/oxplayer/oxplayer_test_account_qr_hold.dart';
+import 'package:fladder/oxplayer/oxplayer_test_account_sign_in.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
@@ -120,6 +124,22 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
     await loggedInGoToHome(context, ref);
   }
 
+  /// Hidden Play review path: hold logo 5s → demo library. No on-screen hint.
+  Widget _loginLogo({bool holdEnabled = true}) {
+    final logo = const OxplayerLoginLogo();
+    if (!holdEnabled) return logo;
+    return OxplayerTestAccountQrHold(
+      onHoldComplete: () {
+        unawaited(oxplayerSignInAsTestAccount(
+          ref: ref,
+          context: context,
+          onSuccess: _onLoginSuccess,
+        ));
+      },
+      child: logo,
+    );
+  }
+
   bool _isTv(BuildContext context) {
     final leanBack = ref.read(argumentsStateProvider).leanBackMode;
     return leanBack || AdaptiveLayout.viewSizeOf(context) == ViewSize.television;
@@ -211,19 +231,19 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: _bootstrapping
-                    ? const Column(
+                    ? Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          OxplayerLoginLogo(),
-                          SizedBox(height: 24),
-                          CircularProgressIndicator(),
+                          _loginLogo(holdEnabled: false),
+                          const SizedBox(height: 24),
+                          const CircularProgressIndicator(),
                         ],
                       )
                     : _bootstrapError != null
                         ? Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const OxplayerLoginLogo(),
+                              _loginLogo(holdEnabled: false),
                               const SizedBox(height: 16),
                               Text(
                                 _bootstrapError!,
@@ -241,7 +261,7 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              const OxplayerLoginLogo(),
+                              _loginLogo(),
                               const SizedBox(height: 24),
                               AnimatedFadeSize(
                                 child: showAccountGrid

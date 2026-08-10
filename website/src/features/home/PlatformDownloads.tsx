@@ -18,10 +18,13 @@ const scrollToDownloadSection = () => {
   });
 };
 
-const cardClassName = (compact: boolean) =>
+const cardClassName = (compact: boolean, disabled = false) =>
   clsx(
-    "flex items-center rounded-xl border border-slate-700 bg-slate-900/50 backdrop-blur-sm transition-all duration-300 cursor-pointer hover:border-primary shrink-0",
+    "flex items-center rounded-xl border border-slate-700 bg-slate-900/50 backdrop-blur-sm transition-all duration-300 shrink-0",
     compact ? "gap-2 px-3 py-3" : "gap-3 px-6 py-4",
+    disabled
+      ? "cursor-not-allowed opacity-60"
+      : "cursor-pointer hover:border-primary",
   );
 
 type PlatformCardProps = {
@@ -48,9 +51,27 @@ const PlatformCard = ({
         )}
       >
         {platform.label}
+        {platform.comingSoon ? (
+          <span className="ml-2 text-xs font-normal text-gray-400">
+            Coming soon
+          </span>
+        ) : null}
       </span>
     </>
   );
+
+  if (platform.comingSoon) {
+    return (
+      <div
+        role="status"
+        aria-disabled="true"
+        aria-label={`${platform.label} — Coming soon`}
+        className={cardClassName(compact, true)}
+      >
+        {content}
+      </div>
+    );
+  }
 
   if (platform.id === "Windows" && onWindowsClick) {
     return (

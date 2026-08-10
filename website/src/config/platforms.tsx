@@ -15,6 +15,8 @@ export type Platform = {
   Icon: IconType;
   /** Shown in the hero on small screens. */
   heroMobile: boolean;
+  /** Temporarily unavailable — rendered disabled with Coming soon. */
+  comingSoon?: boolean;
 };
 
 export const platforms: Platform[] = [
@@ -24,7 +26,13 @@ export const platforms: Platform[] = [
   { id: "macOS", label: "macOS", Icon: FaApple, heroMobile: false },
   { id: "Windows", label: "Windows", Icon: FaWindows, heroMobile: false },
   { id: "Linux", label: "Linux", Icon: FaLinux, heroMobile: false },
-  { id: "Web", label: "Web", Icon: FaGlobe, heroMobile: true },
+  {
+    id: "Web",
+    label: "Web",
+    Icon: FaGlobe,
+    heroMobile: true,
+    comingSoon: true,
+  },
 ];
 
 export const heroMobilePlatforms = platforms.filter((p) => p.heroMobile);

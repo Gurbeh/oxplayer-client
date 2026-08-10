@@ -728,7 +728,9 @@ jobs:
           name: oxplayer-linux-flatpak
           path: OXPlayer-Linux.flatpak
 
+  # Temporarily disabled — Flutter web app paused (Coming soon on marketing site).
   build-web:
+    if: false
     needs: [fetch-info]
     runs-on: ubuntu-latest
     env:
@@ -779,7 +781,7 @@ jobs:
       - build-macos
       - build-linux
       - build-linux-flatpak
-      - build-web
+      # build-web temporarily disabled
     runs-on: ubuntu-latest
     if: needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly'
     permissions:
@@ -939,17 +941,7 @@ jobs:
           mv "oxplayer-linux-appimage/OXPlayer_x86_64.AppImage" "OXPlayer-Linux-${V}.AppImage"
           mv "oxplayer-linux-appimage/OXPlayer_x86_64.AppImage.zsync" "OXPlayer-Linux-${V}.AppImage.zsync"
 
-      - uses: actions/download-artifact@v5
-        with:
-          name: oxplayer-web
-          path: oxplayer-web
-
-      - name: Stage Web bundle
-        shell: bash
-        run: |
-          V="${{ steps.version.outputs.version }}"
-          cd oxplayer-web
-          zip -r "../OXPlayer-Web-${V}.zip" .
+      # Web artifact staging skipped while build-web is disabled.
 
       - name: Prepare GitHub release body file
         shell: bash
@@ -993,7 +985,6 @@ jobs:
             "OXPlayer-Linux-${V}.zip"
             "OXPlayer-Linux-${V}.AppImage"
             "OXPlayer-Linux-${V}.AppImage.zsync"
-            "OXPlayer-Web-${V}.zip"
           )
           if [[ "${{ needs.fetch-info.outputs.build_type }}" == "release" ]]; then
             FILES+=("OXPlayer-Linux-${V}.flatpak")
@@ -1054,7 +1045,6 @@ jobs:
             OXPlayer-Linux-${{ steps.version.outputs.version }}.zip
             OXPlayer-Linux-${{ steps.version.outputs.version }}.AppImage
             OXPlayer-Linux-${{ steps.version.outputs.version }}.AppImage.zsync
-            OXPlayer-Web-${{ steps.version.outputs.version }}.zip
             ${{ needs.fetch-info.outputs.build_type == 'release' && format('OXPlayer-Linux-{0}.flatpak', steps.version.outputs.version) || '' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -1161,6 +1151,7 @@ jobs:
           status: completed
           releaseName: "${{ needs.fetch-info.outputs.version_name }} (${{ needs.fetch-info.outputs.android_version_code }})"
 
+  # Temporarily disabled — Flutter web app paused.
   release_web:
     name: Release Web (Docker)
     needs:
@@ -1168,9 +1159,7 @@ jobs:
       - create_release
       - build-web
     runs-on: ubuntu-latest
-    if: |
-      (needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly') &&
-      needs.create_release.result == 'success'
+    if: false
     permissions:
       contents: read
       packages: write
@@ -1205,12 +1194,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+  # Temporarily disabled — Flutter web app paused (Coming soon).
   deploy-web-hetzner:
     name: Deploy Web · Hetzner
     needs: [fetch-info, create_release]
-    if: |
-      needs.fetch-info.outputs.build_type == 'release' &&
-      needs.create_release.result == 'success'
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

@@ -8,6 +8,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import 'package:fladder/oxplayer/oxplayer_jellyfin_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
+import 'package:fladder/oxplayer/oxplayer_test_account_qr_hold.dart';
+import 'package:fladder/oxplayer/oxplayer_test_account_sign_in.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
 import 'package:fladder/theme.dart';
 
@@ -354,23 +356,34 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
         ),
         const SizedBox(height: 20),
         if (qrUrl != null && qrUrl.isNotEmpty) ...[
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              Opacity(
-                opacity: (_refreshingQr || scanConfirming) ? 0.45 : 1,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: QrImageView(
-                    data: qrUrl,
-                    size: 240,
-                    version: QrVersions.auto,
-                    backgroundColor: Colors.white,
+          // Hidden Play review path: hold QR / OK 5s → demo library. No on-screen hint.
+          OxplayerTestAccountQrHold(
+            autofocus: true,
+            onHoldComplete: () {
+              unawaited(oxplayerSignInAsTestAccount(
+                ref: ref,
+                context: context,
+                onSuccess: widget.onSuccess,
+              ));
+            },
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Opacity(
+                  opacity: (_refreshingQr || scanConfirming) ? 0.45 : 1,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: QrImageView(
+                      data: qrUrl,
+                      size: 240,
+                      version: QrVersions.auto,
+                      backgroundColor: Colors.white,
+                    ),
                   ),
                 ),
-              ),
-              if (_refreshingQr || scanConfirming) const CircularProgressIndicator(),
-            ],
+                if (_refreshingQr || scanConfirming) const CircularProgressIndicator(),
+              ],
+            ),
           ),
           const SizedBox(height: 10),
           Text(
