@@ -1,0 +1,1 @@
+﻿MTProto Telegram login/playback and TV QR/2FA UX.
