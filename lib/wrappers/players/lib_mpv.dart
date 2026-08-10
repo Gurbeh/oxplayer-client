@@ -769,6 +769,12 @@ class LibMPV extends BasePlayer {
 
     await _configureMpvForTextSubtitle(wanted.codec);
 
+    OxplayerStreamLog.event('subtitle_load_entered', fields: {
+      'loadGen': loadGen,
+      'currentLoadGen': _externalSubtitleLoadGen,
+      'index': wanted.index,
+    });
+
     final cached = _externalSubtitleCache[cacheKey];
     OxplayerStreamLog.event('subtitle_cache_lookup', fields: {
       'cacheKey': cacheKey,
@@ -777,7 +783,15 @@ class LibMPV extends BasePlayer {
       'cachedKeys': _externalSubtitleCache.keys.join(' | '),
     });
     if (cached != null) {
-      if (loadGen != _externalSubtitleLoadGen || _player == null) return;
+      if (loadGen != _externalSubtitleLoadGen || _player == null) {
+        OxplayerStreamLog.event('subtitle_load_dropped_stale', fields: {
+          'where': 'cache_hit',
+          'loadGen': loadGen,
+          'currentLoadGen': _externalSubtitleLoadGen,
+          'playerNull': _player == null,
+        });
+        return;
+      }
       await _player!.setSubtitleTrack(
         mpv.SubtitleTrack.data(cached, title: wanted.displayTitle, language: wanted.language),
       );
@@ -795,6 +809,7 @@ class LibMPV extends BasePlayer {
       OxplayerStreamLog.event('subtitle_track_external_start', fields: {
         'url': OxplayerStreamLog.describeUrl(url),
         'index': wanted.index,
+        'loadGen': loadGen,
       });
     }
 
@@ -802,7 +817,22 @@ class LibMPV extends BasePlayer {
       http.Response? response;
       for (var attempt = 0; attempt < 3; attempt++) {
         response = await http.get(Uri.parse(url)).timeout(const Duration(minutes: 3));
-        if (loadGen != _externalSubtitleLoadGen || _player == null) return;
+        OxplayerStreamLog.event('subtitle_fetch_attempt', fields: {
+          'attempt': attempt,
+          'status': response.statusCode,
+          'bytes': response.body.length,
+          'loadGen': loadGen,
+        });
+        if (loadGen != _externalSubtitleLoadGen || _player == null) {
+          OxplayerStreamLog.event('subtitle_load_dropped_stale', fields: {
+            'where': 'after_fetch_attempt',
+            'attempt': attempt,
+            'loadGen': loadGen,
+            'currentLoadGen': _externalSubtitleLoadGen,
+            'playerNull': _player == null,
+          });
+          return;
+        }
         if (response.statusCode == 200) break;
         // API returns 502 when ffmpeg extract from probe source flaps — retry briefly.
         if (response.statusCode != 502 && response.statusCode != 503 && response.statusCode != 504) {
@@ -814,13 +844,30 @@ class LibMPV extends BasePlayer {
         OxplayerStreamLog.event('subtitle_track_external_fail', fields: {
           'status': response?.statusCode,
           'index': wanted.index,
+          'loadGen': loadGen,
         });
         return;
       }
       final text = response.body.trim();
-      if (text.isEmpty) return;
+      if (text.isEmpty) {
+        OxplayerStreamLog.event('subtitle_track_external_fail', fields: {
+          'status': 200,
+          'reason': 'empty_body',
+          'index': wanted.index,
+          'loadGen': loadGen,
+        });
+        return;
+      }
       _externalSubtitleCache[cacheKey] = text;
-      if (loadGen != _externalSubtitleLoadGen || _player == null) return;
+      if (loadGen != _externalSubtitleLoadGen || _player == null) {
+        OxplayerStreamLog.event('subtitle_load_dropped_stale', fields: {
+          'where': 'after_success_before_apply',
+          'loadGen': loadGen,
+          'currentLoadGen': _externalSubtitleLoadGen,
+          'playerNull': _player == null,
+        });
+        return;
+      }
 
       await _player!.setSubtitleTrack(
         mpv.SubtitleTrack.data(
@@ -837,10 +884,13 @@ class LibMPV extends BasePlayer {
         'via': 'data',
       });
     } catch (error) {
-      if (loadGen != _externalSubtitleLoadGen) return;
       OxplayerStreamLog.event('subtitle_track_external_fail', fields: {
         'index': wanted.index,
         'error': error.runtimeType.toString(),
+        'errorMessage': error.toString(),
+        'loadGen': loadGen,
+        'currentLoadGen': _externalSubtitleLoadGen,
+        'droppedAsStale': loadGen != _externalSubtitleLoadGen,
       });
     }
   }
@@ -1009,6 +1059,9 @@ class LibMPV extends BasePlayer {
       // Invalidate any in-flight external-subtitle fetch so it can't land after "off" and
       // silently re-show subtitles the user just turned off.
       _externalSubtitleLoadGen++;
+      OxplayerStreamLog.event('subtitle_track_off', fields: {
+        'loadGen': _externalSubtitleLoadGen,
+      });
       await _player?.setSubtitleTrack(mpv.SubtitleTrack.no());
       await _syncLibassSubtitleStyle();
       return -1;
@@ -1017,6 +1070,12 @@ class LibMPV extends BasePlayer {
     _currentSubtitleLanguage = wantedSubtitle.language;
     _subtitleTextSeen = false;
     _externalSubtitleLoadGen++;
+    OxplayerStreamLog.event('subtitle_track_on_requested', fields: {
+      'loadGen': _externalSubtitleLoadGen,
+      'index': wantedSubtitle.index,
+      'isExternal': wantedSubtitle.isExternal,
+      'supportsExternalStream': wantedSubtitle.supportsExternalStream,
+    });
 
     await _configureMpvForTextSubtitle(wantedSubtitle.codec);
 
