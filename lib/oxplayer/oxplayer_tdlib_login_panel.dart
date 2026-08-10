@@ -331,6 +331,9 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
                   if (sheetContext.mounted) Navigator.of(sheetContext).pop();
                   await widget.onSuccess();
                 },
+                onNeedTwoFactorPassword: () {
+                  if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                },
               ),
             ),
           );
@@ -344,7 +347,18 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
             kind == OxTdlibAuthStateKind.waitingForPhoneNumber ||
             kind == OxTdlibAuthStateKind.waitingForCode ||
             kind == OxTdlibAuthStateKind.waitingForPassword) {
-          if (mounted) setState(() {});
+          if (mounted) {
+            setState(() {});
+            if (kind == OxTdlibAuthStateKind.waitingForPassword) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                _syncKeyboardForAuthStep(
+                  from: OxTdlibAuthStateKind.waitingForQrConfirmation,
+                  to: OxTdlibAuthStateKind.waitingForPassword,
+                );
+              });
+            }
+          }
           return;
         }
         await _cancelQrAndReturnToPhone();

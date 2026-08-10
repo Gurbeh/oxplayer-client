@@ -291,6 +291,10 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
                                                           setState(() => _tvUsePhone = true);
                                                         }
                                                       },
+                                                      onNeedTwoFactorPassword: () {
+                                                        // Keep TDLib waitingForPassword — do not reset.
+                                                        setState(() => _tvUsePhone = true);
+                                                      },
                                                     ))
                                               : OxplayerTdlibLoginPanel(
                                                   onSuccess: _onLoginSuccess,

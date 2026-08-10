@@ -17,6 +17,8 @@ const _kQrRefreshInterval = Duration(seconds: 25);
 
 /// Android TV sign-in for OXPlayer: QR-first (remote typing is bad UX). Optional
 /// [onUsePhoneNumber] lets the user focus a button and switch to the phone panel.
+/// When [onNeedTwoFactorPassword] is set, 2FA is handed off to that callback (close QR
+/// sheet / switch to phone panel) instead of showing the password field inline.
 ///
 /// TODO(l10n): strings here are hardcoded pending ARB entries; follow the oxplayerLogin* key
 /// convention used elsewhere once these are ready to localize.
@@ -24,6 +26,7 @@ class OxplayerTdlibQrLoginPanel extends ConsumerStatefulWidget {
   const OxplayerTdlibQrLoginPanel({
     required this.onSuccess,
     this.onUsePhoneNumber,
+    this.onNeedTwoFactorPassword,
     super.key,
   });
 
@@ -31,6 +34,9 @@ class OxplayerTdlibQrLoginPanel extends ConsumerStatefulWidget {
 
   /// TV: focused with D-pad — switches to phone-number panel.
   final Future<void> Function()? onUsePhoneNumber;
+
+  /// Phone QR sheet / TV: leave QR UI so the phone login panel can show 2FA.
+  final VoidCallback? onNeedTwoFactorPassword;
 
   @override
   ConsumerState<OxplayerTdlibQrLoginPanel> createState() => _OxplayerTdlibQrLoginPanelState();
@@ -44,6 +50,7 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
   bool _exchangingWithOxApi = false;
   bool _passwordBusy = false;
   bool _passwordVisible = false;
+  bool _twoFactorHandedOff = false;
   bool _starting = false;
   bool _refreshingQr = false;
   String? _error;
@@ -180,6 +187,17 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
       }
     }
     setState(() {});
+    if (state.kind == OxTdlibAuthStateKind.waitingForPassword &&
+        widget.onNeedTwoFactorPassword != null &&
+        !_twoFactorHandedOff) {
+      _twoFactorHandedOff = true;
+      _expiryTimer?.cancel();
+      _countdownTicker?.cancel();
+      _urlWaitTimer?.cancel();
+      _log('2FA required — handing off to phone login panel');
+      widget.onNeedTwoFactorPassword!();
+      return;
+    }
     if (state.kind == OxTdlibAuthStateKind.ready && !_oxExchangeStarted) {
       _expiryTimer?.cancel();
       _countdownTicker?.cancel();
@@ -309,7 +327,9 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
             padding: EdgeInsets.symmetric(vertical: 40),
             child: CircularProgressIndicator(),
           ),
-        if (state.kind == OxTdlibAuthStateKind.waitingForPassword) ...[
+        // Inline 2FA only when no hand-off callback (phone sheet / TV switch to LoginPanel).
+        if (state.kind == OxTdlibAuthStateKind.waitingForPassword &&
+            widget.onNeedTwoFactorPassword == null) ...[
           const SizedBox(height: 20),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
