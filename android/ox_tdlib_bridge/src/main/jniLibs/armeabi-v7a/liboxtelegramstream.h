@@ -23,10 +23,7 @@ extern const char *_GoStringPtr(_GoString_ s);
 
 #line 14 "stream_cb.go"
 
-
 #include <stdint.h>
-#include <stdlib.h>
-#include <android/log.h>
 
 typedef int64_t (*mpv_stream_cb_read_fn)(void *cookie, char *buf, uint64_t nbytes);
 typedef int64_t (*mpv_stream_cb_seek_fn)(void *cookie, int64_t offset);
@@ -56,14 +53,6 @@ static void ox_stream_fill_info(mpv_stream_cb_info *info, void *cookie) {
 	info->size_fn = ox_stream_size_fn;
 	info->close_fn = ox_stream_close_fn;
 	info->cancel_fn = ox_stream_cancel_fn;
-}
-
-// TEMPORARY (see cleanup todo — remove once the resume-seek bug is diagnosed): Go's own log
-// package doesn't reliably reach logcat from a plain NDK c-shared .so, unlike Kotlin's Log.i.
-// __android_log_write is non-variadic so it's directly cgo-callable (no wrapper needed for the
-// format string itself — callers pre-format on the Go side with fmt.Sprintf).
-static void ox_log(const char *msg) {
-	__android_log_write(ANDROID_LOG_INFO, "oxtelegramstream", msg);
 }
 
 #line 1 "cgo-generated-wrapper"

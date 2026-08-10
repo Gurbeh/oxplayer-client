@@ -62,7 +62,6 @@ import "C"
 
 import (
 	"fmt"
-	"log"
 	"runtime/cgo"
 	"strconv"
 	"strings"
@@ -103,10 +102,8 @@ func parseStreamID(uri string) (int, bool) {
 //export ox_stream_open_fn
 func ox_stream_open_fn(userData unsafe.Pointer, uri *C.char, info *C.mpv_stream_cb_info) C.int {
 	uriStr := C.GoString(uri)
-	log.Printf("oxtelegram: ox_stream_open_fn CALLED uri=%q", uriStr)
 	id, ok := parseStreamID(uriStr)
 	if !ok {
-		log.Printf("oxtelegram: ox_stream_open_fn parseStreamID failed for uri=%q", uriStr)
 		return C.int(mpvErrorLoadingFailed)
 	}
 

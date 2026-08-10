@@ -769,29 +769,9 @@ class LibMPV extends BasePlayer {
 
     await _configureMpvForTextSubtitle(wanted.codec);
 
-    OxplayerStreamLog.event('subtitle_load_entered', fields: {
-      'loadGen': loadGen,
-      'currentLoadGen': _externalSubtitleLoadGen,
-      'index': wanted.index,
-    });
-
     final cached = _externalSubtitleCache[cacheKey];
-    OxplayerStreamLog.event('subtitle_cache_lookup', fields: {
-      'cacheKey': cacheKey,
-      'hit': cached != null,
-      'cacheSize': _externalSubtitleCache.length,
-      'cachedKeys': _externalSubtitleCache.keys.join(' | '),
-    });
     if (cached != null) {
-      if (loadGen != _externalSubtitleLoadGen || _player == null) {
-        OxplayerStreamLog.event('subtitle_load_dropped_stale', fields: {
-          'where': 'cache_hit',
-          'loadGen': loadGen,
-          'currentLoadGen': _externalSubtitleLoadGen,
-          'playerNull': _player == null,
-        });
-        return;
-      }
+      if (loadGen != _externalSubtitleLoadGen || _player == null) return;
       await _player!.setSubtitleTrack(
         mpv.SubtitleTrack.data(cached, title: wanted.displayTitle, language: wanted.language),
       );
@@ -809,7 +789,6 @@ class LibMPV extends BasePlayer {
       OxplayerStreamLog.event('subtitle_track_external_start', fields: {
         'url': OxplayerStreamLog.describeUrl(url),
         'index': wanted.index,
-        'loadGen': loadGen,
       });
     }
 
@@ -817,22 +796,7 @@ class LibMPV extends BasePlayer {
       http.Response? response;
       for (var attempt = 0; attempt < 3; attempt++) {
         response = await http.get(Uri.parse(url)).timeout(const Duration(minutes: 3));
-        OxplayerStreamLog.event('subtitle_fetch_attempt', fields: {
-          'attempt': attempt,
-          'status': response.statusCode,
-          'bytes': response.body.length,
-          'loadGen': loadGen,
-        });
-        if (loadGen != _externalSubtitleLoadGen || _player == null) {
-          OxplayerStreamLog.event('subtitle_load_dropped_stale', fields: {
-            'where': 'after_fetch_attempt',
-            'attempt': attempt,
-            'loadGen': loadGen,
-            'currentLoadGen': _externalSubtitleLoadGen,
-            'playerNull': _player == null,
-          });
-          return;
-        }
+        if (loadGen != _externalSubtitleLoadGen || _player == null) return;
         if (response.statusCode == 200) break;
         // API returns 502 when ffmpeg extract from probe source flaps — retry briefly.
         if (response.statusCode != 502 && response.statusCode != 503 && response.statusCode != 504) {
@@ -844,30 +808,13 @@ class LibMPV extends BasePlayer {
         OxplayerStreamLog.event('subtitle_track_external_fail', fields: {
           'status': response?.statusCode,
           'index': wanted.index,
-          'loadGen': loadGen,
         });
         return;
       }
       final text = response.body.trim();
-      if (text.isEmpty) {
-        OxplayerStreamLog.event('subtitle_track_external_fail', fields: {
-          'status': 200,
-          'reason': 'empty_body',
-          'index': wanted.index,
-          'loadGen': loadGen,
-        });
-        return;
-      }
+      if (text.isEmpty) return;
       _externalSubtitleCache[cacheKey] = text;
-      if (loadGen != _externalSubtitleLoadGen || _player == null) {
-        OxplayerStreamLog.event('subtitle_load_dropped_stale', fields: {
-          'where': 'after_success_before_apply',
-          'loadGen': loadGen,
-          'currentLoadGen': _externalSubtitleLoadGen,
-          'playerNull': _player == null,
-        });
-        return;
-      }
+      if (loadGen != _externalSubtitleLoadGen || _player == null) return;
 
       await _player!.setSubtitleTrack(
         mpv.SubtitleTrack.data(
@@ -884,13 +831,10 @@ class LibMPV extends BasePlayer {
         'via': 'data',
       });
     } catch (error) {
+      if (loadGen != _externalSubtitleLoadGen) return;
       OxplayerStreamLog.event('subtitle_track_external_fail', fields: {
         'index': wanted.index,
         'error': error.runtimeType.toString(),
-        'errorMessage': error.toString(),
-        'loadGen': loadGen,
-        'currentLoadGen': _externalSubtitleLoadGen,
-        'droppedAsStale': loadGen != _externalSubtitleLoadGen,
       });
     }
   }
@@ -1014,6 +958,26 @@ class LibMPV extends BasePlayer {
   @override
   Future<void> seek(Duration position) async => _player?.seek(position);
 
+  /// Callers (video_player_provider.dart) invoke setAudioTrack/setSubtitleTrack immediately
+  /// after loadVideo() returns — but loadVideo() itself only awaits the mpv `open` command being
+  /// issued, not mpv's demuxer actually finishing track discovery (that happens asynchronously,
+  /// same race proven for the resume-seek bug: mpv can report `playing` before its own track
+  /// list is populated, especially for stream_cb sources reading an already-cached local file).
+  /// Without this wait, [audioTracks]/[subTracks] read back empty (mpvTrackCount=0) and track
+  /// selection silently no-ops forever — there's no retry once mpv catches up. Bounded so a file
+  /// that genuinely has no muxed tracks of this kind doesn't stall selection indefinitely.
+  Future<void> _ensureTracksReady({Duration timeout = const Duration(seconds: 2)}) async {
+    if (_player == null) return;
+    if (audioTracks.length > 2 || subTracks.length > 2) return;
+    try {
+      await _player!.stream.tracks
+          .firstWhere((t) => t.audio.length > 2 || t.subtitle.length > 2)
+          .timeout(timeout);
+    } catch (_) {
+      // Timed out or file genuinely has no muxed tracks — proceed with whatever is available.
+    }
+  }
+
   @override
   Future<int> setAudioTrack(AudioStreamModel? model, PlaybackModel playbackModel) async {
     final wantedAudioStream = model ?? playbackModel.defaultAudioStream;
@@ -1029,7 +993,9 @@ class LibMPV extends BasePlayer {
       _logAudio('audio_track_off');
       await _player?.setAudioTrack(mpv.AudioTrack.no());
     } else {
-      final internalTracks = audioTracks.getRange(2, audioTracks.length).toList();
+      await _ensureTracksReady();
+      final internalTracks =
+          audioTracks.length > 2 ? audioTracks.getRange(2, audioTracks.length).toList() : <mpv.AudioTrack>[];
       final listIndex = (playbackModel.audioStreams?.indexOf(wantedAudioStream) ?? -1) - 1;
       final audioTrack = internalTracks.elementAtOrNull(listIndex);
       _logAudio('audio_track_select', fields: {
@@ -1059,9 +1025,6 @@ class LibMPV extends BasePlayer {
       // Invalidate any in-flight external-subtitle fetch so it can't land after "off" and
       // silently re-show subtitles the user just turned off.
       _externalSubtitleLoadGen++;
-      OxplayerStreamLog.event('subtitle_track_off', fields: {
-        'loadGen': _externalSubtitleLoadGen,
-      });
       await _player?.setSubtitleTrack(mpv.SubtitleTrack.no());
       await _syncLibassSubtitleStyle();
       return -1;
@@ -1070,14 +1033,9 @@ class LibMPV extends BasePlayer {
     _currentSubtitleLanguage = wantedSubtitle.language;
     _subtitleTextSeen = false;
     _externalSubtitleLoadGen++;
-    OxplayerStreamLog.event('subtitle_track_on_requested', fields: {
-      'loadGen': _externalSubtitleLoadGen,
-      'index': wantedSubtitle.index,
-      'isExternal': wantedSubtitle.isExternal,
-      'supportsExternalStream': wantedSubtitle.supportsExternalStream,
-    });
 
     await _configureMpvForTextSubtitle(wantedSubtitle.codec);
+    await _ensureTracksReady();
 
     // Fladder: jellyfin sub stream index → mpv demux list (skips auto/no).
     final internalTracks =
@@ -1087,8 +1045,13 @@ class LibMPV extends BasePlayer {
 
     final url = wantedSubtitle.url;
     final hasUrl = url != null && url.isNotEmpty;
-    final useExternalUri =
-        hasUrl && (wantedSubtitle.isExternal || wantedSubtitle.supportsExternalStream);
+    // isExternal alone: supportsExternalStream just means the server CAN also extract this
+    // track over HTTP, not that it must — every muxed subtitle in our catalog qualifies, so
+    // OR-ing it in here always won the branch below and forced a full network round-trip
+    // (ffmpeg re-reading the whole source file server-side) for subtitles mpv already has
+    // direct access to in the same file it's demuxing. Reserve the fetch path for genuinely
+    // external subtitle files (isExternal) only.
+    final useExternalUri = hasUrl && wantedSubtitle.isExternal;
 
     // OX: DeliveryUrl before demux — progressive CDN MKV can expose ghost embedded
     // tracks (sid set but no dialogue); external SRT from API is the reliable path.

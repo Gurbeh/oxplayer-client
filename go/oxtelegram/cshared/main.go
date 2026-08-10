@@ -273,19 +273,21 @@ func ox_start_playback(channel *C.char, messageID C.int64_t) *C.char {
 
 	mu.Lock()
 	// Subtitle/audio swap → Fladder shouldReload re-resolves t.me → must NOT tear down the
-	// live HTTP bridge (MPV still reading the old URL). Reuse same session+URL.
-	if playback != nil && playbackFileID != 0 && bridge != nil &&
+	// live session (mpv's stream_cb instance is still reading it). Reuse same session+URL.
+	//
+	// The returned string is discarded by the Dart caller (see
+	// oxplayer_telegram_windows_bridge.dart: it only checks the pointer for null, then frees it
+	// and separately calls ox_stream_uri_for_current_playback for the real gotdstream:// URL) —
+	// so this must be a valid non-null string, but never bridge.URLFor's HTTP loopback URL:
+	// URLFor() lazily binds a real TCP listener via EnsureStarted(), and stream_cb has fully
+	// replaced that transport, so calling it here would open an idle socket every playback for
+	// no reason.
+	if playback != nil && playbackFileID != 0 &&
 		playbackChan == ch && playbackMsgID == mid {
 		id := playbackFileID
-		b := bridge
 		mu.Unlock()
-		url, err := b.URLFor(id)
-		if err != nil {
-			setErr(err)
-			return nil
-		}
 		setErr(nil)
-		return C.CString(url)
+		return C.CString(fmt.Sprintf("%s%d", streamProtocol, id))
 	}
 	c := client
 	b := bridge
@@ -321,13 +323,8 @@ func ox_start_playback(channel *C.char, messageID C.int64_t) *C.char {
 	b.Register(id, src)
 	mu.Unlock()
 
-	url, err := b.URLFor(id)
-	if err != nil {
-		setErr(err)
-		return nil
-	}
 	setErr(nil)
-	return C.CString(url)
+	return C.CString(fmt.Sprintf("%s%d", streamProtocol, id))
 }
 
 // ox_stream_uri_for_current_playback returns "gotdstream://<id>" for the currently active

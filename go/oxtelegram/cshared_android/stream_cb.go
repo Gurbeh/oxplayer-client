@@ -12,10 +12,7 @@
 package main
 
 /*
-#cgo LDFLAGS: -llog
 #include <stdint.h>
-#include <stdlib.h>
-#include <android/log.h>
 
 typedef int64_t (*mpv_stream_cb_read_fn)(void *cookie, char *buf, uint64_t nbytes);
 typedef int64_t (*mpv_stream_cb_seek_fn)(void *cookie, int64_t offset);
@@ -46,19 +43,10 @@ static void ox_stream_fill_info(mpv_stream_cb_info *info, void *cookie) {
 	info->close_fn = ox_stream_close_fn;
 	info->cancel_fn = ox_stream_cancel_fn;
 }
-
-// TEMPORARY (see cleanup todo — remove once the resume-seek bug is diagnosed): Go's own log
-// package doesn't reliably reach logcat from a plain NDK c-shared .so, unlike Kotlin's Log.i.
-// __android_log_write is non-variadic so it's directly cgo-callable (no wrapper needed for the
-// format string itself — callers pre-format on the Go side with fmt.Sprintf).
-static void ox_log(const char *msg) {
-	__android_log_write(ANDROID_LOG_INFO, "oxtelegramstream", msg);
-}
 */
 import "C"
 
 import (
-	"fmt"
 	"runtime/cgo"
 	"strconv"
 	"strings"
@@ -66,13 +54,6 @@ import (
 
 	"oxtelegram"
 )
-
-func oxLog(format string, args ...any) {
-	msg := fmt.Sprintf(format, args...)
-	cMsg := C.CString(msg)
-	C.ox_log(cMsg)
-	C.free(unsafe.Pointer(cMsg))
-}
 
 const (
 	mpvErrorLoadingFailed = -13
@@ -105,15 +86,12 @@ func ox_stream_open_fn(userData unsafe.Pointer, uri *C.char, info *C.mpv_stream_
 
 	src, err := newJNIByteSource(id)
 	if err != nil {
-		oxLog("ox_stream_open_fn id=%d newJNIByteSource FAILED: %v", id, err)
 		return C.int(mpvErrorLoadingFailed)
 	}
 	inst, err := oxtelegram.NewStreamInstance(src)
 	if err != nil {
-		oxLog("ox_stream_open_fn id=%d NewStreamInstance FAILED: %v", id, err)
 		return C.int(mpvErrorLoadingFailed)
 	}
-	oxLog("ox_stream_open_fn id=%d OK size=%d localPath=%s", id, src.Size(), src.LocalPath())
 
 	h := cgo.NewHandle(inst)
 	// See cshared/stream_cb.go's identical line for why this uintptr->unsafe.Pointer conversion
@@ -147,15 +125,12 @@ func ox_stream_read_fn(cookie unsafe.Pointer, buf *C.char, nbytes C.uint64_t) C.
 func ox_stream_seek_fn(cookie unsafe.Pointer, offset C.int64_t) C.int64_t {
 	inst, ok := streamInstanceFor(cookie)
 	if !ok {
-		oxLog("ox_stream_seek_fn offset=%d: bad cookie (no StreamInstance)", int64(offset))
 		return C.int64_t(mpvErrorGeneric)
 	}
 	n, err := inst.Seek(int64(offset))
 	if err != nil {
-		oxLog("ox_stream_seek_fn offset=%d FAILED: %v", int64(offset), err)
 		return C.int64_t(mpvErrorUnsupported)
 	}
-	oxLog("ox_stream_seek_fn offset=%d OK -> %d", int64(offset), n)
 	return C.int64_t(n)
 }
 
