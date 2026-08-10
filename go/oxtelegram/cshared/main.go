@@ -302,7 +302,7 @@ func ox_start_playback(channel *C.char, messageID C.int64_t) *C.char {
 		setErr(err)
 		return nil
 	}
-	dl, err := c.OpenDownload(ref, dir)
+	dl, err := c.OpenDownload(ref, ch, mid, dir)
 	if err != nil {
 		setErr(err)
 		return nil
@@ -328,6 +328,25 @@ func ox_start_playback(channel *C.char, messageID C.int64_t) *C.char {
 	}
 	setErr(nil)
 	return C.CString(url)
+}
+
+// ox_stream_uri_for_current_playback returns "gotdstream://<id>" for the currently active
+// playback session set up by ox_start_playback (or NULL if none) — the URL to hand mpv's
+// loadfile when using the stream_cb path (see stream_cb.go) instead of ox_start_playback's HTTP
+// loopback URL. Both point at the same registered session; callers pick one transport per
+// mpv.Player, they are not meant to be mixed for a single load.
+//
+//export ox_stream_uri_for_current_playback
+func ox_stream_uri_for_current_playback() *C.char {
+	mu.Lock()
+	id := playbackFileID
+	mu.Unlock()
+	if id == 0 {
+		setErr(fmt.Errorf("no active playback session"))
+		return nil
+	}
+	setErr(nil)
+	return C.CString(fmt.Sprintf("%s%d", streamProtocol, id))
 }
 
 //export ox_stop_playback

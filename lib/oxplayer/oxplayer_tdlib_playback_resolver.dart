@@ -45,6 +45,23 @@ bool oxplayerIsTdlibHttpBridgeUrl(String? url) {
   return uri != null && (uri.host == '127.0.0.1' || uri.host == 'localhost');
 }
 
+/// True for a resolved stream_cb `gotdstream://{id}` playback url (Windows libmpv path — see
+/// OxplayerTelegramStreamCb) — mpv reads this via direct C callbacks
+/// (go/oxtelegram/cshared/stream_cb.go), not a real network protocol, so nothing else in the app
+/// ever produces this scheme, making it as safe/simple a signal as the HTTP bridge host check.
+bool oxplayerIsGotdStreamCbUrl(String? url) {
+  if (url == null) return false;
+  final uri = Uri.tryParse(url);
+  return uri != null && uri.scheme == 'gotdstream';
+}
+
+/// True for either Telegram direct-play transport mpv/mdk understands: the loopback HTTP bridge
+/// or (Windows) the stream_cb protocol that replaced it there. Use this, not the two individual
+/// checks, for playback-session lifecycle decisions (stop/cleanup, retry-timer suppression,
+/// resume-seek handling) that must not silently miss one transport while only checking the other.
+bool oxplayerIsTelegramDirectPlayUrl(String? url) =>
+    oxplayerIsTdlibHttpBridgeUrl(url) || oxplayerIsGotdStreamCbUrl(url);
+
 /// Resolves a `t.me/{username}/{messageId}` PlaybackInfo link to a `tdlib-file://{fileId}` uri by
 /// starting a TDLib download session (see TelegramFileDataSource on the Android side, which reads
 /// from that uri). Requires an already-logged-in Telegram user session — callers should check

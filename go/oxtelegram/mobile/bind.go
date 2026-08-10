@@ -116,7 +116,7 @@ func (c *Client) StartPlaybackSession(channelUsername string, messageID int64, c
 	if err != nil {
 		return nil, err
 	}
-	dl, err := c.inner.OpenDownload(ref, cacheDir)
+	dl, err := c.inner.OpenDownload(ref, channelUsername, messageID, cacheDir)
 	if err != nil {
 		return nil, err
 	}

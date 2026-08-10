@@ -34,6 +34,45 @@ static void ox_auth_sink_invoke(ox_auth_sink fn, const char* a, const char* b, c
 
 #line 1 "cgo-generated-wrapper"
 
+#line 25 "stream_cb.go"
+
+#include <stdint.h>
+
+typedef int64_t (*mpv_stream_cb_read_fn)(void *cookie, char *buf, uint64_t nbytes);
+typedef int64_t (*mpv_stream_cb_seek_fn)(void *cookie, int64_t offset);
+typedef int64_t (*mpv_stream_cb_size_fn)(void *cookie);
+typedef void (*mpv_stream_cb_close_fn)(void *cookie);
+typedef void (*mpv_stream_cb_cancel_fn)(void *cookie);
+
+typedef struct mpv_stream_cb_info {
+	void *cookie;
+	mpv_stream_cb_read_fn read_fn;
+	mpv_stream_cb_seek_fn seek_fn;
+	mpv_stream_cb_size_fn size_fn;
+	mpv_stream_cb_close_fn close_fn;
+	mpv_stream_cb_cancel_fn cancel_fn;
+} mpv_stream_cb_info;
+
+// Forward declarations of the Go functions exported further down this file — needed so
+// ox_stream_fill_info can reference their addresses before cgo has generated _cgo_export.h.
+// Signatures here must exactly match the //export'd Go function signatures below.
+extern int64_t ox_stream_read_fn(void *cookie, char *buf, uint64_t nbytes);
+extern int64_t ox_stream_seek_fn(void *cookie, int64_t offset);
+extern int64_t ox_stream_size_fn(void *cookie);
+extern void ox_stream_close_fn(void *cookie);
+extern void ox_stream_cancel_fn(void *cookie);
+
+static void ox_stream_fill_info(mpv_stream_cb_info *info, void *cookie) {
+	info->cookie = cookie;
+	info->read_fn = ox_stream_read_fn;
+	info->seek_fn = ox_stream_seek_fn;
+	info->size_fn = ox_stream_size_fn;
+	info->close_fn = ox_stream_close_fn;
+	info->cancel_fn = ox_stream_cancel_fn;
+}
+
+#line 1 "cgo-generated-wrapper"
+
 
 /* End of preamble from import "C" comments.  */
 
@@ -107,8 +146,34 @@ extern __declspec(dllexport) int ox_submit_password(char* password);
 extern __declspec(dllexport) int ox_request_qr(void);
 extern __declspec(dllexport) int ox_logout(void);
 extern __declspec(dllexport) char* ox_start_playback(char* channel, int64_t messageID);
+
+// ox_stream_uri_for_current_playback returns "gotdstream://<id>" for the currently active
+// playback session set up by ox_start_playback (or NULL if none) — the URL to hand mpv's
+// loadfile when using the stream_cb path (see stream_cb.go) instead of ox_start_playback's HTTP
+// loopback URL. Both point at the same registered session; callers pick one transport per
+// mpv.Player, they are not meant to be mixed for a single load.
+//
+extern __declspec(dllexport) char* ox_stream_uri_for_current_playback(void);
 extern __declspec(dllexport) int ox_stop_playback(char* sessionURI);
 extern __declspec(dllexport) char* ox_fetch_webapp_init_data(char* bot, char* shortName, char* hostedURL, char* platform);
+
+// ox_stream_open_fn matches mpv_stream_cb_open_ro_fn's signature exactly
+// (int (*)(void *user_data, char *uri, mpv_stream_cb_info *info)). Pass the address of this
+// function (looked up by symbol name from Dart) as the open_fn argument to
+// mpv_stream_cb_add_ro. Only one playback session is live at a time today (see
+// closePlaybackLocked's single-session note in main.go) — id must match the currently registered
+// playbackFileID.
+//
+extern __declspec(dllexport) int ox_stream_open_fn(void* userData, char* uri, mpv_stream_cb_info* info);
+extern __declspec(dllexport) int64_t ox_stream_read_fn(void* cookie, char* buf, uint64_t nbytes);
+extern __declspec(dllexport) int64_t ox_stream_seek_fn(void* cookie, int64_t offset);
+extern __declspec(dllexport) int64_t ox_stream_size_fn(void* cookie);
+extern __declspec(dllexport) void ox_stream_close_fn(void* cookie);
+
+// ox_stream_cancel_fn is called by mpv from a thread other than the one running
+// read_fn/seek_fn specifically to interrupt a blocked call — must not block itself.
+//
+extern __declspec(dllexport) void ox_stream_cancel_fn(void* cookie);
 
 #ifdef __cplusplus
 }

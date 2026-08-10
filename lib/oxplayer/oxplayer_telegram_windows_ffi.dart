@@ -30,6 +30,10 @@ final class OxTelegramNative {
             Pointer<Utf8> Function(Pointer<Utf8>, int)>('ox_start_playback'),
         stopPlayback =
             lib.lookupFunction<Int32 Function(Pointer<Utf8>), int Function(Pointer<Utf8>)>('ox_stop_playback'),
+        streamUriForCurrentPlayback = lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
+          'ox_stream_uri_for_current_playback',
+        ),
+        streamOpenFnAddress = lib.lookup<NativeFunction<OxStreamOpenFnNative>>('ox_stream_open_fn'),
         fetchWebApp = lib.lookupFunction<
             Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
             Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>)>(
@@ -57,6 +61,13 @@ final class OxTelegramNative {
   final int Function() logout;
   final Pointer<Utf8> Function(Pointer<Utf8>, int) startPlayback;
   final int Function(Pointer<Utf8>) stopPlayback;
+  final Pointer<Utf8> Function() streamUriForCurrentPlayback;
+
+  /// Address of the native ox_stream_open_fn — pass this directly as mpv_stream_cb_add_ro's
+  /// open_fn argument (see OxplayerTelegramStreamCb.registerOn). Never called from Dart itself,
+  /// so the declared signature only needs to be a valid NativeFunction type, not byte-accurate to
+  /// mpv_stream_cb_open_ro_fn's real C signature (mpv_stream_cb_info* stays opaque here).
+  final Pointer<NativeFunction<OxStreamOpenFnNative>> streamOpenFnAddress;
   final Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>) fetchWebApp;
 
   static OxTelegramNative? _instance;
@@ -97,6 +108,15 @@ typedef OxAuthSinkNative = Void Function(
   Pointer<Utf8>,
   Pointer<Utf8>,
   Pointer<Utf8>,
+);
+
+/// C typedef: int (*)(void*, char*, mpv_stream_cb_info*) — matches mpv_stream_cb_open_ro_fn's
+/// shape closely enough for FFI's purposes (the third param stays an opaque `Pointer<Void>` here
+/// since this signature is never called from Dart, only its address is taken).
+typedef OxStreamOpenFnNative = Int32 Function(
+  Pointer<Void>,
+  Pointer<Utf8>,
+  Pointer<Void>,
 );
 
 class OxTelegramNativeException implements Exception {

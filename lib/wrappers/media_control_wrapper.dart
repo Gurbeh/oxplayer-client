@@ -480,7 +480,7 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
     // (VideoPlayerImplementation.clearSession) — this player runs inside the normal Flutter
     // widget tree instead, so nothing else calls this. No-op for any non-Telegram url.
     final sessionUrl = playbackModel.media?.url;
-    if (oxplayerIsTdlibHttpBridgeUrl(sessionUrl)) {
+    if (oxplayerIsTelegramDirectPlayUrl(sessionUrl)) {
       unawaited(OxplayerTdlibBridgeController.instance().stopPlaybackSession(sessionUrl!));
     }
 

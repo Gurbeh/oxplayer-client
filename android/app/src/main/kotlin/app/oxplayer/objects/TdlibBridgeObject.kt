@@ -12,6 +12,7 @@ import android.os.Looper
 import app.oxplayer.tdlibbridge.auth.OxTelegramAuthController
 import app.oxplayer.tdlibbridge.auth.TdlibAuthState
 import app.oxplayer.tdlibbridge.media.OxTelegramFileFetcher
+import app.oxplayer.tdlibbridge.player.OxTelegramStreamBridge
 import app.oxplayer.tdlibbridge.player.TdlibHttpBridgeServer
 import app.oxplayer.tdlibbridge.session.OxTelegramClient
 import app.oxplayer.tdlibbridge.session.OxTelegramSessionStorage
@@ -39,6 +40,12 @@ import java.util.concurrent.atomic.AtomicInteger
  * is not yet ported to gotd/td — see plan Phase 4 (hard requirement, not yet investigated).
  */
 object TdlibBridgeObject : OxTdlibBridgeApi {
+
+    /** TEMPORARILY true for the joint device-testing pass (2026-08-10) validating the JNI
+     *  round-trip on a real device for the first time — see OxTelegramStreamBridge's doc. Flip
+     *  back to false if this test session finds a real bug, or leave true once confirmed working
+     *  and consider removing the HTTP bridge fallback entirely (as already done on Windows). */
+    private const val OX_TELEGRAM_STREAM_CB_ENABLED = true
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -181,7 +188,19 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
                 fileFetcher = OxTelegramFileFetcher(session)
                 currentPlaybackFileId = fileId
                 Log.i("OXPLAY_TDLIB", "startPlaybackSession resolved fileId=$fileId size=${session.size()} mime=${session.mimeType()}")
-                if (source.preferHttpBridge) httpBridgeServer.urlFor(fileId) else "tdlib-file://${fileId}"
+                when {
+                    !source.preferHttpBridge -> "tdlib-file://${fileId}"
+                    OX_TELEGRAM_STREAM_CB_ENABLED -> {
+                        // stream_cb path (go/oxtelegram/cshared_android) — untested on-device as of
+                        // this writing; see OxTelegramStreamBridge's doc. Flip the flag above once
+                        // validated in the joint device-testing pass; until then this branch is dead
+                        // and playback keeps using the proven HTTP bridge below. Reuses fileId (not
+                        // a separate counter) so closeAfterPlayback's cleanup covers this too.
+                        OxTelegramStreamBridge.registerSession(fileId, session)
+                        "gotdstream://${fileId}"
+                    }
+                    else -> httpBridgeServer.urlFor(fileId)
+                }
             }.fold(
                 onSuccess = { uri -> replyOnMain(callback, Result.success(uri)) },
                 onFailure = { error -> replyOnMain(callback, Result.failure(error)) },
@@ -230,6 +249,7 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
         if (fetcher != null) {
             scope.launch { runCatching { fetcher.cancelDownload(fileId) } }
         }
+        OxTelegramStreamBridge.unregisterSession(fileId)
         activeClient?.close()
         clearNativeSession()
     }

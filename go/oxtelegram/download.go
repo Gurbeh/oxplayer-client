@@ -19,6 +19,10 @@ import (
 
 const downloadChunkSize = 512 * 1024 // must stay a multiple of 4KB per upload.getFile's alignment rule
 
+// maxFloodRetries mirrors oxplayer-be/apps/ox-stream/internal/mtproto/upload.go's proven retry
+// budget for FLOOD_WAIT on chunk fetches.
+const maxFloodRetries = 3
+
 // byteRange is a half-open [start, end) contiguous downloaded region on the cache file.
 type byteRange struct {
 	start int64
@@ -43,6 +47,11 @@ type byteRange struct {
 type DownloadSession struct {
 	client *Client
 	ref    *VideoFileRef
+	// channel/messageID identify ref's source message — kept only to re-resolve a fresh
+	// FileReference on FILE_REFERENCE_EXPIRED/INVALID (see refreshFileReference). Empty channel
+	// means refresh is unavailable (caller didn't provide it) and that error class is fatal.
+	channel   string
+	messageID int64
 
 	mu sync.Mutex
 	// ranges are sorted, non-overlapping, merged half-open intervals of bytes present on disk.
@@ -57,8 +66,11 @@ type DownloadSession struct {
 }
 
 // OpenDownload creates (or reopens) the local cache file for ref under cacheDir — the same file
-// TelegramFileDataSource/TdlibHttpBridgeServer read from as bytes land.
-func (c *Client) OpenDownload(ref *VideoFileRef, cacheDir string) (*DownloadSession, error) {
+// TelegramFileDataSource/TdlibHttpBridgeServer read from as bytes land. channel/messageID are
+// ref's source message, kept only so refreshFileReference can re-resolve on
+// FILE_REFERENCE_EXPIRED/INVALID; pass "" if unavailable (that error class then becomes fatal
+// instead of recovered).
+func (c *Client) OpenDownload(ref *VideoFileRef, channel string, messageID int64, cacheDir string) (*DownloadSession, error) {
 	if c.API() == nil {
 		return nil, fmt.Errorf("client not configured")
 	}
@@ -67,7 +79,7 @@ func (c *Client) OpenDownload(ref *VideoFileRef, cacheDir string) (*DownloadSess
 	if err != nil {
 		return nil, fmt.Errorf("open cache file: %w", err)
 	}
-	return &DownloadSession{client: c, ref: ref, file: f}, nil
+	return &DownloadSession{client: c, ref: ref, channel: channel, messageID: messageID, file: f}, nil
 }
 
 func (d *DownloadSession) LocalPath() string { return d.file.Name() }
@@ -311,10 +323,74 @@ func alignDown(n, align int64) int64 {
 }
 
 func (d *DownloadSession) location() *tg.InputDocumentFileLocation {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	return &tg.InputDocumentFileLocation{
 		ID:            d.ref.DocumentID,
 		AccessHash:    d.ref.AccessHash,
 		FileReference: d.ref.FileReference,
+	}
+}
+
+// refreshFileReference re-resolves channel/messageID and swaps in the fresh FileReference/
+// AccessHash — the recovery path for FILE_REFERENCE_EXPIRED/INVALID, which is a normal, expected
+// MTProto condition (references rotate), not a fatal error. Requires channel to have been passed
+// to OpenDownload; otherwise this class of error stays fatal.
+func (d *DownloadSession) refreshFileReference(ctx context.Context) error {
+	d.mu.Lock()
+	channel, messageID := d.channel, d.messageID
+	d.mu.Unlock()
+	if channel == "" {
+		return fmt.Errorf("no source channel/message recorded, cannot refresh file reference")
+	}
+	fresh, err := d.client.ResolveVideoFile(ctx, channel, messageID)
+	if err != nil {
+		return fmt.Errorf("re-resolve %s/%d: %w", channel, messageID, err)
+	}
+	d.mu.Lock()
+	d.ref.FileReference = fresh.FileReference
+	d.ref.AccessHash = fresh.AccessHash
+	d.mu.Unlock()
+	return nil
+}
+
+// uploadGetFileWithRetry wraps one upload.getFile call with the two recoverable-error classes
+// confirmed missing in earlier revisions: FILE_REFERENCE_EXPIRED/INVALID (refreshed at most once
+// per call, via refreshFileReference) and FLOOD_WAIT_% (retried up to maxFloodRetries times,
+// mirroring oxplayer-be/apps/ox-stream/internal/mtproto/upload.go's proven pattern). req.Location
+// is refreshed in place on a file-reference retry, so callers must not reuse req concurrently.
+func (d *DownloadSession) uploadGetFileWithRetry(
+	ctx context.Context,
+	invoke func(context.Context, *tg.UploadGetFileRequest) (tg.UploadFileClass, error),
+	req *tg.UploadGetFileRequest,
+) (tg.UploadFileClass, error) {
+	refRefreshed := false
+	floodAttempts := 0
+	for {
+		res, err := invoke(ctx, req)
+		if err == nil {
+			return res, nil
+		}
+		if !refRefreshed && tgerr.Is(err, "FILE_REFERENCE_EXPIRED", "FILE_REFERENCE_INVALID") {
+			log.Printf("oxtelegram: %v, refreshing file reference", err)
+			if rerr := d.refreshFileReference(ctx); rerr != nil {
+				return nil, fmt.Errorf("refresh file reference after %v: %w", err, rerr)
+			}
+			refRefreshed = true
+			req.Location = d.location()
+			continue
+		}
+		if floodAttempts >= maxFloodRetries {
+			return nil, err
+		}
+		ok, fwErr := tgerr.FloodWait(ctx, err)
+		if fwErr != nil {
+			return nil, fwErr
+		}
+		if !ok {
+			return nil, err
+		}
+		floodAttempts++
 	}
 }
 
@@ -338,7 +414,7 @@ func (d *DownloadSession) fetchChunk(ctx context.Context, offset, limit int64) (
 	}
 
 	start := time.Now()
-	res, err := invoke(ctx, req)
+	res, err := d.uploadGetFileWithRetry(ctx, invoke, req)
 	if took := time.Since(start); took > 500*time.Millisecond {
 		log.Printf("oxtelegram: slow UploadGetFile offset=%d limit=%d tookMs=%d err=%v", offset, limit, took.Milliseconds(), err)
 	}
@@ -353,7 +429,7 @@ func (d *DownloadSession) fetchChunk(ctx context.Context, offset, limit int64) (
 		d.mu.Lock()
 		d.dcConn = mediaConn
 		d.mu.Unlock()
-		res, err = tg.NewClient(mediaConn).UploadGetFile(ctx, req)
+		res, err = d.uploadGetFileWithRetry(ctx, tg.NewClient(mediaConn).UploadGetFile, req)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("UploadGetFile: %w", err)
@@ -399,11 +475,15 @@ func (d *DownloadSession) fetchCDNChunk(ctx context.Context, redirect *tg.Upload
 		return data, nil
 	}
 
-	if _, err := master.UploadReuploadCDNFile(ctx, &tg.UploadReuploadCDNFileRequest{
-		FileToken:    redirect.FileToken,
-		RequestToken: requestToken,
-	}); err != nil {
-		return nil, fmt.Errorf("upload.reuploadCdnFile: %w", err)
+	reuploadErr := floodRetry(ctx, func() error {
+		_, err := master.UploadReuploadCDNFile(ctx, &tg.UploadReuploadCDNFileRequest{
+			FileToken:    redirect.FileToken,
+			RequestToken: requestToken,
+		})
+		return err
+	})
+	if reuploadErr != nil {
+		return nil, fmt.Errorf("upload.reuploadCdnFile: %w", reuploadErr)
 	}
 
 	data, requestToken, err = getCDNFile(ctx, master, redirect, offset, limit)
@@ -416,11 +496,38 @@ func (d *DownloadSession) fetchCDNChunk(ctx context.Context, redirect *tg.Upload
 	return data, nil
 }
 
+// floodRetry retries fn (an RPC call reporting only its error) up to maxFloodRetries times on
+// FLOOD_WAIT_%d — the same budget as uploadGetFileWithRetry, for CDN call sites whose request/
+// response shapes don't fit that helper directly.
+func floodRetry(ctx context.Context, fn func() error) error {
+	for attempt := 0; ; attempt++ {
+		err := fn()
+		if err == nil {
+			return nil
+		}
+		if attempt >= maxFloodRetries {
+			return err
+		}
+		ok, fwErr := tgerr.FloodWait(ctx, err)
+		if fwErr != nil {
+			return fwErr
+		}
+		if !ok {
+			return err
+		}
+	}
+}
+
 func getCDNFile(ctx context.Context, api *tg.Client, redirect *tg.UploadFileCDNRedirect, offset, limit int64) ([]byte, []byte, error) {
-	res, err := api.UploadGetCDNFile(ctx, &tg.UploadGetCDNFileRequest{
-		Offset:    offset,
-		Limit:     int(limit),
-		FileToken: redirect.FileToken,
+	var res tg.UploadCDNFileClass
+	err := floodRetry(ctx, func() error {
+		var rpcErr error
+		res, rpcErr = api.UploadGetCDNFile(ctx, &tg.UploadGetCDNFileRequest{
+			Offset:    offset,
+			Limit:     int(limit),
+			FileToken: redirect.FileToken,
+		})
+		return rpcErr
 	})
 	if err != nil {
 		return nil, nil, err

@@ -9,10 +9,11 @@ bool oxplayerStreamDirectMkvUrl(String url) {
 }
 
 /// Progressive byte-range sources that must not get MPV's short reopen-retry loop.
-/// Includes Telegram loopback HTTP bridge (gotd) — same seek/buffer semantics as ox-stream MKV.
+/// Includes Telegram direct-play (gotd) via either transport — loopback HTTP bridge or (Windows)
+/// stream_cb — same seek/buffer semantics as ox-stream MKV.
 bool oxplayerStreamProgressiveHttpUrl(String url) {
   if (!OxplayerEnv.isEnabled) return false;
-  return oxplayerStreamDirectMkvUrl(url) || oxplayerIsTdlibHttpBridgeUrl(url);
+  return oxplayerStreamDirectMkvUrl(url) || oxplayerIsTelegramDirectPlayUrl(url);
 }
 
 /// Large client-side resume/seek on progressive HTTP needs long MPV load grace.

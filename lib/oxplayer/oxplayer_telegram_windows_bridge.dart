@@ -6,6 +6,7 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'package:fladder/oxplayer/oxplayer_telegram_stream_cb.dart';
 import 'package:fladder/oxplayer/oxplayer_telegram_windows_ffi.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
 
@@ -150,7 +151,10 @@ class OxTelegramWindowsBridge {
   }
 
   Future<String> startPlaybackSession(OxTdlibPlaybackSource source) async {
-    // Windows always uses HTTP bridge + libmpv (no Exo / tdlib-file://).
+    // Windows: gotd direct-play via libmpv stream_cb — replaces the HTTP loopback bridge
+    // entirely (see go/oxtelegram/cshared/stream_cb.go). ox_start_playback still runs the real
+    // resolve/download/registration; only the URL handed to mpv changes from an HTTP loopback
+    // URL to a gotdstream:// one, via ox_stream_uri_for_current_playback.
     final ch = source.channelUsername.toNativeUtf8();
     try {
       final urlPtr = _native.startPlayback(ch, source.messageId);
@@ -158,7 +162,16 @@ class OxTelegramWindowsBridge {
         final msg = _native.readCString(_native.lastError());
         throw OxTelegramNativeException(msg.isEmpty ? 'startPlayback failed' : msg);
       }
-      return _native.readCString(urlPtr);
+      // The HTTP loopback URL itself is unused now — still free the native CString it holds.
+      _native.free(urlPtr);
+      final streamUri = OxplayerTelegramStreamCb.currentStreamUri();
+      if (streamUri == null) {
+        final msg = _native.readCString(_native.lastError());
+        throw OxTelegramNativeException(
+          msg.isEmpty ? 'stream_cb: no active playback session after startPlayback' : msg,
+        );
+      }
+      return streamUri;
     } finally {
       malloc.free(ch);
     }

@@ -28,6 +28,7 @@ import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_mpv.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
+import 'package:fladder/oxplayer/oxplayer_telegram_stream_cb.dart';
 import 'package:fladder/oxplayer/oxplayer_audio_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_http_auth.dart';
@@ -66,6 +67,16 @@ class LibMPV extends BasePlayer {
   bool _isFading = false;
   bool _subtitleTextSeen = false;
   int _externalSubtitleLoadGen = 0;
+  // mpv's own log stream (decode/demux warnings+errors) can burst into hundreds of lines/sec
+  // during a bad decode stretch (observed live: an HEVC ref-frame error storm during a Telegram
+  // FLOOD_WAIT-induced resync flooded OxplayerStreamLog.event's debugPrint/developer.log calls
+  // fast enough to make the whole app unresponsive — "Not Responding", force-stopped by the
+  // user, no actual native crash was ever recorded in Windows' Application Error log). Throttled
+  // per-second below; only the count of drops is logged, not each dropped line.
+  DateTime _mpvLogWindowStart = DateTime.now();
+  int _mpvLogCountInWindow = 0;
+  int _mpvLogDroppedInWindow = 0;
+  static const _mpvLogMaxPerSecond = 20;
   // Keyed by DeliveryUrl (path only). Server-side extraction is a fresh ffmpeg pass every
   // request (Cache-Control: no-store, no server cache) taking 30-90s, so toggling a subtitle
   // track off/on repeatedly without this looks broken/unresponsive rather than merely slow.
@@ -122,6 +133,11 @@ class LibMPV extends BasePlayer {
         libassAndroidFont: OxSubtitleFont.libassFontForPlayer,
         libass: !kIsWeb && settings.useLibass,
         bufferSize: settings.bufferSize * 1024 * 1024, // MPV uses buffer size in bytes
+        // mpv's own protocol/demuxer errors (e.g. a custom stream_cb protocol failing to open)
+        // never reach OX_STREAM/OX_AUDIO otherwise — they stay inside libmpv unless explicitly
+        // requested via mpv_request_log_messages. 'warn' is enough for real failures without
+        // flooding logs with routine 'v'/'debug' chatter.
+        logLevel: mpv.MPVLogLevel.warn,
       ),
     );
 
@@ -133,6 +149,7 @@ class LibMPV extends BasePlayer {
         ),
       );
       _setupPlayerStreams(_player!);
+      await _registerStreamCb(_player!);
     }
 
     if (_player?.platform is mpv.NativePlayer) {
@@ -181,6 +198,28 @@ class LibMPV extends BasePlayer {
     _stateController.add(state);
   }
 
+  void _handleMpvLog(mpv.PlayerLog log) {
+    final now = DateTime.now();
+    if (now.difference(_mpvLogWindowStart) >= const Duration(seconds: 1)) {
+      if (_mpvLogDroppedInWindow > 0) {
+        OxplayerStreamLog.event('mpv_log_throttled', fields: {'droppedLastSecond': _mpvLogDroppedInWindow});
+      }
+      _mpvLogWindowStart = now;
+      _mpvLogCountInWindow = 0;
+      _mpvLogDroppedInWindow = 0;
+    }
+    if (_mpvLogCountInWindow >= _mpvLogMaxPerSecond) {
+      _mpvLogDroppedInWindow++;
+      return;
+    }
+    _mpvLogCountInWindow++;
+    OxplayerStreamLog.event('mpv_log', fields: {
+      'level': log.level,
+      'prefix': log.prefix,
+      'text': log.text,
+    });
+  }
+
   void _cancelPlayerStreams() {
     for (final sub in _playerStreamSubs) {
       sub.cancel();
@@ -190,6 +229,7 @@ class LibMPV extends BasePlayer {
 
   void _setupPlayerStreams(mpv.Player player) {
     _playerStreamSubs.addAll([
+      player.stream.log.listen(_handleMpvLog),
       player.stream.playing.listen((value) {
         if (value && _player?.state.volume == 0 && _preferredVolume > 0) {
           _logAudio('volume_restore_on_play', fields: {'reason': 'playing_event'});
@@ -245,6 +285,29 @@ class LibMPV extends BasePlayer {
     ]);
   }
 
+  /// Registers the "gotdstream://" stream_cb protocol on [player]'s own mpv_handle (Windows
+  /// only — no-ops elsewhere). Must run for every new mpv.Player, not just the first: this is a
+  /// per-handle registration (see OxplayerTelegramStreamCb), so crossfadeToUrl's incomingPlayer
+  /// needs its own call too, or its gotdstream:// loads fail as an unrecognized protocol.
+  Future<void> _registerStreamCb(mpv.Player player) async {
+    OxplayerStreamLog.event('stream_cb_register_entry', fields: {
+      'oxplayerEnvEnabled': OxplayerEnv.isEnabled,
+      'targetPlatform': defaultTargetPlatform.name,
+      'isNativePlayer': player.platform is mpv.NativePlayer,
+    });
+    if (!OxplayerEnv.isEnabled ||
+        (defaultTargetPlatform != TargetPlatform.windows && defaultTargetPlatform != TargetPlatform.android)) {
+      return;
+    }
+    if (player.platform is! mpv.NativePlayer) return;
+    try {
+      final handle = await player.handle;
+      OxplayerTelegramStreamCb.registerOn(handle);
+    } catch (error) {
+      OxplayerStreamLog.event('stream_cb_register_handle_error', fields: {'error': error.toString()});
+    }
+  }
+
   Future<void> crossfadeToUrl(String url, Duration startPosition, {double? replayGainDb}) async {
     if (!_settings.enableCrossfade || !VideoPlayerSettingsModel.crossfadeSupportedOnCurrentPlatform) {
       await _applyReplayGainSettings(trackGainDb: replayGainDb);
@@ -280,6 +343,7 @@ class LibMPV extends BasePlayer {
       await native.setProperty('start', '${startPosition.inMilliseconds / 1000}');
     }
 
+    await _registerStreamCb(incomingPlayer);
     await _applyReplayGainSettings(trackGainDb: replayGainDb, targetPlayer: incomingPlayer);
     await incomingPlayer.setVolume(0.0);
     await incomingPlayer.open(mpv.Media(url), play: true);
@@ -357,7 +421,10 @@ class LibMPV extends BasePlayer {
     // connection at the resume offset) — playback looks "stuck" forever even though bytes are
     // streaming in fine. Open at 0 like a normal load instead and let the deferred
     // `_player?.seek(startPosition)` below (after the file is actually ready) do the seek.
-    final tdlibBridge = oxplayerIsTdlibHttpBridgeUrl(url);
+    // Same caution applies to the stream_cb transport (gotdstream://): the early byte-offset
+    // seek this avoids happens in mpv/ffmpeg's demuxer layer, not the HTTP stream driver
+    // specifically, so it isn't specific to the HTTP bridge.
+    final tdlibBridge = oxplayerIsTelegramDirectPlayUrl(url);
     _remuxTimelineBase = serverSeek ? startPosition : Duration.zero;
 
     if (oxStreamResumeSeek) {
@@ -381,10 +448,10 @@ class LibMPV extends BasePlayer {
 
     url = OxplayerStreamHttpAuth.stripAndRegister(url);
 
-    // Telegram loopback progressive: bigger demuxer cache so forward seek doesn't underrun
-    // while MTProto fills the next Range window.
+    // Telegram direct-play progressive (HTTP bridge or stream_cb): bigger demuxer cache so
+    // forward seek doesn't underrun while MTProto fills the next window.
     if (OxplayerEnv.isEnabled &&
-        oxplayerIsTdlibHttpBridgeUrl(url) &&
+        oxplayerIsTelegramDirectPlayUrl(url) &&
         _player?.platform is mpv.NativePlayer) {
       final native = _player!.platform as dynamic;
       try {
@@ -392,6 +459,25 @@ class LibMPV extends BasePlayer {
         await native.setProperty('demuxer-max-bytes', '150MiB');
         await native.setProperty('demuxer-max-back-bytes', '50MiB');
         await native.setProperty('demuxer-readahead-secs', '20');
+      } catch (_) {/* older libmpv */}
+    }
+
+    // stream_cb (gotdstream://) only: mpv's stream/stream_cb.c registers custom protocols with
+    // STREAM_ORIGIN_UNSAFE (stream/stream_cb.c's stream_info_cb). Loads that don't carry
+    // STREAM_ORIGIN_DIRECT (mpv treats anything reached through its internal playlist mechanism
+    // this way, which loadfile always goes through) get check_origin()'d against UNSAFE and
+    // silently rejected before open_fn is ever called — confirmed by adding a log line inside
+    // the Go open_fn and seeing it never fire, while mpv logs "No protocol handler found". This
+    // property forces STREAM_ORIGIN_DIRECT for every stream open on this player instance
+    // (stream/stream.c's stream_create_instance), bypassing that check — mpv's own error message
+    // for the analogous STREAM_UNSAFE case literally names this option as the fix. Scoped to only
+    // when actually loading a gotdstream:// URL, and reset to 'no' otherwise, since it is a
+    // player-wide property (not a per-load flag) and widens what a *different*, actually-external
+    // playlist loaded later on this same player instance would be allowed to reach.
+    if (OxplayerEnv.isEnabled && _player?.platform is mpv.NativePlayer) {
+      final native = _player!.platform as dynamic;
+      try {
+        await native.setProperty('load-unsafe-playlists', oxplayerIsGotdStreamCbUrl(url) ? 'yes' : 'no');
       } catch (_) {/* older libmpv */}
     }
 
@@ -567,8 +653,21 @@ class LibMPV extends BasePlayer {
       (value) async {
         // Remux URL already includes ?start= from PlaybackInfo; do not seek again on web.
         if (serverSeek) return;
-        if (startPosition != Duration.zero && (_player?.state.position.inSeconds ?? 0) < startPosition.inSeconds - 5) {
-          await _player?.seek(startPosition);
+        if (startPosition == Duration.zero) return;
+        if ((_player?.state.position.inSeconds ?? 0) >= startPosition.inSeconds - 5) return;
+        await _player?.seek(startPosition);
+        if (tdlibBridge) {
+          // gotdstream (and, per the shared mkv/ffmpeg demuxer code path, likely the HTTP bridge
+          // too): mpv doesn't build its MKV seek index (Cues, read from near EOF) until the
+          // *first* seek is attempted, so this initial seek is reliably rejected ("error running
+          // command _command(seek, ...)") on a cold open — confirmed on-device via
+          // ox_stream_seek_fn tracing: the failing command never reaches our seek_fn at all, and
+          // mpv only starts reading near EOF (then back near the start) right after. One retry
+          // once that index read has had time to land is enough.
+          await Future.delayed(const Duration(milliseconds: 700));
+          if ((_player?.state.position.inSeconds ?? 0) < startPosition.inSeconds - 5) {
+            await _player?.seek(startPosition);
+          }
         }
       },
     );
