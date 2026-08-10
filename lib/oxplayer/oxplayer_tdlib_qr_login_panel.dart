@@ -12,8 +12,11 @@ import 'package:fladder/src/tdlib_bridge.g.dart';
 import 'package:fladder/theme.dart';
 
 /// Telegram QR login token lifetime is ~30s (TDLib `auth.loginToken.expires`).
-/// Refresh slightly early so the on-screen code never sits expired.
-const _kQrRefreshInterval = Duration(seconds: 25);
+/// Countdown is display-only — gotd refreshes tokens itself and pushes a new URL via
+/// auth state. Do NOT call [OxplayerTdlibBridgeController.requestQrLogin] on expiry:
+/// that cancels the in-flight QR.Auth goroutine and races phone scans into
+/// AuthLoginTokenMigrateTo failures.
+const _kQrRefreshInterval = Duration(seconds: 30);
 
 /// Android TV sign-in for OXPlayer: QR-first (remote typing is bad UX). Optional
 /// [onUsePhoneNumber] lets the user focus a button and switch to the phone panel.
@@ -53,11 +56,13 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
   bool _twoFactorHandedOff = false;
   bool _starting = false;
   bool _refreshingQr = false;
+  bool _scanConfirming = false;
   String? _error;
   String? _shownQrUrl;
   Timer? _urlWaitTimer;
   Timer? _expiryTimer;
   Timer? _countdownTicker;
+  Timer? _confirmWatchdog;
   int _qrRetryCount = 0;
   DateTime? _qrIssuedAt;
   int _secondsUntilRefresh = 0;
@@ -74,6 +79,7 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
     _urlWaitTimer?.cancel();
     _expiryTimer?.cancel();
     _countdownTicker?.cancel();
+    _confirmWatchdog?.cancel();
     _controller.removeListener(_onStateChanged);
     _passwordController.dispose();
     _phoneOptionFocus.dispose();
@@ -111,32 +117,19 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
     _countdownTicker?.cancel();
     _qrIssuedAt = DateTime.now();
     _secondsUntilRefresh = _kQrRefreshInterval.inSeconds;
-    _expiryTimer = Timer(_kQrRefreshInterval, () {
-      if (!mounted) return;
-      if (_controller.state.kind == OxTdlibAuthStateKind.ready) return;
-      _log('QR refresh timer fired — requesting new token');
-      unawaited(_refreshQr());
-    });
+    // Display-only countdown. gotd re-exports when the token expires and emits a new
+    // waitingForQrConfirmation URL — we re-arm from _onStateChanged. No requestQrLogin.
     _countdownTicker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || _qrIssuedAt == null) return;
       final left = _kQrRefreshInterval.inSeconds -
           DateTime.now().difference(_qrIssuedAt!).inSeconds;
-      setState(() => _secondsUntilRefresh = left.clamp(0, _kQrRefreshInterval.inSeconds));
+      final clamped = left.clamp(0, _kQrRefreshInterval.inSeconds);
+      setState(() {
+        _secondsUntilRefresh = clamped;
+        // At 0 show "Refreshing…" until gotd pushes the next URL (re-arms above).
+        _refreshingQr = clamped == 0;
+      });
     });
-  }
-
-  Future<void> _refreshQr() async {
-    if (_refreshingQr) return;
-    setState(() => _refreshingQr = true);
-    try {
-      await _controller.requestQrLogin();
-      // New URL arrives via onAuthStateChanged → re-arms expiry.
-    } catch (e) {
-      _log('QR refresh failed: $e');
-      if (mounted) setState(() => _error = oxTdlibAuthUserMessage(e));
-    } finally {
-      if (mounted) setState(() => _refreshingQr = false);
-    }
   }
 
   Future<void> _requestQr() async {
@@ -176,14 +169,34 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
     if (!mounted) return;
     final state = _controller.state;
     final url = state.qrLoginUrl;
-    _log('state=${state.kind.name} url=${url != null}');
+    _log('state=${state.kind.name} url=${url != null && url.isNotEmpty}');
+
+    final confirming = state.kind == OxTdlibAuthStateKind.waitingForQrConfirmation &&
+        (url == null || url.isEmpty);
+    if (confirming && !_scanConfirming) {
+      _armConfirmWatchdog();
+    } else if (!confirming) {
+      _confirmWatchdog?.cancel();
+    }
+    _scanConfirming = confirming;
+
     if (url != null && url.isNotEmpty) {
       _urlWaitTimer?.cancel();
       _qrRetryCount = 0;
+      final notice = state.errorMessage;
+      final expiredNotice = notice != null &&
+          notice.toUpperCase().contains('AUTH_TOKEN');
       if (url != _shownQrUrl) {
         _shownQrUrl = url;
         _armExpiryRefresh();
         _log('QR URL updated (${url.length}c) — refresh timer armed');
+        if (expiredNotice) {
+          setState(() => _error = oxTdlibAuthUserMessage(notice));
+          return;
+        }
+      } else if (expiredNotice) {
+        setState(() => _error = oxTdlibAuthUserMessage(notice));
+        return;
       }
     }
     setState(() {});
@@ -194,6 +207,7 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
       _expiryTimer?.cancel();
       _countdownTicker?.cancel();
       _urlWaitTimer?.cancel();
+      _confirmWatchdog?.cancel();
       _log('2FA required — handing off to phone login panel');
       widget.onNeedTwoFactorPassword!();
       return;
@@ -201,11 +215,52 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
     if (state.kind == OxTdlibAuthStateKind.ready && !_oxExchangeStarted) {
       _expiryTimer?.cancel();
       _countdownTicker?.cancel();
+      _confirmWatchdog?.cancel();
       _oxExchangeStarted = true;
       unawaited(_exchangeWithOxApi());
     }
     if (state.kind == OxTdlibAuthStateKind.failed) {
-      setState(() => _error = state.errorMessage ?? 'Telegram auth failed');
+      final raw = state.errorMessage ?? 'Telegram auth failed';
+      final friendly = oxTdlibAuthUserMessage(raw);
+      final upper = raw.toUpperCase();
+      if (upper.contains('AUTH_TOKEN')) {
+        // Should be rare after native recovery — still unstick UI + mint new QR.
+        setState(() => _error = friendly);
+        unawaited(_recoverFreshQr());
+        return;
+      }
+      setState(() => _error = friendly);
+    }
+  }
+
+  void _armConfirmWatchdog() {
+    _confirmWatchdog?.cancel();
+    _confirmWatchdog = Timer(const Duration(seconds: 20), () {
+      if (!mounted) return;
+      final state = _controller.state;
+      final url = state.qrLoginUrl;
+      if (state.kind != OxTdlibAuthStateKind.waitingForQrConfirmation) return;
+      if (url != null && url.isNotEmpty) return;
+      _log('confirming stuck 20s — recovering fresh QR');
+      setState(() => _error = 'Scan timed out. Scan the new QR code.');
+      unawaited(_recoverFreshQr());
+    });
+  }
+
+  Future<void> _recoverFreshQr() async {
+    _confirmWatchdog?.cancel();
+    try {
+      final kind = _controller.state.kind;
+      if (kind == OxTdlibAuthStateKind.failed ||
+          kind == OxTdlibAuthStateKind.ready ||
+          kind == OxTdlibAuthStateKind.closed) {
+        await _controller.resetForPhoneLogin();
+      }
+      await _controller.requestQrLogin();
+      _armUrlWaitTimer();
+    } catch (e) {
+      _log('recoverFreshQr failed: $e');
+      if (mounted) setState(() => _error = oxTdlibAuthUserMessage(e));
     }
   }
 
@@ -244,7 +299,12 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final state = _controller.state;
-    final qrUrl = state.qrLoginUrl ?? _shownQrUrl;
+    final liveUrl = state.qrLoginUrl;
+    final qrUrl = (liveUrl != null && liveUrl.isNotEmpty) ? liveUrl : _shownQrUrl;
+    // Native emits empty QR URL while Import runs after scan — keep last QR dimmed + spinner.
+    final scanConfirming = state.kind == OxTdlibAuthStateKind.waitingForQrConfirmation &&
+        (liveUrl == null || liveUrl.isEmpty) &&
+        (_shownQrUrl != null && _shownQrUrl!.isNotEmpty);
 
     if (state.kind == OxTdlibAuthStateKind.ready) {
       return Padding(
@@ -298,7 +358,7 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
             alignment: Alignment.center,
             children: [
               Opacity(
-                opacity: _refreshingQr ? 0.45 : 1,
+                opacity: (_refreshingQr || scanConfirming) ? 0.45 : 1,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: QrImageView(
@@ -309,14 +369,16 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
                   ),
                 ),
               ),
-              if (_refreshingQr) const CircularProgressIndicator(),
+              if (_refreshingQr || scanConfirming) const CircularProgressIndicator(),
             ],
           ),
           const SizedBox(height: 10),
           Text(
-            _refreshingQr
-                ? 'Refreshing code…'
-                : 'Code refreshes in ${_secondsUntilRefresh}s',
+            scanConfirming
+                ? 'Confirming on Telegram…'
+                : _refreshingQr
+                    ? 'Refreshing code…'
+                    : 'Code refreshes in ${_secondsUntilRefresh}s',
             style: theme.textTheme.labelMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -408,9 +470,10 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
           TextButton(
             onPressed: () {
               _qrRetryCount = 0;
-              unawaited(_start());
+              setState(() => _error = null);
+              unawaited(_recoverFreshQr());
             },
-            child: const Text('Try again'),
+            child: const Text('Get new QR'),
           ),
         ],
       ],

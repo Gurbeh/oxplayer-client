@@ -9,7 +9,7 @@ sealed class TdlibAuthState {
     data object WaitingForPhoneNumber : TdlibAuthState()
     data object WaitingForCode : TdlibAuthState()
     data class WaitingForPassword(val hint: String) : TdlibAuthState()
-    data class WaitingForQrConfirmation(val loginUrl: String) : TdlibAuthState()
+    data class WaitingForQrConfirmation(val loginUrl: String, val notice: String = "") : TdlibAuthState()
     data object Ready : TdlibAuthState()
     data object LoggingOut : TdlibAuthState()
     data object Closed : TdlibAuthState()

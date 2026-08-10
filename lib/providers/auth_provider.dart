@@ -12,6 +12,7 @@ import 'package:fladder/models/credentials_model.dart';
 import 'package:fladder/models/login_screen_model.dart';
 import 'package:fladder/oxplayer/oxplayer_api_disk_cache.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_telegram_logout.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
 import 'package:fladder/providers/favourites_provider.dart';
@@ -183,6 +184,9 @@ class AuthNotifier extends StateNotifier<LoginScreenModel> {
       await ref.read(seerrApiProvider).logout();
     } catch (e) {
       // Ignore logout errors for seerr
+    }
+    if (OxplayerConfig.isEnabled) {
+      await oxplayerLogoutTelegramSession();
     }
     clearAllProviders();
     return null;

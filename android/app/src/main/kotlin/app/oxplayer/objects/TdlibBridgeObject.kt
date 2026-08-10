@@ -328,6 +328,7 @@ private fun TdlibAuthState.toPigeon(): OxTdlibAuthState = when (this) {
         OxTdlibAuthState(
             kind = OxTdlibAuthStateKind.WAITING_FOR_QR_CONFIRMATION,
             qrLoginUrl = loginUrl,
+            errorMessage = notice.ifEmpty { null },
         )
     is TdlibAuthState.Ready ->
         OxTdlibAuthState(kind = OxTdlibAuthStateKind.READY)

@@ -50,8 +50,12 @@ func (c *Client) Configure(ctx context.Context, sink AuthEventSink) error {
 		return nil
 	}
 
+	dispatcher := tg.NewUpdateDispatcher()
 	tgClient := telegram.NewClient(c.apiID, c.apiHash, telegram.Options{
 		SessionStorage: &sessionStorageAdapter{backing: c.storage},
+		// Required for QR: UpdateLoginToken must reach qrlogin.OnLoginToken. Default
+		// (nil handler) sets NoUpdates=true and drops the scan signal.
+		UpdateHandler: dispatcher,
 	})
 
 	runCtx, cancel := context.WithCancel(context.Background())
@@ -79,7 +83,7 @@ func (c *Client) Configure(ctx context.Context, sink AuthEventSink) error {
 	c.tg = tgClient
 	c.cancel = cancel
 	c.runDone = runDone
-	c.Auth = newAuthController(tgClient, c.apiID, c.apiHash, sink)
+	c.Auth = newAuthController(tgClient, c.apiID, c.apiHash, sink, dispatcher)
 	c.mu.Unlock()
 
 	select {

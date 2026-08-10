@@ -5,11 +5,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
+import 'package:fladder/oxplayer/oxplayer_dpad_text_field.dart';
 import 'package:fladder/oxplayer/oxplayer_jellyfin_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_qr_login_panel.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
 import 'package:fladder/theme.dart';
+import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 
 /// Phone+code(+2FA) sign-in for OXPlayer: the user's real Telegram account, authenticated
 /// entirely on-device via TDLib. Once TDLib reports the account is authorized, this panel
@@ -17,8 +19,7 @@ import 'package:fladder/theme.dart';
 /// OxplayerTdlibBridgeController.authenticateWithOxApi) for an OX session — no separate bot
 /// approval step. Replaces the previous bot-QR-deep-link login (OxplayerTelegramLoginPanel).
 ///
-/// Uses Material [TextField] (not Fladder [OutlinedTextField]) so phone entry stays editable on
-/// emulators — OutlinedTextField becomes readOnly when InputDevice.dPad + useSystemIME=false.
+/// TV (D-pad) uses [OxplayerDpadTextField]: visible focus ring, Select opens system IME.
 ///
 /// TODO(l10n): strings here are hardcoded pending ARB entries; follow the oxplayerLogin* key
 /// convention used elsewhere once these are ready to localize.
@@ -51,14 +52,16 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
   final _codeFocus = FocusNode();
   final _passwordFocus = FocusNode();
   final _submitFocus = FocusNode();
+  final _eyeFocus = FocusNode();
   final _qrFocus = FocusNode();
   final _backToQrFocus = FocusNode();
-  final _togglePasswordFocus = FocusNode();
   bool _busy = false;
   /// Sync gate — [setState] `_busy` alone races keyboard Done + Continue tap → double SMS.
   bool _submitLocked = false;
   bool _exchangingWithOxApi = false;
   bool _passwordVisible = false;
+  /// Stay on 2FA UI if native briefly emits failed (wrong password) instead of waitingForPassword.
+  bool _lockOnTwoFactor = false;
   String? _error;
   bool _oxExchangeStarted = false;
   bool _qrSheetOpen = false;
@@ -70,17 +73,11 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
     _lastKind = _controller.state.kind;
     _controller.addListener(_onStateChanged);
     _phoneController.addListener(_onPhoneTextChanged);
-    // D-pad: arrow keys on TextField move the caret by default — steal Down so TV
-    // remotes can reach Continue / QR instead of trapping focus in the field.
-    _phoneFocus.onKeyEvent = _onFieldKeyEvent;
-    _codeFocus.onKeyEvent = _onFieldKeyEvent;
-    _passwordFocus.onKeyEvent = _onFieldKeyEvent;
-    // TDLib is warmed in OxplayerLoginScreen bootstrap — just focus the field.
+    // TDLib is warmed in OxplayerLoginScreen bootstrap — focus the active auth field.
+    // When QR hands off mid-2FA, kind is already waitingForPassword on first mount.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (_controller.state.kind == OxTdlibAuthStateKind.waitingForPhoneNumber) {
-        _phoneFocus.requestFocus();
-      }
+      _focusAuthField(_controller.state.kind, showIme: true);
     });
   }
 
@@ -95,22 +92,10 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
     _codeFocus.dispose();
     _passwordFocus.dispose();
     _submitFocus.dispose();
+    _eyeFocus.dispose();
     _qrFocus.dispose();
     _backToQrFocus.dispose();
-    _togglePasswordFocus.dispose();
     super.dispose();
-  }
-
-  KeyEventResult _onFieldKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    if (event.logicalKey == LogicalKeyboardKey.arrowDown ||
-        event.logicalKey == LogicalKeyboardKey.arrowRight) {
-      if (_submitFocus.canRequestFocus) {
-        _submitFocus.requestFocus();
-        return KeyEventResult.handled;
-      }
-    }
-    return KeyEventResult.ignored;
   }
 
   void _onPhoneTextChanged() {
@@ -120,19 +105,23 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
   void _onSubmitPressed() {
     if (_busy || _submitLocked) return;
     final kind = _controller.state.kind;
+    final onPassword = kind == OxTdlibAuthStateKind.waitingForPassword ||
+        (_lockOnTwoFactor && kind == OxTdlibAuthStateKind.failed);
     final canSubmit = switch (kind) {
       OxTdlibAuthStateKind.waitingForCode => _codeController.text.trim().isNotEmpty,
       OxTdlibAuthStateKind.waitingForPassword => _passwordController.text.isNotEmpty,
+      OxTdlibAuthStateKind.failed when onPassword => _passwordController.text.isNotEmpty,
       OxTdlibAuthStateKind.waitingForPhoneNumber => _phoneController.text.trim().isNotEmpty,
       _ => false,
     };
     if (!canSubmit) {
       setState(() {
-        _error = switch (kind) {
-          OxTdlibAuthStateKind.waitingForCode => 'Enter the code from Telegram',
-          OxTdlibAuthStateKind.waitingForPassword => 'Enter your two-factor password',
-          _ => 'Enter a phone number with country code',
-        };
+        _error = onPassword
+            ? 'Enter your two-factor password'
+            : switch (kind) {
+                OxTdlibAuthStateKind.waitingForCode => 'Enter the code from Telegram',
+                _ => 'Enter a phone number with country code',
+              };
       });
       return;
     }
@@ -144,31 +133,47 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
     SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
   }
 
+  void _showKeyboard() {
+    SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+  }
+
+  void _focusAuthField(OxTdlibAuthStateKind kind, {required bool showIme}) {
+    switch (kind) {
+      case OxTdlibAuthStateKind.waitingForPhoneNumber:
+        _phoneFocus.requestFocus();
+      case OxTdlibAuthStateKind.waitingForCode:
+        _codeFocus.requestFocus();
+      case OxTdlibAuthStateKind.waitingForPassword:
+        _passwordFocus.requestFocus();
+      default:
+        return;
+    }
+    if (!showIme) return;
+    // TV: Select/OK opens system IME (or mini KB if useSystemIme=false). Don't auto-open.
+    if (AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _showKeyboard();
+    });
+  }
+
   /// Close previous IME, then open the correct keyboard for the new auth step.
   /// Numeric code → text 2FA must dismiss first or Android keeps the number pad.
+  /// QR → 2FA handoff must NOT dismiss first (nothing to reset; dismiss fights IME open).
   void _syncKeyboardForAuthStep({
     required OxTdlibAuthStateKind? from,
     required OxTdlibAuthStateKind to,
   }) {
     if (from == to) return;
-    _dismissKeyboard();
-    // Let the numeric IME fully tear down before requesting text focus.
-    final delayMs = (from == OxTdlibAuthStateKind.waitingForCode &&
-            to == OxTdlibAuthStateKind.waitingForPassword)
-        ? 200
-        : 80;
+    final needsImeReset = from == OxTdlibAuthStateKind.waitingForCode &&
+        to == OxTdlibAuthStateKind.waitingForPassword;
+    if (needsImeReset) {
+      _dismissKeyboard();
+    }
+    final delayMs = needsImeReset ? 200 : 80;
     Future<void>.delayed(Duration(milliseconds: delayMs), () {
       if (!mounted) return;
-      switch (to) {
-        case OxTdlibAuthStateKind.waitingForPhoneNumber:
-          _phoneFocus.requestFocus();
-        case OxTdlibAuthStateKind.waitingForCode:
-          _codeFocus.requestFocus();
-        case OxTdlibAuthStateKind.waitingForPassword:
-          _passwordFocus.requestFocus();
-        default:
-          break;
-      }
+      _focusAuthField(to, showIme: true);
     });
   }
 
@@ -177,6 +182,14 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
     final kind = _controller.state.kind;
     final prev = _lastKind;
     _lastKind = kind;
+    if (kind == OxTdlibAuthStateKind.waitingForPassword) {
+      _lockOnTwoFactor = true;
+    } else if (kind == OxTdlibAuthStateKind.ready ||
+        kind == OxTdlibAuthStateKind.waitingForPhoneNumber ||
+        kind == OxTdlibAuthStateKind.waitingForCode ||
+        kind == OxTdlibAuthStateKind.waitingForQrConfirmation) {
+      _lockOnTwoFactor = false;
+    }
     // Drop spinner as soon as TDLib advances (WaitCode can arrive before RPC Ok returns —
     // otherwise Continue stays spinning through slow Telegram DC handshakes).
     final advancedPastSubmit = prev != kind &&
@@ -187,7 +200,10 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
       if (advancedPastSubmit) {
         _busy = false;
         // Late success after a timeout error — clear stale message.
-        _error = null;
+        // Keep error when re-entering waitingForPassword after a wrong-password attempt.
+        if (kind != OxTdlibAuthStateKind.waitingForPassword || prev != kind) {
+          _error = null;
+        }
       }
     });
     if (prev != kind) {
@@ -231,34 +247,38 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
       _error = null;
     });
     try {
-      switch (_controller.state.kind) {
-        case OxTdlibAuthStateKind.waitingForCode:
-          final code = _codeController.text.trim();
-          if (code.isEmpty) {
-            throw OxplayerTdlibBridgeException('Enter the code from Telegram');
-          }
-          // Dismiss numeric pad immediately — next step may be text 2FA password.
-          _dismissKeyboard();
-          await _controller.submitCode(code);
-          break;
-        case OxTdlibAuthStateKind.waitingForPassword:
-          if (_passwordController.text.isEmpty) {
-            throw OxplayerTdlibBridgeException('Enter your two-factor password');
-          }
-          _dismissKeyboard();
-          await _controller.submitTwoFactorPassword(_passwordController.text);
-          break;
-        case OxTdlibAuthStateKind.waitingForQrConfirmation:
-          setState(() => _error = 'Finish QR sign-in, or cancel it first.');
-          break;
-        case OxTdlibAuthStateKind.waitingForPhoneNumber:
-          await _controller.submitPhoneNumber(_phoneController.text);
-          _dismissKeyboard();
-          break;
-        default:
-          throw OxplayerTdlibBridgeException(
-            'Unexpected login state (${_controller.state.kind.name}). Use Retry on the login screen.',
-          );
+      final kind = _controller.state.kind;
+      final onPassword = kind == OxTdlibAuthStateKind.waitingForPassword ||
+          (_lockOnTwoFactor && kind == OxTdlibAuthStateKind.failed);
+      if (onPassword) {
+        if (_passwordController.text.isEmpty) {
+          throw OxplayerTdlibBridgeException('Enter your two-factor password');
+        }
+        _dismissKeyboard();
+        await _controller.submitTwoFactorPassword(_passwordController.text);
+      } else {
+        switch (kind) {
+          case OxTdlibAuthStateKind.waitingForCode:
+            final code = _codeController.text.trim();
+            if (code.isEmpty) {
+              throw OxplayerTdlibBridgeException('Enter the code from Telegram');
+            }
+            // Dismiss numeric pad immediately — next step may be text 2FA password.
+            _dismissKeyboard();
+            await _controller.submitCode(code);
+            break;
+          case OxTdlibAuthStateKind.waitingForQrConfirmation:
+            setState(() => _error = 'Finish QR sign-in, or cancel it first.');
+            break;
+          case OxTdlibAuthStateKind.waitingForPhoneNumber:
+            await _controller.submitPhoneNumber(_phoneController.text);
+            _dismissKeyboard();
+            break;
+          default:
+            throw OxplayerTdlibBridgeException(
+              'Unexpected login state (${kind.name}). Use Retry on the login screen.',
+            );
+        }
       }
     } catch (e) {
       if (mounted) setState(() => _error = oxTdlibAuthUserMessage(e));
@@ -366,25 +386,6 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
     });
   }
 
-  InputDecoration _fieldDecoration(ThemeData theme, {required String label, String? hint}) {
-    final radius = BorderRadius.circular(8);
-    return InputDecoration(
-      labelText: label,
-      hintText: hint,
-      filled: true,
-      fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-      border: OutlineInputBorder(borderRadius: radius),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: radius,
-        borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: radius,
-        borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -392,18 +393,19 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
 
     // Show QR icon whenever the phone-number Continue row is visible — not only for
     // waitingForPhoneNumber (after QR abort/reset kind can briefly be closed/failed/uninitialized).
+    final showPasswordStep = kind == OxTdlibAuthStateKind.waitingForPassword ||
+        (_lockOnTwoFactor && kind == OxTdlibAuthStateKind.failed);
     final onPhoneContinueStep = switch (kind) {
       OxTdlibAuthStateKind.waitingForCode ||
       OxTdlibAuthStateKind.waitingForPassword ||
       OxTdlibAuthStateKind.ready =>
         false,
+      OxTdlibAuthStateKind.failed when _lockOnTwoFactor => false,
       OxTdlibAuthStateKind.waitingForQrConfirmation => _qrSheetOpen,
       _ => true,
     };
     final showQrOption = widget.showQrShortcut && onPhoneContinueStep;
     final showBackToQr = widget.onBackToQr != null && onPhoneContinueStep;
-    final canSubmitPhone = kind == OxTdlibAuthStateKind.waitingForPhoneNumber &&
-        _phoneController.text.trim().isNotEmpty;
 
     if (kind == OxTdlibAuthStateKind.waitingForQrConfirmation && !_qrSheetOpen) {
       return Column(
@@ -453,57 +455,82 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
 
     late final Widget field;
     late final String buttonLabel;
-    switch (kind) {
+    final effectiveKind =
+        showPasswordStep ? OxTdlibAuthStateKind.waitingForPassword : kind;
+    switch (effectiveKind) {
       case OxTdlibAuthStateKind.waitingForCode:
-        field = TextField(
+        field = OxplayerDpadTextField(
           key: const ValueKey('tdlib-auth-code'),
           controller: _codeController,
           focusNode: _codeFocus,
+          label: 'Code',
+          hint: '• • • • •',
           keyboardType: TextInputType.number,
           textAlign: TextAlign.center,
-          textInputAction: TextInputAction.done,
           autofocus: true,
+          enabled: !_busy && !_submitLocked,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           style: theme.textTheme.headlineSmall?.copyWith(letterSpacing: 8),
-          decoration: _fieldDecoration(theme, label: 'Code', hint: '• • • • •'),
           onChanged: (_) => setState(() {}),
-          onSubmitted: (_) {
-            if (!_submitLocked && !_busy) unawaited(_submit());
+          onKeyboardClosed: () {
+            if (_codeController.text.trim().isNotEmpty && !_submitLocked && !_busy) {
+              _submitFocus.requestFocus();
+            }
           },
+          onMoveFocusDown: () => _submitFocus.requestFocus(),
         );
         buttonLabel = 'Confirm code';
         break;
       case OxTdlibAuthStateKind.waitingForPassword:
         final hint = _controller.state.passwordHint;
-        field = TextField(
-          key: const ValueKey('tdlib-auth-password'),
-          controller: _passwordController,
-          focusNode: _passwordFocus,
-          obscureText: !_passwordVisible,
-          // Text keyboard (not number pad) for 2FA cloud password.
-          keyboardType: TextInputType.visiblePassword,
-          textInputAction: TextInputAction.done,
-          autofocus: true,
-          enableSuggestions: false,
-          autocorrect: false,
-          decoration: _fieldDecoration(
-            theme,
-            label: 'Two-factor password',
-            hint: (hint != null && hint.isNotEmpty) ? hint : null,
-          ).copyWith(
-            suffixIcon: IconButton(
-              focusNode: _togglePasswordFocus,
-              tooltip: _passwordVisible ? 'Hide password' : 'Show password',
-              onPressed: () => setState(() => _passwordVisible = !_passwordVisible),
-              icon: Icon(
-                _passwordVisible ? IconsaxPlusLinear.eye_slash : IconsaxPlusLinear.eye,
+        final fieldsEnabled = !_busy && !_submitLocked;
+        field = Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: OxplayerDpadTextField(
+                key: const ValueKey('tdlib-auth-password'),
+                controller: _passwordController,
+                focusNode: _passwordFocus,
+                label: 'Two-factor password',
+                hint: (hint != null && hint.isNotEmpty) ? hint : null,
+                obscureText: !_passwordVisible,
+                keyboardType: TextInputType.visiblePassword,
+                autofocus: true,
+                enabled: fieldsEnabled,
+                onChanged: (_) => setState(() {}),
+                onKeyboardClosed: () {
+                  if (_passwordController.text.isNotEmpty && !_submitLocked && !_busy) {
+                    _submitFocus.requestFocus();
+                  }
+                },
+                onMoveFocusDown: () => _eyeFocus.requestFocus(),
               ),
             ),
-          ),
-          onChanged: (_) => setState(() {}),
-          onSubmitted: (_) {
-            if (!_submitLocked && !_busy) unawaited(_submit());
-          },
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 52,
+              height: 52,
+              child: IconButton.outlined(
+                focusNode: _eyeFocus,
+                tooltip: _passwordVisible ? 'Hide password' : 'Show password',
+                style: IconButton.styleFrom(shape: FladderTheme.largeShape).copyWith(
+                  side: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.focused)) {
+                      return BorderSide(color: theme.colorScheme.primary, width: 3);
+                    }
+                    return BorderSide(color: theme.colorScheme.outline);
+                  }),
+                ),
+                onPressed: fieldsEnabled
+                    ? () => setState(() => _passwordVisible = !_passwordVisible)
+                    : null,
+                icon: Icon(
+                  _passwordVisible ? IconsaxPlusLinear.eye_slash : IconsaxPlusLinear.eye,
+                ),
+              ),
+            ),
+          ],
         );
         buttonLabel = 'Confirm password';
         break;
@@ -540,22 +567,22 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
           ),
         );
       default:
-        field = TextField(
+        field = OxplayerDpadTextField(
           controller: _phoneController,
           focusNode: _phoneFocus,
+          label: 'Phone number',
+          hint: '+1 234 567 8900',
           keyboardType: TextInputType.phone,
-          textInputAction: TextInputAction.done,
           autofocus: true,
+          enabled: !_busy && !_submitLocked,
           autofillHints: const [AutofillHints.telephoneNumber],
-          enableSuggestions: false,
-          decoration: _fieldDecoration(
-            theme,
-            label: 'Phone number',
-            hint: '+1 234 567 8900',
-          ),
-          onSubmitted: (_) {
-            if (!_submitLocked && !_busy && canSubmitPhone) unawaited(_submit());
+          onChanged: (_) => setState(() {}),
+          onKeyboardClosed: () {
+            if (_phoneController.text.trim().isNotEmpty && !_submitLocked && !_busy) {
+              _submitFocus.requestFocus();
+            }
           },
+          onMoveFocusDown: () => _submitFocus.requestFocus(),
         );
         buttonLabel = 'Continue';
     }
@@ -605,6 +632,20 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
                     style: FilledButton.styleFrom(
                       shape: FladderTheme.largeShape,
                       minimumSize: const Size.fromHeight(52),
+                    ).copyWith(
+                      side: WidgetStateProperty.resolveWith((states) {
+                        if (states.contains(WidgetState.focused)) {
+                          return BorderSide(
+                            color: theme.colorScheme.secondary,
+                            width: 3,
+                          );
+                        }
+                        return BorderSide.none;
+                      }),
+                      elevation: WidgetStateProperty.resolveWith((states) {
+                        if (states.contains(WidgetState.focused)) return 6;
+                        return 0;
+                      }),
                     ),
                     onPressed: actionsEnabled ? _onSubmitPressed : null,
                     child: _busy

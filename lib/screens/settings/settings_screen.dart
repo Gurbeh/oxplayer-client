@@ -258,32 +258,48 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     : context.localized.logoutUserPopupContent(userName, user?.credentials.url ?? "");
                 showDialog(
                   context: context,
-                  builder: (context) => AlertDialog(
-                    title: Text(title),
-                    scrollable: true,
-                    content: Text(body),
-                    actions: [
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: Text(context.localized.cancel),
+                  barrierDismissible: false,
+                  builder: (context) {
+                    var loggingOut = false;
+                    return StatefulBuilder(
+                      builder: (context, setDialogState) => AlertDialog(
+                        title: Text(title),
+                        scrollable: true,
+                        content: Text(body),
+                        actions: [
+                          ElevatedButton(
+                            onPressed: loggingOut ? null : () => Navigator.pop(context),
+                            child: Text(context.localized.cancel),
+                          ),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom().copyWith(
+                              iconColor: WidgetStatePropertyAll(Theme.of(context).colorScheme.onErrorContainer),
+                              foregroundColor: WidgetStatePropertyAll(Theme.of(context).colorScheme.onErrorContainer),
+                              backgroundColor: WidgetStatePropertyAll(Theme.of(context).colorScheme.errorContainer),
+                            ),
+                            onPressed: loggingOut
+                                ? null
+                                : () async {
+                                    setDialogState(() => loggingOut = true);
+                                    await ref.read(authProvider.notifier).logOutUser();
+                                    if (context.mounted) {
+                                      Navigator.pop(context);
+                                      context.router.replaceAll(oxplayerSignOutRouteList());
+                                      await ref.read(authProvider.notifier).initModel();
+                                    }
+                                  },
+                            child: loggingOut
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : Text(context.localized.logout),
+                          ),
+                        ],
                       ),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom().copyWith(
-                          iconColor: WidgetStatePropertyAll(Theme.of(context).colorScheme.onErrorContainer),
-                          foregroundColor: WidgetStatePropertyAll(Theme.of(context).colorScheme.onErrorContainer),
-                          backgroundColor: WidgetStatePropertyAll(Theme.of(context).colorScheme.errorContainer),
-                        ),
-                        onPressed: () async {
-                          await ref.read(authProvider.notifier).logOutUser();
-                          if (context.mounted) {
-                            context.router.replaceAll(oxplayerSignOutRouteList());
-                            await ref.read(authProvider.notifier).initModel();
-                          }
-                        },
-                        child: Text(context.localized.logout),
-                      ),
-                    ],
-                  ),
+                    );
+                  },
                 );
               },
             ),

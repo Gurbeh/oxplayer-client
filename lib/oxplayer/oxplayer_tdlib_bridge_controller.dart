@@ -43,7 +43,12 @@ String oxTdlibAuthUserMessage(Object error) {
         ? 'Too many attempts. Wait a bit, then try again.'
         : 'Invalid phone number. Include country code (e.g. +98…).';
   }
-  if (upper.contains('PASSWORD_HASH_INVALID') || upper.contains('PASSWORD_EMPTY')) {
+  if (upper.contains('AUTH_TOKEN_EXPIRED') || upper.contains('AUTH_TOKEN_INVALID')) {
+    return 'That QR code expired. Scan the new one.';
+  }
+  if (upper.contains('PASSWORD_HASH_INVALID') ||
+      upper.contains('PASSWORD_EMPTY') ||
+      upper.contains('INVALID PASSWORD')) {
     return 'Wrong two-factor password.';
   }
   if (upper.contains('FLOOD_WAIT') || upper.contains('TOO_MANY_REQUESTS')) {
@@ -231,6 +236,11 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
       }
       await ensureConfigured();
     }
+    // OX logout does not always clear Telegram — AuthReady blocks QR/phone restart.
+    if (_state.kind == OxTdlibAuthStateKind.ready) {
+      _log('prepareForLoginScreen: Telegram still ready — reset for re-auth');
+      await resetForPhoneLogin();
+    }
     if (phoneFirst && _state.kind == OxTdlibAuthStateKind.waitingForQrConfirmation) {
       await resetForPhoneLogin();
     }
@@ -341,6 +351,20 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
   }
 
   Future<void> logOut() => _useWindows ? _windows!.logOut() : _api.logOut();
+
+  /// OX account sign-out: wipe Telegram session without re-warming the client.
+  /// Login screen [prepareForLoginScreen] / [ensureConfigured] starts a fresh client later.
+  Future<void> clearSessionAfterOxLogout() async {
+    _log('clearSessionAfterOxLogout from kind=${_state.kind.name}');
+    try {
+      await logOut();
+    } catch (e) {
+      _log('clearSessionAfterOxLogout logOut error (continuing): $e');
+    }
+    _configured = false;
+    _state = OxTdlibAuthState(kind: OxTdlibAuthStateKind.uninitialized);
+    notifyListeners();
+  }
 
   /// Abort QR (or any mid-auth) and recreate client so phone login works again.
   Future<void> resetForPhoneLogin() async {

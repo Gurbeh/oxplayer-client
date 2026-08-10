@@ -20,7 +20,10 @@ class OxTelegramAuthController(private val client: OxTelegramClient) {
             "waitingForPhoneNumber" -> TdlibAuthState.WaitingForPhoneNumber
             "waitingForCode" -> TdlibAuthState.WaitingForCode
             "waitingForPassword" -> TdlibAuthState.WaitingForPassword(passwordHint)
-            "waitingForQrConfirmation" -> TdlibAuthState.WaitingForQrConfirmation(qrLoginUrl)
+            "waitingForQrConfirmation" -> TdlibAuthState.WaitingForQrConfirmation(
+                qrLoginUrl.orEmpty(),
+                errorMessage.orEmpty(),
+            )
             "ready" -> TdlibAuthState.Ready
             "loggingOut" -> TdlibAuthState.LoggingOut
             "closed" -> TdlibAuthState.Closed

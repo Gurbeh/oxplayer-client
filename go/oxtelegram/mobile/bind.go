@@ -88,7 +88,9 @@ func (c *Client) RequestQrLogin() error {
 }
 
 func (c *Client) LogOut() error {
-	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+	// AuthLogOut can hang on bad networks; keep OX sign-out snappy. Local session wipe
+	// still runs in Kotlin after this returns.
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
 	return c.inner.Auth.LogOut(ctx)
 }

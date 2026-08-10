@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/auth"
@@ -46,19 +48,47 @@ type AuthEventSink interface {
 // auth.ErrPasswordAuthNeeded after phone SignIn (see plan Phase 1 — this is a design requirement,
 // not something to patch in later after Phase 6 device testing finds it).
 type AuthController struct {
-	tg      *telegram.Client
-	apiID   int
-	apiHash string
-	sink    AuthEventSink
+	tg         *telegram.Client
+	apiID      int
+	apiHash    string
+	sink       AuthEventSink
+	dispatcher tg.UpdateDispatcher
 
 	mu       sync.Mutex
 	phone    string
 	codeHash string
 	qrCancel context.CancelFunc
+	// loggedIn is signaled by UpdateLoginToken (QR accepted on phone). Created once;
+	// RequestQrLogin always reads this same channel.
+	loggedIn qrlogin.LoggedIn
 }
 
-func newAuthController(tgClient *telegram.Client, apiID int, apiHash string, sink AuthEventSink) *AuthController {
-	return &AuthController{tg: tgClient, apiID: apiID, apiHash: apiHash, sink: sink}
+func newAuthController(
+	tgClient *telegram.Client,
+	apiID int,
+	apiHash string,
+	sink AuthEventSink,
+	dispatcher tg.UpdateDispatcher,
+) *AuthController {
+	a := &AuthController{
+		tg:         tgClient,
+		apiID:      apiID,
+		apiHash:    apiHash,
+		sink:       sink,
+		dispatcher: dispatcher,
+	}
+	// Buffered so UpdateLoginToken is not dropped if it arrives between show() and select.
+	ch := make(chan struct{}, 1)
+	dispatcher.OnLoginToken(func(ctx context.Context, e tg.Entities, update *tg.UpdateLoginToken) error {
+		println("ox-tdlib-auth: UpdateLoginToken received")
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
+		return nil
+	})
+	a.loggedIn = ch
+	return a
 }
 
 func (a *AuthController) emit(kind AuthStateKind, qrURL, hint, errMsg string) {
@@ -124,7 +154,7 @@ func (a *AuthController) handleSignInResult(err error) error {
 		a.emit(AuthReady, "", "", "")
 		return nil
 	}
-	if errors.Is(err, auth.ErrPasswordAuthNeeded) || tgerr.Is(err, "SESSION_PASSWORD_REQUIRED") {
+	if isPasswordNeeded(err) {
 		a.emit(AuthWaitingForPassword, "", "", "")
 		return nil
 	}
@@ -132,10 +162,32 @@ func (a *AuthController) handleSignInResult(err error) error {
 	return err
 }
 
+func isPasswordNeeded(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, auth.ErrPasswordAuthNeeded) {
+		return true
+	}
+	// Phone SignIn uses SESSION_PASSWORD_REQUIRED; QR Import often returns SESSION_PASSWORD_NEEDED.
+	if tgerr.Is(err, "SESSION_PASSWORD_REQUIRED") || tgerr.Is(err, "SESSION_PASSWORD_NEEDED") {
+		return true
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "SESSION_PASSWORD_NEEDED") ||
+		strings.Contains(msg, "SESSION_PASSWORD_REQUIRED")
+}
+
 // SubmitTwoFactorPassword completes 2FA (step 3), reached from either the phone or QR flow.
+// Wrong password stays on waitingForPassword — AuthFailed would send the TV UI back to the
+// phone-number step (LoginPanel's default branch). Dart still receives the error via return.
 func (a *AuthController) SubmitTwoFactorPassword(ctx context.Context, password string) error {
 	_, err := a.tg.Auth().Password(ctx, password)
 	if err != nil {
+		if isInvalidPassword(err) {
+			a.emit(AuthWaitingForPassword, "", "", "")
+			return err
+		}
 		a.emit(AuthFailed, "", "", err.Error())
 		return err
 	}
@@ -143,16 +195,24 @@ func (a *AuthController) SubmitTwoFactorPassword(ctx context.Context, password s
 	return nil
 }
 
-// RequestQrLogin starts the QR login flow (Android TV path). Runs in its own goroutine since
-// qrlogin.QR.Auth blocks until scanned/expired/cancelled; each freshly (re)generated token fires
-// an emit(waitingForQrConfirmation, ...) with the new tg://login?token=... URL for the caller to
-// render as a QR code.
+func isInvalidPassword(err error) bool {
+	if err == nil {
+		return false
+	}
+	if tgerr.Is(err, "PASSWORD_HASH_INVALID") || tgerr.Is(err, "PASSWORD_EMPTY") {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "password_hash_invalid") ||
+		strings.Contains(msg, "invalid password") ||
+		strings.Contains(msg, "password_empty")
+}
+
+// RequestQrLogin starts the QR login flow (Android TV path). Runs in its own goroutine.
 //
-// No push-based "scanned" signal is wired up (would need a gotd/contrib-style update dispatcher,
-// out of scope for Phase 1) — QR.Auth's own periodic token-refresh loop (every ~30s per
-// Telegram's protocol) re-checks acceptance on each expiry instead, at the cost of up to ~30s
-// added latency to detect a scan versus a live push. Functionally complete; a pure UX polish
-// deferred as a follow-up, not a correctness gap.
+// Uses telegram.Client.QR() (MigrateTo wired). Acceptance is detected via UpdateLoginToken
+// and a 2s Import probe — NOT via repeated Export (each Export can mint a new token and
+// invalidate the QR the user is mid-scan). Token refresh Export runs only on expiry.
 func (a *AuthController) RequestQrLogin(ctx context.Context) error {
 	qrCtx, cancel := context.WithCancel(ctx)
 	a.mu.Lock()
@@ -162,34 +222,191 @@ func (a *AuthController) RequestQrLogin(ctx context.Context) error {
 	a.qrCancel = cancel
 	a.mu.Unlock()
 
-	go func() {
-		qr := qrlogin.NewQR(a.tg.API(), a.apiID, a.apiHash, qrlogin.Options{})
-		neverFires := make(chan struct{})
-		_, err := qr.Auth(qrCtx, qrlogin.LoggedIn(neverFires), func(showCtx context.Context, token qrlogin.Token) error {
-			a.emit(AuthWaitingForQr, token.URL(), "", "")
-			return nil
-		})
-		if err != nil {
-			if errors.Is(err, context.Canceled) {
-				return
-			}
-			if errors.Is(err, auth.ErrPasswordAuthNeeded) || tgerr.Is(err, "SESSION_PASSWORD_REQUIRED") {
-				a.emit(AuthWaitingForPassword, "", "", "")
-				return
-			}
-			a.emit(AuthFailed, "", "", err.Error())
-			return
-		}
-		a.emit(AuthReady, "", "", "")
-	}()
+	go a.runQrLogin(qrCtx)
 	return nil
+}
+
+func (a *AuthController) runQrLogin(qrCtx context.Context) {
+	qr := a.tg.QR()
+	var token qrlogin.Token
+	var expiry *time.Timer
+
+	refreshToken := func(notice string) (ok bool) {
+		t, err := qr.Export(qrCtx)
+		if err != nil {
+			_ = a.handleQrExportErr(err, func() {})
+			return false
+		}
+		if t.Empty() {
+			return false
+		}
+		token = t
+		a.emit(AuthWaitingForQr, token.URL(), "", notice)
+		if expiry != nil {
+			expiry.Reset(tokenExpiresIn(token))
+		}
+		return true
+	}
+
+	tryImport := func() (done bool) {
+		// Empty QR URL = "confirming" UI on the Flutter QR panel (scan accepted, Import running).
+		a.emit(AuthWaitingForQr, "", "", "")
+		_, err := qr.Import(qrCtx)
+		if err != nil && isQrStillWaiting(err) {
+			// Premature signal — restore previous QR for another attempt.
+			if !token.Empty() {
+				a.emit(AuthWaitingForQr, token.URL(), "", "")
+			}
+			return false
+		}
+		// Stale/expired token after scan — mint a fresh QR; do not AuthFailed (traps TV on spinner).
+		if err != nil && isQrTokenExpired(err) {
+			if !refreshToken("AUTH_TOKEN_EXPIRED") {
+				a.emit(AuthFailed, "", "", err.Error())
+				return true
+			}
+			return false
+		}
+		_ = a.handleSignInResult(err)
+		return true
+	}
+
+	// Mirror gotd qrlogin.Auth timing: do not Export every few seconds (mints a new QR).
+	// Acceptance: UpdateLoginToken and a probe that only reacts to MigrateTo/Success.
+	exported, err := qr.Export(qrCtx)
+	if err != nil {
+		_ = a.handleQrExportErr(err, func() { _ = tryImport() })
+		return
+	}
+	token = exported
+	if token.Empty() {
+		_ = tryImport()
+		return
+	}
+
+	until := tokenExpiresIn(token)
+	expiry = time.NewTimer(until)
+	defer expiry.Stop()
+	probe := time.NewTicker(2 * time.Second)
+	defer probe.Stop()
+	a.emit(AuthWaitingForQr, token.URL(), "", "")
+
+	for {
+		select {
+		case <-qrCtx.Done():
+			return
+		case <-a.loggedIn:
+			if tryImport() {
+				return
+			}
+		case <-probe.C:
+			// Probe without replacing the on-screen QR when still AuthLoginToken.
+			result, err := a.tg.API().AuthExportLoginToken(qrCtx, &tg.AuthExportLoginTokenRequest{
+				APIID:   a.apiID,
+				APIHash: a.apiHash,
+			})
+			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					return
+				}
+				if isPasswordNeeded(err) {
+					a.emit(AuthWaitingForPassword, "", "", "")
+					return
+				}
+				if isQrTokenExpired(err) {
+					if !refreshToken("AUTH_TOKEN_EXPIRED") {
+						return
+					}
+					continue
+				}
+				continue
+			}
+			switch result.(type) {
+			case *tg.AuthLoginToken:
+				// Still waiting — keep current QR even if server rotated the unused token.
+				continue
+			case *tg.AuthLoginTokenMigrateTo, *tg.AuthLoginTokenSuccess:
+				if tryImport() {
+					return
+				}
+			default:
+				continue
+			}
+		case <-expiry.C:
+			if !refreshToken("") {
+				return
+			}
+		}
+	}
+}
+
+func isQrTokenExpired(err error) bool {
+	if err == nil {
+		return false
+	}
+	if tgerr.Is(err, "AUTH_TOKEN_EXPIRED") || tgerr.Is(err, "AUTH_TOKEN_INVALID") {
+		return true
+	}
+	msg := strings.ToUpper(err.Error())
+	return strings.Contains(msg, "AUTH_TOKEN_EXPIRED") ||
+		strings.Contains(msg, "AUTH_TOKEN_INVALID")
+}
+
+func tokenExpiresIn(token qrlogin.Token) time.Duration {
+	until := time.Until(token.Expires()).Truncate(time.Second)
+	if until < 5*time.Second {
+		// Expires() missing/zero — Telegram tokens last ~30s; refresh slightly early.
+		return 25 * time.Second
+	}
+	return until
+}
+
+func (a *AuthController) handleQrExportErr(err error, finishImport func()) bool {
+	if errors.Is(err, context.Canceled) {
+		return true
+	}
+	if isPasswordNeeded(err) {
+		a.emit(AuthWaitingForPassword, "", "", "")
+		return true
+	}
+	var mig *qrlogin.MigrationNeededError
+	if errors.As(err, &mig) || isUnexpectedLoginTokenMigrate(err) {
+		finishImport()
+		return true
+	}
+	a.emit(AuthFailed, "", "", err.Error())
+	return true
+}
+
+// isQrStillWaiting reports Import/Export "not accepted yet" (still *tg.AuthLoginToken).
+func isQrStillWaiting(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "AuthLoginToken") &&
+		!strings.Contains(msg, "AuthLoginTokenMigrateTo") &&
+		!strings.Contains(msg, "AuthLoginTokenSuccess")
+}
+
+func isUnexpectedLoginTokenMigrate(err error) bool {
+	if err == nil {
+		return false
+	}
+	// gotd v0.132 Export: errors.Errorf("unexpected type %T", result) for MigrateTo.
+	msg := err.Error()
+	return strings.Contains(msg, "unexpected type") && strings.Contains(msg, "AuthLoginTokenMigrateTo")
 }
 
 // LogOut invalidates the session server-side. The caller is responsible for wiping local session
 // storage afterward (mirrors TdlibBridgeObject.logOut's close-then-wipe ordering).
+// DeadlineExceeded/Canceled are treated as success so OX UI logout does not hang ~30s.
 func (a *AuthController) LogOut(ctx context.Context) error {
 	a.emit(AuthLoggingOut, "", "", "")
 	_, err := a.tg.API().AuthLogOut(ctx)
 	a.emit(AuthClosed, "", "", "")
+	if err != nil && (errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)) {
+		return nil
+	}
 	return err
 }
