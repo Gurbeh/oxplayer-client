@@ -352,6 +352,30 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
 
   Future<void> logOut() => _useWindows ? _windows!.logOut() : _api.logOut();
 
+  /// True when TDLib finished AuthorizationStateReady (persisted user session on device).
+  ///
+  /// Used on cold start to keep OX sessions that already completed Telegram sign-in, while
+  /// forcing re-login for legacy bot/deep-link OX sessions that have no MTProto session.
+  /// Fail-open on configure/init errors so a transient Telegram outage does not wipe OX tokens.
+  Future<bool> hasReadyUserSession({
+    Duration readyTimeout = const Duration(seconds: 25),
+  }) async {
+    try {
+      await ensureConfigured(readyTimeout: readyTimeout);
+    } catch (e) {
+      _log('hasReadyUserSession: ensureConfigured failed ($e) — fail-open');
+      return true;
+    }
+    final kind = _state.kind;
+    if (kind == OxTdlibAuthStateKind.ready) {
+      _log('hasReadyUserSession: ready');
+      return true;
+    }
+    // No completed Telegram user session (or mid-login leftover).
+    _log('hasReadyUserSession: not ready kind=${kind.name}');
+    return false;
+  }
+
   /// OX account sign-out: wipe Telegram session without re-warming the client.
   /// Login screen [prepareForLoginScreen] / [ensureConfigured] starts a fresh client later.
   Future<void> clearSessionAfterOxLogout() async {

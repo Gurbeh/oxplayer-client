@@ -1,5 +1,11 @@
+import 'dart:io';
+
 import 'package:fladder/models/account_model.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_session.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
+import 'package:fladder/providers/auth_provider.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum OxplayerSplashAuthResult {
@@ -13,13 +19,36 @@ enum OxplayerSplashAuthResult {
   sessionWithLock,
 }
 
+bool _oxTdlibSessionGateSupported() {
+  if (kIsWeb) return false;
+  try {
+    return Platform.isAndroid || Platform.isWindows;
+  } catch (_) {
+    return false;
+  }
+}
+
 /// OX cold-start: restore API session for any saved account, then decide lock vs home.
+///
+/// When this build has TDLib credentials, also require a **ready** Telegram user-session
+/// on device. Legacy OX logins (bot deep-link) without MTProto are signed out so the user
+/// re-authenticates via Telegram. Users who already completed Telegram sign-in stay signed in.
 Future<OxplayerSplashAuthResult> oxplayerResolveSplashAuth(
   WidgetRef ref,
   AccountModel account,
 ) async {
   final sessionOk = await oxplayerRestoreSession(ref, account);
   if (!sessionOk) return OxplayerSplashAuthResult.needsLogin;
+
+  if (OxplayerEnv.telegramDirectPlayConfigured && _oxTdlibSessionGateSupported()) {
+    final hasTelegramSession =
+        await OxplayerTdlibBridgeController.instance().hasReadyUserSession();
+    if (!hasTelegramSession) {
+      // Full OX logout (clears tokens + account). Does not wipe a missing Telegram session.
+      await ref.read(authProvider.notifier).logOutUser();
+      return OxplayerSplashAuthResult.needsLogin;
+    }
+  }
 
   if (account.askForAuthOnLaunch && account.authMethod.shouldLock) {
     return OxplayerSplashAuthResult.sessionWithLock;
