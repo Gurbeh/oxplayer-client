@@ -183,7 +183,11 @@ class _ItemDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
                         ? MediaStreamHelper(
                             mediaStream: details.episode!.mediaStreams,
                             onItemChanged: (changed) {
-                              oxplayerOnUserMediaStreamsChanged(ref, changed);
+                              oxplayerOnUserMediaStreamsChanged(
+                                ref,
+                                changed,
+                                itemId: details.episode!.id,
+                              );
                               final updateEpisode = details.episode!.copyWith(
                                 mediaStreams: changed,
                               );

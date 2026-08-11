@@ -187,7 +187,11 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                             ? MediaStreamHelper(
                                 mediaStream: details.mediaStreams,
                                 onItemChanged: (changed) {
-                                  oxplayerOnUserMediaStreamsChanged(ref, changed);
+                                  oxplayerOnUserMediaStreamsChanged(
+                                    ref,
+                                    changed,
+                                    itemId: details.id,
+                                  );
                                   ref
                                       .read(providerInstance.notifier)
                                       .setMediaStreamHelper(changed);

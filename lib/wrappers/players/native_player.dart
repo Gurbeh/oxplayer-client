@@ -236,6 +236,7 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
             selectedIndex: model.mediaStreams?.defaultSubStreamIndex,
             serverDefaultIndex: model.mediaStreams?.defaultSubStreamIndex,
             subStreams: model.subStreams,
+            mediaSourceName: model.mediaStreams?.currentVersionStream?.name,
           ) ??
           model.mediaStreams?.defaultSubStreamIndex ??
           1,

@@ -140,15 +140,31 @@ fun ExoPlayer.isInternalSubtitleTrackSelected(subtitleTrack: InternalTrack): Boo
 @OptIn(UnstableApi::class)
 fun ExoPlayer.clearSubtitleTrack() {
     val selector = trackSelector as? DefaultTrackSelector ?: return
-    val newParams = selector.buildUponParameters()
-        .setRendererDisabled(C.TRACK_TYPE_TEXT, false)
+    val mapped = selector.currentMappedTrackInfo
+    val params = this.trackSelectionParameters.buildUpon()
         .setPreferredTextLanguage(null)
+        .setSelectUndeterminedTextLanguage(false)
+        .clearOverridesOfType(C.TRACK_TYPE_TEXT)
         .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-        .build()
-    selector.setParameters(newParams)
 
-    this.trackSelectionParameters = selector.parameters.buildUpon()
-        .build()
+    // Explicitly disable every mapped text group so ASS bitmap + text siblings both go off.
+    if (mapped != null) {
+        for (rendererIndex in 0 until mapped.rendererCount) {
+            if (mapped.getRendererType(rendererIndex) != C.TRACK_TYPE_TEXT) continue
+            val groups = mapped.getTrackGroups(rendererIndex)
+            for (groupIndex in 0 until groups.length) {
+                params.addOverride(TrackSelectionOverride(groups[groupIndex], emptyList()))
+            }
+        }
+    }
+
+    selector.setParameters(
+        selector.buildUponParameters()
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+            .setPreferredTextLanguage(null)
+            .build()
+    )
+    this.trackSelectionParameters = params.build()
 }
 
 @OptIn(UnstableApi::class)
@@ -168,29 +184,48 @@ fun ExoPlayer.enableSubtitles(language: String? = null) {
 @OptIn(UnstableApi::class)
 fun ExoPlayer.setInternalSubtitleTrack(subtitleTrack: InternalTrack) {
     try {
-        enableSubtitles()
         val selector = trackSelector as? DefaultTrackSelector ?: return
         val mapped = selector.currentMappedTrackInfo ?: return
-        val groups = mapped.getTrackGroups(subtitleTrack.rendererIndex)
-        if (subtitleTrack.groupIndex >= groups.length) return
+        if (subtitleTrack.rendererIndex >= mapped.rendererCount) return
+        val wantedGroups = mapped.getTrackGroups(subtitleTrack.rendererIndex)
+        if (subtitleTrack.groupIndex >= wantedGroups.length) return
 
-        val group = groups[subtitleTrack.groupIndex]
-        val override = TrackSelectionOverride(group, subtitleTrack.trackIndex)
+        // Do not call enableSubtitles(preferredLanguage): preferred-language auto-select
+        // re-enables sibling text groups alongside the explicit override.
+        val params = this.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+            .setPreferredTextLanguage(null)
+            .setSelectUndeterminedTextLanguage(false)
+            .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+
+        // One softsub only. ass-media LEGACY emits ASS as bitmap cues on one group while
+        // Media3 may still default-select a parallel text/SSA group → small ASS + large
+        // CaptionStyleCompat text both on SubtitleView until other groups are disabled.
+        for (rendererIndex in 0 until mapped.rendererCount) {
+            if (mapped.getRendererType(rendererIndex) != C.TRACK_TYPE_TEXT) continue
+            val groups = mapped.getTrackGroups(rendererIndex)
+            for (groupIndex in 0 until groups.length) {
+                val group = groups[groupIndex]
+                if (rendererIndex == subtitleTrack.rendererIndex &&
+                    groupIndex == subtitleTrack.groupIndex
+                ) {
+                    params.addOverride(
+                        TrackSelectionOverride(group, listOf(subtitleTrack.trackIndex)),
+                    )
+                } else {
+                    params.addOverride(TrackSelectionOverride(group, emptyList()))
+                }
+            }
+        }
 
         selector.setParameters(
             selector.buildUponParameters()
                 .setRendererDisabled(subtitleTrack.rendererIndex, false)
-                .build()
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                .setPreferredTextLanguage(null)
+                .build(),
         )
-
-        // Clear text overrides first so the first selection after prepare always
-        // triggers a fresh TextRenderer → SubtitleView bind (avoids "selected in UI
-        // but invisible until user toggles track" on some Media3 builds).
-        this.trackSelectionParameters = this.trackSelectionParameters
-            .buildUpon()
-            .clearOverridesOfType(C.TRACK_TYPE_TEXT)
-            .setOverrideForType(override)
-            .build()
+        this.trackSelectionParameters = params.build()
     } catch (e: Exception) {
         e.printStackTrace()
     }

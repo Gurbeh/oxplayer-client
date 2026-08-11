@@ -6,6 +6,7 @@ import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_prefetch.dart';
 import 'package:fladder/oxplayer/oxplayer_share.dart';
 
 /// Delivery / track flavor for a file variant (soft sub, dubbed, etc.).
@@ -297,8 +298,18 @@ void oxplayerRememberMediaStreamsSelection(WidgetRef ref, MediaStreamsModel stre
   ref.read(oxMediaVariantPreferenceProvider.notifier).rememberStream(current);
 }
 
-MediaStreamsModel oxplayerOnUserMediaStreamsChanged(WidgetRef ref, MediaStreamsModel changed) {
+MediaStreamsModel oxplayerOnUserMediaStreamsChanged(
+  WidgetRef ref,
+  MediaStreamsModel changed, {
+  String? itemId,
+}) {
   oxplayerRememberMediaStreamsSelection(ref, changed);
+  if (OxplayerConfig.isEnabled && itemId != null && itemId.isNotEmpty) {
+    final msId = changed.currentVersionStream?.id;
+    if (msId != null && msId.isNotEmpty) {
+      OxplayerPlaybackPrefetch.scheduleForItem(ref.read, itemId, mediaSourceId: msId);
+    }
+  }
   return changed;
 }
 

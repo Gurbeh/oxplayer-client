@@ -436,12 +436,6 @@ fun ExoPlayer.properlySetSubAndAudioTracks(playableData: PlayableData) {
                 Handler(Looper.getMainLooper()).post {
                     try {
                         exo.setInternalSubtitleTrack(subTrack)
-                        Handler(Looper.getMainLooper()).post {
-                            try {
-                                exo.setInternalSubtitleTrack(subTrack)
-                            } catch (_: Exception) {
-                            }
-                        }
                     } catch (_: Exception) {
                     }
                 }

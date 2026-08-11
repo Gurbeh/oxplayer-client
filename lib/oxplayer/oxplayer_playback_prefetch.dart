@@ -8,16 +8,15 @@ import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/oxplayer/ox_series_next_up.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_info_polling.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_link_cache.dart';
 import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/util/duration_extensions.dart';
 
-/// Warms PlaybackInfo + CDN byte ranges before the user taps Play.
+/// Warms PlaybackInfo (public-provider copy) and caches the playable t.me link in-memory.
 abstract final class OxplayerPlaybackPrefetch {
-  static const _dedupeTtl = Duration(seconds: 60);
-  static final Map<String, DateTime> _recent = {};
   static final Map<String, Future<void>> _inFlight = {};
 
   /// Fire-and-forget when detail screen knows the likely play target.
@@ -43,7 +42,8 @@ abstract final class OxplayerPlaybackPrefetch {
     );
   }
 
-  /// Detail prefetch + immediate re-fire on Play tap (deduped).
+  /// Detail open / quality change / Play tap — coalesce identical in-flight only.
+  /// Always refreshes the in-memory link cache when the call succeeds (process TTL = 2h).
   static void scheduleForItem(
     OxplayerRead read,
     String itemId, {
@@ -51,9 +51,7 @@ abstract final class OxplayerPlaybackPrefetch {
     String? mediaSourceId,
   }) {
     if (!OxplayerConfig.isEnabled || itemId.isEmpty || kIsWeb) return;
-    final key = _cacheKey(itemId, startPosition, mediaSourceId);
-    final last = _recent[key];
-    if (last != null && DateTime.now().difference(last) < _dedupeTtl) return;
+    final key = _cacheKey(itemId, mediaSourceId);
     if (_inFlight.containsKey(key)) return;
 
     _inFlight[key] = _run(read, itemId, startPosition: startPosition, mediaSourceId: mediaSourceId)
@@ -61,10 +59,21 @@ abstract final class OxplayerPlaybackPrefetch {
     unawaited(_inFlight[key]);
   }
 
-  static String _cacheKey(String itemId, Duration? start, String? mediaSourceId) {
-    final ticks = start?.inMilliseconds ?? 0;
+  /// Play path: wait for an in-flight prefetch for this MediaSource before falling back to API.
+  static Future<void> waitInFlightForMediaSource(String? mediaSourceId) async {
     final ms = mediaSourceId?.trim() ?? '';
-    return '$itemId|$ticks|$ms';
+    if (ms.isEmpty) return;
+    final pending = _inFlight.entries
+        .where((e) => e.key.endsWith('|$ms') || e.key == '|$ms')
+        .map((e) => e.value)
+        .toList();
+    if (pending.isEmpty) return;
+    await Future.wait(pending);
+  }
+
+  static String _cacheKey(String itemId, String? mediaSourceId) {
+    final ms = mediaSourceId?.trim() ?? '';
+    return '$itemId|$ms';
   }
 
   static Future<void> _run(
@@ -73,16 +82,13 @@ abstract final class OxplayerPlaybackPrefetch {
     Duration? startPosition,
     String? mediaSourceId,
   }) async {
-    final key = _cacheKey(itemId, startPosition, mediaSourceId);
     final userId = read(userProvider)?.id;
     if (userId == null || userId.isEmpty) return;
 
     final sw = Stopwatch()..start();
     try {
       final api = read(jellyApiProvider);
-      // The call itself is the warm-up — it triggers the backend's synchronous public-copy
-      // hydrate (tryInlinePublicProviderCopy) so a play tap right after has a ready t.me link.
-      await oxplayerPollPlaybackInfoUntilReady(() {
+      final response = await oxplayerPollPlaybackInfoUntilReady(() {
         return api.itemsItemIdPlaybackInfoPost(
           itemId: itemId,
           body: PlaybackInfoDto(
@@ -97,15 +103,20 @@ abstract final class OxplayerPlaybackPrefetch {
         );
       });
 
+      if (response.isSuccessful && response.body != null) {
+        OxplayerPlaybackLinkCache.putFromResponse(response.body);
+      }
+
       OxplayerStreamLog.event('playback_prefetch', fields: {
         'itemId': itemId,
+        'mediaSourceId': mediaSourceId,
+        'cached': response.body != null,
         'playbackInfoMs': sw.elapsedMilliseconds,
       });
-
-      _recent[key] = DateTime.now();
     } catch (e) {
       OxplayerStreamLog.event('playback_prefetch', fields: {
         'itemId': itemId,
+        'mediaSourceId': mediaSourceId,
         'error': e.runtimeType.toString(),
         'elapsedMs': sw.elapsedMilliseconds,
       });

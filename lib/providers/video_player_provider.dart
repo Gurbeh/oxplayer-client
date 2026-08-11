@@ -206,6 +206,7 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
         selectedIndex: model.mediaStreams?.defaultSubStreamIndex,
         serverDefaultIndex: model.mediaStreams?.defaultSubStreamIndex,
         subStreams: model.subStreams,
+        mediaSourceName: model.mediaStreams?.currentVersionStream?.name,
       );
       final resolvedSub = model.subStreams?.firstWhereOrNull((s) => s.index == resolvedSubIndex);
       // Route through PlaybackModel.setSubtitle (not state.setSubtitleTrack directly) so

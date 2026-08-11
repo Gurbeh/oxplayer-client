@@ -9,6 +9,7 @@ import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_media_variant.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_prefetch.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/sync_provider.dart';
@@ -70,6 +71,15 @@ class EpisodeDetailsProvider extends StateNotifier<EpisodeDetailModel> {
       );
       if (OxplayerConfig.isEnabled) {
         state = state.copyWith(episode: oxplayerPrepareEpisodeMediaStreams(state.episode, ref));
+        final ep = state.episode;
+        if (ep != null) {
+          OxplayerPlaybackPrefetch.scheduleForItem(
+            ref.read,
+            ep.id,
+            startPosition: ep.userData.playBackPosition,
+            mediaSourceId: ep.streamModel?.currentVersionStream?.id,
+          );
+        }
       }
 
       return seriesResponse;

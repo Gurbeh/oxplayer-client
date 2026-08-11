@@ -223,7 +223,11 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                         ? MediaStreamHelper(
                             mediaStream: currentEpisode.mediaStreams,
                             onItemChanged: (changed) {
-                              oxplayerOnUserMediaStreamsChanged(ref, changed);
+                              oxplayerOnUserMediaStreamsChanged(
+                                ref,
+                                changed,
+                                itemId: currentEpisode.id,
+                              );
                               final updateEpisode = currentEpisode.copyWith(
                                 mediaStreams: changed,
                               );

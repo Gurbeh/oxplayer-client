@@ -32,7 +32,9 @@ import 'package:fladder/models/syncing/sync_item.dart';
 import 'package:fladder/models/video_stream_model.dart';
 import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
 import 'package:fladder/oxplayer/oxplayer_force_repair_interceptor.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_link_cache.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_media_source.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_prefetch.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_subtitle.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
@@ -407,6 +409,7 @@ class PlaybackModelHelper {
             newStreamModel?.defaultSubStreamIndex),
         serverDefaultIndex: newStreamModel?.defaultSubStreamIndex,
         subStreams: newStreamModel?.subStreams,
+        mediaSourceName: newStreamModel?.currentVersionStream?.name,
       );
 
       //Native player does not allow for loading external subtitles with transcoding
@@ -418,6 +421,7 @@ class PlaybackModelHelper {
 
       Future<PlaybackInfoResponse?> fetchPlaybackInfo({required bool forceRepair}) async {
         if (forceRepair) {
+          OxplayerPlaybackLinkCache.invalidate(requestedMediaSourceId);
           oxplayerArmForceRepairPlayback(ref);
         }
         final response = await api.itemsItemIdPlaybackInfoPost(
@@ -437,10 +441,27 @@ class PlaybackModelHelper {
             mediaSourceId: newStreamModel?.currentVersionStream?.id,
           ),
         );
+        if (response.body != null && OxplayerEnv.isEnabled) {
+          OxplayerPlaybackLinkCache.putFromResponse(response.body);
+        }
         return response.body;
       }
 
-      var playbackInfo = await fetchPlaybackInfo(forceRepair: false);
+      PlaybackInfoResponse? playbackInfo;
+      if (OxplayerEnv.isEnabled && requestedMediaSourceId != null) {
+        playbackInfo = OxplayerPlaybackLinkCache.get(requestedMediaSourceId);
+        if (playbackInfo == null) {
+          await OxplayerPlaybackPrefetch.waitInFlightForMediaSource(requestedMediaSourceId);
+          playbackInfo = OxplayerPlaybackLinkCache.get(requestedMediaSourceId);
+        }
+        if (playbackInfo != null) {
+          OxplayerStreamLog.event('playback_link_cache_hit', fields: {
+            'itemId': item.id,
+            'mediaSourceId': requestedMediaSourceId,
+          });
+        }
+      }
+      playbackInfo ??= await fetchPlaybackInfo(forceRepair: false);
       if (playbackInfo == null) {
         return null;
       }
