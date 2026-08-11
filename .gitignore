@@ -102,3 +102,6 @@ android/.kotlin/*
 # graphify - local knowledge graph output (never commit)
 **/graphify-out/**
 **/.graphify/**
+
+# Claude Code - local runtime state (never commit)
+.claude/scheduled_tasks.lock

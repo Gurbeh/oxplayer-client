@@ -166,6 +166,24 @@ jobs:
           keyAlias=${ANDROID_KEY_ALIAS}
           EOF
 
+          # Isolated key for the `direct` flavor (GitHub/website APK) — optional so this
+          # step doesn't break existing releases before ANDROID_DIRECT_* is added to Infisical.
+          # Falls back to signing `direct` release builds with the Play key above until then.
+          if [ -n "${ANDROID_DIRECT_KEYSTORE_BASE64:-}" ] && \
+             [ -n "${ANDROID_DIRECT_KEYSTORE_PASSWORD:-}" ] && \
+             [ -n "${ANDROID_DIRECT_KEY_ALIAS:-}" ] && \
+             [ -n "${ANDROID_DIRECT_KEY_PASSWORD:-}" ]; then
+            echo "${ANDROID_DIRECT_KEYSTORE_BASE64}" | base64 --decode > android/app/keystore-direct.jks
+
+            cat > android/app/key-direct.properties <<EOF
+          storePassword=${ANDROID_DIRECT_KEYSTORE_PASSWORD}
+          keyPassword=${ANDROID_DIRECT_KEY_PASSWORD}
+          keyAlias=${ANDROID_DIRECT_KEY_ALIAS}
+          EOF
+          else
+            echo "::warning::ANDROID_DIRECT_* signing secrets not set in Infisical — 'direct' flavor (GitHub/website APK) is signed with the Play upload key instead of its own isolated key."
+          fi
+
       - uses: actions/setup-java@v5
         with:
           distribution: "zulu"
@@ -275,7 +293,7 @@ jobs:
 
       - name: Clean up keystore
         if: always()
-        run: rm -f android/app/keystore.jks android/app/key.properties
+        run: rm -f android/app/keystore.jks android/app/key.properties android/app/keystore-direct.jks android/app/key-direct.properties
 
       - name: Collect Android artifacts (development)
         if: needs.fetch-info.outputs.build_type == 'development'

@@ -12,6 +12,16 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+// `direct` flavor (GitHub/website APK) signs with its own key, isolated from the Play
+// upload key above — see android/app/src/direct/AndroidManifest.xml for why this flavor
+// exists. Optional: falls back to the `release` signingConfig when absent (e.g. local
+// builds, or before the ANDROID_DIRECT_* secrets are added to Infisical).
+def directKeystoreProperties = new Properties()
+def directKeystorePropertiesFile = file('key-direct.properties')
+if (directKeystorePropertiesFile.exists()) {
+    directKeystoreProperties.load(new FileInputStream(directKeystorePropertiesFile))
+}
+
 // Semantic version + versionCode derived from pubspec.yaml (decoupled from +N build suffix).
 def pubspecFile = file('../../pubspec.yaml')
 if (!pubspecFile.exists()) {
@@ -94,6 +104,14 @@ android {
             keyPassword keystoreProperties['keyPassword']
             storePassword keystoreProperties['storePassword']
         }
+        if (directKeystorePropertiesFile.exists()) {
+            direct {
+                storeFile file('keystore-direct.jks')
+                keyAlias directKeystoreProperties['keyAlias']
+                keyPassword directKeystoreProperties['keyPassword']
+                storePassword directKeystoreProperties['storePassword']
+            }
+        }
     }
     buildTypes {
         debug {
@@ -123,12 +141,19 @@ android {
             dimension "default"
             applicationIdSuffix ""
         }
-        // Same applicationId/signing as `production` — only the manifest differs (adds
-        // REQUEST_INSTALL_PACKAGES, see src/direct/AndroidManifest.xml). Used for the
-        // GitHub/website APK so the Play-submitted AAB never declares that permission.
+        // Same applicationId as `production` — the manifest adds REQUEST_INSTALL_PACKAGES
+        // (see src/direct/AndroidManifest.xml) and release builds sign with their own key
+        // (see signingConfigs.direct above). Used for the GitHub/website APK so the
+        // Play-submitted AAB never carries that permission or shares that key.
         direct {
             dimension "default"
             applicationIdSuffix ""
+            if (directKeystorePropertiesFile.exists()) {
+                // Applies to every build type of this flavor, including debug — harmless
+                // here since CI only writes key-direct.properties in the release job,
+                // which never also builds `directDebug` (see .github/workflows/build.yml).
+                signingConfig signingConfigs.direct
+            }
         }
     }
 }

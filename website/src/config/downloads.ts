@@ -40,3 +40,22 @@ export function resolvePlatformUrl(platformId: PlatformId, assets: { name: strin
   const asset = assets.find((a) => pattern.test(a.name));
   return asset?.browser_download_url ?? RELEASES_PAGE_URL;
 }
+
+/** Short-link slug served at oxplayer.app/dl/{slug} — kept in sync with oxplayer-be main-bot. */
+export const PLATFORM_DL_SLUGS: Record<Exclude<PlatformId, "Web">, string> = {
+  Android: "a",
+  AndroidTV: "tv",
+  iOS: "i",
+  macOS: "m",
+  Windows: "w",
+  Linux: "l",
+};
+
+export const DL_SLUG_TO_PLATFORM: Record<string, Exclude<PlatformId, "Web">> = Object.fromEntries(
+  Object.entries(PLATFORM_DL_SLUGS).map(([platform, slug]) => [slug, platform]),
+) as Record<string, Exclude<PlatformId, "Web">>;
+
+/** Shareable short download link for a platform, relative to the site root. */
+export function dlPath(platformId: Exclude<PlatformId, "Web">): string {
+  return `/dl/${PLATFORM_DL_SLUGS[platformId]}/`;
+}

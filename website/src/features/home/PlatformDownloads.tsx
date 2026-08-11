@@ -1,9 +1,8 @@
 "use client";
 
 import Button from "@/components/ui/Button";
-import { resolvePlatformUrl, type PlatformId } from "@/config/downloads";
+import { dlPath, type PlatformId } from "@/config/downloads";
 import { platforms, type Platform } from "@/config/platforms";
-import { useReleaseDownloadUrls } from "@/providers/ReleaseDownloadsProvider";
 import clsx from "clsx";
 import { useEffect, useState } from "react";
 import { FaDownload } from "react-icons/fa";
@@ -207,7 +206,6 @@ const PlatformDownloads = ({
   showDownloadMore = false,
   className = "",
 }: PlatformDownloadsProps) => {
-  const urls = useReleaseDownloadUrls();
   const [windowsDownloadUrl, setWindowsDownloadUrl] = useState<string | null>(
     null,
   );
@@ -217,8 +215,7 @@ const PlatformDownloads = ({
       <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
         {items.map((platform) => {
           const href =
-            urls[platform.id as PlatformId] ??
-            resolvePlatformUrl(platform.id, []);
+            platform.id === "Web" ? "#" : dlPath(platform.id as Exclude<PlatformId, "Web">);
 
           return (
             <PlatformCard

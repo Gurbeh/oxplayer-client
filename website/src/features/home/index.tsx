@@ -9,23 +9,20 @@ import WhyOX from "./why-ox";
 import Footer from "./footer";
 import FAQ from "./FAQ";
 import Reviews from "./reviews";
-import { ReleaseDownloadsProvider } from "@/providers/ReleaseDownloadsProvider";
 
 const Home = () => {
   return (
-    <ReleaseDownloadsProvider>
-      <div className="min-h-screen">
-        <Hero />
-        <AppShowcase />
-        <TelegramPrivacyNote />
-        <KeyFeatures />
-        <HowItWorks />
-        <WhyOX />
-        <Reviews />
-        <FAQ />
-        <Footer />
-      </div>
-    </ReleaseDownloadsProvider>
+    <div className="min-h-screen">
+      <Hero />
+      <AppShowcase />
+      <TelegramPrivacyNote />
+      <KeyFeatures />
+      <HowItWorks />
+      <WhyOX />
+      <Reviews />
+      <FAQ />
+      <Footer />
+    </div>
   );
 };
 
