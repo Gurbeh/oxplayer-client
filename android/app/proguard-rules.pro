@@ -28,3 +28,9 @@
 
 # Flutter deferred components reference Play Core; we ship a single AAB (no split APKs).
 -dontwarn com.google.android.play.core.**
+
+# OxTelegramStreamBridge: openSessionAsync/ensureAvailableAsync/cancelCurrentRead are invoked
+# from native code (go/oxtelegram/cshared_android/jni_bridge.go, CallStaticVoidMethod) —  R8 has
+# no visibility into that call site and will strip/rename these as unreachable, which makes
+# GetStaticMethodID return null and the native side abort() on the next call. Must keep whole.
+-keep class app.oxplayer.tdlibbridge.player.OxTelegramStreamBridge { *; }

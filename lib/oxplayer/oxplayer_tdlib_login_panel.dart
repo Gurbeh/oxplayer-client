@@ -469,9 +469,19 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
           textAlign: TextAlign.center,
           autofocus: true,
           enabled: !_busy && !_submitLocked,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(5),
+          ],
           style: theme.textTheme.headlineSmall?.copyWith(letterSpacing: 8),
-          onChanged: (_) => setState(() {}),
+          onChanged: (value) {
+            setState(() {});
+            // Telegram login codes are 5 digits — submit as soon as it's complete.
+            if (value.trim().length == 5 && !_submitLocked && !_busy) {
+              _dismissKeyboard();
+              unawaited(_submit());
+            }
+          },
           onKeyboardClosed: () {
             if (_codeController.text.trim().isNotEmpty && !_submitLocked && !_busy) {
               _submitFocus.requestFocus();

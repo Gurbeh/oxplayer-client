@@ -133,6 +133,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          lfs: true
 
       - uses: ./.github/actions/oxplayer-infisical-secrets
         with:
@@ -453,6 +454,8 @@ jobs:
 
   build-ios:
     needs: [fetch-info]
+    # TEMP: disabled to speed up CI while landing the 1.1.118 LFS-checkout hotfix. Revert this `if: false`.
+    if: false
     runs-on: macos-latest
     env:
       SENTRY_ENVIRONMENT: production
@@ -521,6 +524,8 @@ jobs:
 
   build-macos:
     needs: [fetch-info]
+    # TEMP: disabled to speed up CI while landing the 1.1.118 LFS-checkout hotfix. Revert this `if: false`.
+    if: false
     runs-on: macos-latest
     env:
       SENTRY_ENVIRONMENT: production
@@ -588,6 +593,8 @@ jobs:
 
   build-linux:
     needs: [fetch-info]
+    # TEMP: disabled to speed up CI while landing the 1.1.118 LFS-checkout hotfix. Revert this `if: false`.
+    if: false
     runs-on: ubuntu-latest
     env:
       SENTRY_ENVIRONMENT: production
@@ -777,11 +784,9 @@ jobs:
       - fetch-info
       - build-android
       - build-windows
-      - build-ios
-      - build-macos
-      - build-linux
-      - build-linux-flatpak
       # build-web temporarily disabled
+      # TEMP: build-ios, build-macos, build-linux, build-linux-flatpak dropped from needs
+      # while those jobs are disabled for the 1.1.118 LFS-checkout hotfix. Revert together.
     runs-on: ubuntu-latest
     if: needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly'
     permissions:
@@ -882,64 +887,8 @@ jobs:
           V="${{ steps.version.outputs.version }}"
           mv "oxplayer-windows-installer/fladder_setup.exe" "OXPlayer-Windows-${V}-Setup.exe"
 
-      - uses: actions/download-artifact@v5
-        with:
-          name: oxplayer-iOS
-          path: oxplayer-iOS
-
-      - name: Stage iOS IPA
-        shell: bash
-        run: |
-          V="${{ steps.version.outputs.version }}"
-          mv "oxplayer-iOS/iOS.ipa" "OXPlayer-iOS-${V}.ipa"
-
-      - uses: actions/download-artifact@v5
-        with:
-          name: oxplayer-macOS
-          path: oxplayer-macOS
-
-      - name: Stage macOS DMG
-        shell: bash
-        run: |
-          V="${{ steps.version.outputs.version }}"
-          mv "oxplayer-macOS/macOS.dmg" "OXPlayer-macOS-${V}.dmg"
-
-      - uses: actions/download-artifact@v5
-        with:
-          name: oxplayer-linux
-          path: oxplayer-linux
-
-      - name: Stage Linux bundle
-        shell: bash
-        run: |
-          V="${{ steps.version.outputs.version }}"
-          cd oxplayer-linux
-          zip -r "../OXPlayer-Linux-${V}.zip" .
-
-      - uses: actions/download-artifact@v5
-        if: needs.fetch-info.outputs.build_type == 'release'
-        with:
-          name: oxplayer-linux-flatpak
-          path: oxplayer-linux-flatpak
-
-      - name: Stage Linux Flatpak
-        if: needs.fetch-info.outputs.build_type == 'release'
-        shell: bash
-        run: |
-          V="${{ steps.version.outputs.version }}"
-          mv "oxplayer-linux-flatpak/OXPlayer-Linux.flatpak" "OXPlayer-Linux-${V}.flatpak"
-
-      - uses: actions/download-artifact@v5
-        with:
-          name: oxplayer-linux-appimage
-          path: oxplayer-linux-appimage
-
-      - name: Stage Linux AppImage
-        shell: bash
-        run: |
-          V="${{ steps.version.outputs.version }}"
-          mv "oxplayer-linux-appimage/OXPlayer_x86_64.AppImage" "OXPlayer-Linux-${V}.AppImage"
-          mv "oxplayer-linux-appimage/OXPlayer_x86_64.AppImage.zsync" "OXPlayer-Linux-${V}.AppImage.zsync"
+      # TEMP: iOS/macOS/Linux artifact staging skipped while those build jobs are disabled
+      # (see build-ios/build-macos/build-linux `if: false`). Revert together.
 
       # Web artifact staging skipped while build-web is disabled.
 
@@ -973,6 +922,7 @@ jobs:
             EXTRA_FLAGS=(--latest --generate-notes)
           fi
 
+          # TEMP: iOS/macOS/Linux assets dropped while those build jobs are disabled. Revert together.
           FILES=(
             "OXPlayer-Android-${V}-arm64-v8a.apk"
             "OXPlayer-Android-${V}-armeabi-v7a.apk"
@@ -980,15 +930,7 @@ jobs:
             "OXPlayer-Android-${V}.aab"
             "OXPlayer-Windows-${V}-Setup.exe"
             "OXPlayer-Windows-${V}.zip"
-            "OXPlayer-iOS-${V}.ipa"
-            "OXPlayer-macOS-${V}.dmg"
-            "OXPlayer-Linux-${V}.zip"
-            "OXPlayer-Linux-${V}.AppImage"
-            "OXPlayer-Linux-${V}.AppImage.zsync"
           )
-          if [[ "${{ needs.fetch-info.outputs.build_type }}" == "release" ]]; then
-            FILES+=("OXPlayer-Linux-${V}.flatpak")
-          fi
 
           for f in "${FILES[@]}"; do
             if [[ ! -f "$f" ]]; then
@@ -1033,6 +975,7 @@ jobs:
           make_latest: ${{ needs.fetch-info.outputs.build_type == 'release' }}
           generate_release_notes: ${{ needs.fetch-info.outputs.build_type == 'release' }}
           fail_on_unmatched_files: true
+          # TEMP: iOS/macOS/Linux assets dropped while those build jobs are disabled. Revert together.
           files: |
             OXPlayer-Android-${{ steps.version.outputs.version }}-arm64-v8a.apk
             OXPlayer-Android-${{ steps.version.outputs.version }}-armeabi-v7a.apk
@@ -1040,12 +983,6 @@ jobs:
             OXPlayer-Android-${{ steps.version.outputs.version }}.aab
             OXPlayer-Windows-${{ steps.version.outputs.version }}-Setup.exe
             OXPlayer-Windows-${{ steps.version.outputs.version }}.zip
-            OXPlayer-iOS-${{ steps.version.outputs.version }}.ipa
-            OXPlayer-macOS-${{ steps.version.outputs.version }}.dmg
-            OXPlayer-Linux-${{ steps.version.outputs.version }}.zip
-            OXPlayer-Linux-${{ steps.version.outputs.version }}.AppImage
-            OXPlayer-Linux-${{ steps.version.outputs.version }}.AppImage.zsync
-            ${{ needs.fetch-info.outputs.build_type == 'release' && format('OXPlayer-Linux-{0}.flatpak', steps.version.outputs.version) || '' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
 

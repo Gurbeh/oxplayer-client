@@ -7,6 +7,7 @@
 // Fails if:
 // - armeabi-v7a and arm64-v8a .so basenames differ (Google Play 64-bit pairing)
 // - x86 (32-bit Intel) natives are present (Flutter never ships libflutter/libapp on x86)
+// - any .so is not a real ELF binary (e.g. an unresolved Git LFS pointer stub)
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -15,6 +16,7 @@ const _arm32 = 'armeabi-v7a';
 const _arm64 = 'arm64-v8a';
 const _x64 = 'x86_64';
 const _allowedAbis = {_arm32, _arm64, _x64};
+const _elfMagic = [0x7f, 0x45, 0x4c, 0x46]; // "\x7fELF"
 
 void main(List<String> args) {
   final aab = _flagValue(args, '--aab');
@@ -50,10 +52,15 @@ Map<String, Set<String>> _libsFromDirectory(Directory root) {
   if (!root.existsSync()) {
     _fail('Directory not found: ${root.path}');
   }
+  final badMagic = <String>[];
   for (final abi in _allowedAbis) {
     final abiDir = _findAbiDir(root, abi);
     if (abiDir == null) continue;
     out[abi] = _listSo(abiDir);
+    for (final f in abiDir.listSync().whereType<File>()) {
+      if (!f.path.endsWith('.so')) continue;
+      if (!_hasElfMagic(f.readAsBytesSync())) badMagic.add(f.path);
+    }
   }
   final x86Dir = _findAbiDir(root, 'x86');
   if (x86Dir != null && _listSo(x86Dir).isNotEmpty) {
@@ -62,7 +69,21 @@ Map<String, Set<String>> _libsFromDirectory(Directory root) {
       'Exclude x86 via ndk.abiFilters (armeabi-v7a, arm64-v8a, x86_64 only).',
     );
   }
+  if (badMagic.isNotEmpty) {
+    _fail(
+      'Not real ELF binaries (e.g. unresolved Git LFS pointer stubs): '
+      '${badMagic.join(", ")}',
+    );
+  }
   return out;
+}
+
+bool _hasElfMagic(List<int> bytes) {
+  if (bytes.length < _elfMagic.length) return false;
+  for (var i = 0; i < _elfMagic.length; i++) {
+    if (bytes[i] != _elfMagic[i]) return false;
+  }
+  return true;
 }
 
 Directory? _findAbiDir(Directory root, String abi) {
@@ -91,6 +112,7 @@ Map<String, Set<String>> _libsFromArchive(String archivePath) {
   final lines = (result.stdout as String).split('\n');
   final out = <String, Set<String>>{};
   final forbiddenX86 = <String>{};
+  final soEntries = <String>[];
 
   for (final raw in lines) {
     final line = raw.trim();
@@ -106,6 +128,7 @@ Map<String, Set<String>> _libsFromArchive(String archivePath) {
     }
     if (!_allowedAbis.contains(abi)) continue;
     out.putIfAbsent(abi, () => {}).add(name);
+    soEntries.add(line);
   }
 
   if (forbiddenX86.isNotEmpty) {
@@ -113,6 +136,25 @@ Map<String, Set<String>> _libsFromArchive(String archivePath) {
       'AAB/APK contains x86 (32-bit) natives (${forbiddenX86.length} file(s)), '
       'e.g. ${forbiddenX86.take(3).join(", ")}. '
       'Use ndk.abiFilters without x86.',
+    );
+  }
+
+  final badMagic = <String>[];
+  for (final entry in soEntries) {
+    final extract = Process.runSync(
+      'unzip',
+      ['-p', archivePath, entry],
+      stdoutEncoding: null,
+    );
+    if (extract.exitCode != 0) {
+      _fail('unzip -p failed for $entry in $archivePath: ${extract.stderr}');
+    }
+    if (!_hasElfMagic(extract.stdout as List<int>)) badMagic.add(entry);
+  }
+  if (badMagic.isNotEmpty) {
+    _fail(
+      'Not real ELF binaries (e.g. unresolved Git LFS pointer stubs): '
+      '${badMagic.join(", ")}',
     );
   }
   return out;
