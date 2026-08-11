@@ -224,6 +224,7 @@ def oxGoogleServicesCandidates = [
         file("google-services.json"),
         file("src/development/google-services.json"),
         file("src/production/google-services.json"),
+        file("src/direct/google-services.json"),
 ]
 def oxGoogleServicesFile = oxGoogleServicesCandidates.find { it.isFile() }
 if (oxGoogleServicesFile != null) {

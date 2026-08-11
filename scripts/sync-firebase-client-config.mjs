@@ -5,6 +5,8 @@
  *
  * Writes:
  *   android/app/src/production/google-services.json  (app.oxplayer)
+ *   android/app/src/direct/google-services.json       (app.oxplayer, same Firebase app as production —
+ *                                                       `direct` flavor shares its applicationId)
  *   android/app/src/development/google-services.json (app.oxplayer.dev, if registered)
  *   lib/firebase_options.dart
  *
@@ -477,6 +479,8 @@ async function main() {
   if (byPackage.has(PRODUCTION_PACKAGE)) {
     const gs = await downloadGoogleServices(token, sa.project_id, byPackage.get(PRODUCTION_PACKAGE));
     outputs.push(writeGoogleServices(path.join("src", "production"), gs));
+    // `direct` flavor (GitHub/website APK) shares production's applicationId — same Firebase app.
+    outputs.push(writeGoogleServices(path.join("src", "direct"), gs));
     dartOptions.push(firebaseOptionsFromGoogleServices(gs, PRODUCTION_PACKAGE, "android"));
   }
 
