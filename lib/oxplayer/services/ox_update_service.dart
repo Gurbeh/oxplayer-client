@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
@@ -20,10 +21,34 @@ import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 
 const String kOxSkippedVersionKey = 'ox_skipped_version';
+const String _kPlayInstallerPackage = 'com.android.vending';
+
+/// Whether this Android install came from the Play Store (vs. a sideloaded APK).
+/// Cached after the first check — the installer source cannot change at runtime.
+abstract final class OxUpdateSource {
+  static bool? _isPlayInstall;
+
+  static Future<bool> isPlayInstall() async {
+    final cached = _isPlayInstall;
+    if (cached != null) return cached;
+    if (kIsWeb || !Platform.isAndroid) return false;
+
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final result = info.installerStore == _kPlayInstallerPackage;
+      _isPlayInstall = result;
+      return result;
+    } catch (_) {
+      // Unknown installer source — treat as non-Play so the sideload updater takes over.
+      return false;
+    }
+  }
+}
 
 /// Parses and compares semantic versions (`major.minor.patch`, optional pre-release ignored).
 final class OxSemver {
-  const OxSemver({required this.major, required this.minor, required this.patch});
+  const OxSemver(
+      {required this.major, required this.minor, required this.patch});
 
   final int major;
   final int minor;
@@ -87,12 +112,17 @@ final class OxOptionalUpdatePrompt {
     required this.targetVersion,
     required this.skipKey,
     required this.sharedPreferences,
+    required this.canUseFlexibleUpdate,
   });
 
   final String currentVersion;
   final String targetVersion;
   final String skipKey;
   final SharedPreferences sharedPreferences;
+
+  /// Whether "Update" should trigger Play's flexible in-app download instead of
+  /// linking out to the Play Store listing.
+  final bool canUseFlexibleUpdate;
 }
 
 /// Android-only selective in-app update flow (Play binary check + semver policy).
@@ -103,8 +133,10 @@ abstract final class OxUpdateService {
   static GlobalKey<NavigatorState>? _navigatorKey;
   static StackRouter? _router;
   static bool _dialogShowing = false;
+  static bool _pendingRestartPrompt = false;
 
   static bool get hasPendingOptionalPrompt => _pendingOptionalPrompt != null;
+  static bool get hasPendingRestartPrompt => _pendingRestartPrompt;
 
   /// Registered from [MaterialApp.router] so optional-update dialogs use a
   /// context below the route [Navigator] (not [OxUpdatePromptHost], which sits above it).
@@ -131,9 +163,13 @@ abstract final class OxUpdateService {
   }) async {
     if (!OxplayerConfig.isEnabled) return;
     if (kIsWeb || !Platform.isAndroid) return;
+    // Sideloaded APK installs can't use the Play in-app update API — OxGitHubUpdateService
+    // handles those with a self-hosted download + install flow instead.
+    if (!await OxUpdateSource.isPlayInstall()) return;
 
     try {
-      final current = OxSemver.parse(currentVersion) ?? const OxSemver(major: 0, minor: 0, patch: 0);
+      final current = OxSemver.parse(currentVersion) ??
+          const OxSemver(major: 0, minor: 0, patch: 0);
       final currentVersionCode = int.tryParse(currentBuildNumber);
 
       AppUpdateInfo? updateInfo;
@@ -146,6 +182,13 @@ abstract final class OxUpdateService {
           error: error,
           stackTrace: stackTrace,
         );
+      }
+
+      // A flexible update from a previous session already finished downloading but was
+      // never installed (app was backgrounded, not fully closed) — just nudge to restart.
+      if (updateInfo?.installStatus == InstallStatus.downloaded) {
+        _pendingRestartPrompt = true;
+        return;
       }
 
       final playReportsUpdate =
@@ -177,7 +220,8 @@ abstract final class OxUpdateService {
         backendTarget: backendTarget,
         playVersionCode: playVersionCode,
       );
-      final targetLabel = resolved?.displayVersion ?? backendTarget?.toString() ?? 'latest';
+      final targetLabel =
+          resolved?.displayVersion ?? backendTarget?.toString() ?? 'latest';
       final skipKey = _skipKeyForUpdate(
         playSignalsUpdate: playSignalsUpdate,
         playVersionCode: playVersionCode,
@@ -199,11 +243,18 @@ abstract final class OxUpdateService {
         }
       }
 
+      // Only Play-confirmed updates can use the flexible in-app flow — a backend-only
+      // target (ahead of Play's staged rollout) has nothing for Play to download yet.
+      final canUseFlexibleUpdate = playSignalsUpdate &&
+          updateInfo != null &&
+          updateInfo.flexibleUpdateAllowed;
+
       _pendingOptionalPrompt = OxOptionalUpdatePrompt(
         currentVersion: current.toString(),
         targetVersion: targetLabel,
         skipKey: skipKey,
         sharedPreferences: sharedPreferences,
+        canUseFlexibleUpdate: canUseFlexibleUpdate,
       );
     } catch (error, stackTrace) {
       developer.log(
@@ -226,7 +277,11 @@ abstract final class OxUpdateService {
   }
 
   static OxSemver? _pickTargetSemver({
-    required ({String displayVersion, String skipKey, OxSemver? targetSemver})? resolved,
+    required ({
+      String displayVersion,
+      String skipKey,
+      OxSemver? targetSemver
+    })? resolved,
     required OxSemver? backendTarget,
     required int? playVersionCode,
   }) {
@@ -234,7 +289,8 @@ abstract final class OxUpdateService {
       if (resolved?.targetSemver != null) resolved!.targetSemver!,
       if (backendTarget != null) backendTarget,
       if (playVersionCode != null)
-        if (OxSemver.fromVersionCode(playVersionCode) case final fromPlay?) fromPlay,
+        if (OxSemver.fromVersionCode(playVersionCode) case final fromPlay?)
+          fromPlay,
     ];
     return _newestSemver(candidates);
   }
@@ -265,7 +321,9 @@ abstract final class OxUpdateService {
     }
 
     final context = _navigatorKey?.currentContext;
-    if (context == null || !context.mounted || Navigator.maybeOf(context) == null) {
+    if (context == null ||
+        !context.mounted ||
+        Navigator.maybeOf(context) == null) {
       // Navigator may not exist on the first warm-up frame (see OXPLAYER-CLIENT-X).
       WidgetsBinding.instance.addPostFrameCallback((_) {
         showPendingOptionalPrompt();
@@ -287,7 +345,66 @@ abstract final class OxUpdateService {
     }
   }
 
-  static Future<({String displayVersion, String skipKey, OxSemver? targetSemver})?> _resolveUpdateTarget({
+  /// Shows a deferred "restart to install" snackbar for a flexible update that has
+  /// already finished downloading.
+  static Future<void> showPendingRestartPrompt() async {
+    if (!_pendingRestartPrompt) return;
+    if (!_isPastSplashScreen()) return;
+
+    final context = _navigatorKey?.currentContext;
+    if (context == null ||
+        !context.mounted ||
+        Navigator.maybeOf(context) == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showPendingRestartPrompt();
+      });
+      return;
+    }
+
+    _pendingRestartPrompt = false;
+    _showRestartSnackBar();
+  }
+
+  /// Starts Play's flexible in-app update: downloads in the background with Play's own
+  /// notification UI, then prompts to restart once ready.
+  static Future<void> startFlexibleUpdate() async {
+    try {
+      final result = await InAppUpdate.startFlexibleUpdate();
+      if (result == AppUpdateResult.success) {
+        _showRestartSnackBar();
+      }
+    } catch (error, stackTrace) {
+      developer.log(
+        'Flexible update failed',
+        name: 'OxUpdateService',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  static void _showRestartSnackBar() {
+    final context = _navigatorKey?.currentContext;
+    if (context == null || !context.mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(days: 1),
+        behavior: SnackBarBehavior.floating,
+        content: const Text(
+          'Update downloaded. Restart to install now — it will otherwise install next time you fully close and reopen the app.',
+        ),
+        action: SnackBarAction(
+          label: 'Restart',
+          onPressed: () => InAppUpdate.completeFlexibleUpdate(),
+        ),
+      ),
+    );
+  }
+
+  static Future<
+          ({String displayVersion, String skipKey, OxSemver? targetSemver})?>
+      _resolveUpdateTarget({
     required AppUpdateInfo updateInfo,
   }) async {
     final candidates = <OxSemver>[];
@@ -318,7 +435,8 @@ abstract final class OxUpdateService {
     return (
       displayVersion: best?.toString() ?? 'latest',
       skipKey: skipKey,
-      targetSemver: best ?? (playCode != null ? OxSemver.fromVersionCode(playCode) : null),
+      targetSemver: best ??
+          (playCode != null ? OxSemver.fromVersionCode(playCode) : null),
     );
   }
 
@@ -361,12 +479,10 @@ abstract final class OxUpdateService {
     if (base == null) return null;
 
     try {
-      final response = await _httpClient
-          .get(
-            Uri.parse('$base/ox/client/android-update'),
-            headers: const {'Accept': 'application/json'},
-          )
-          .timeout(const Duration(seconds: 8));
+      final response = await _httpClient.get(
+        Uri.parse('$base/ox/client/android-update'),
+        headers: const {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 8));
 
       if (response.statusCode != 200) return null;
 
@@ -389,7 +505,8 @@ abstract final class OxUpdateService {
     final fromDefine = define.trim();
     if (fromDefine.isNotEmpty) return fromDefine;
 
-    final fromEnv = OxplayerDotenv.get('OXPLAYER_ANDROID_MARKET_VERSION').trim();
+    final fromEnv =
+        OxplayerDotenv.get('OXPLAYER_ANDROID_MARKET_VERSION').trim();
     if (fromEnv.isNotEmpty) return fromEnv;
 
     return _targetVersionFromMapping();
@@ -448,12 +565,15 @@ class _OxOptionalUpdateDialog extends StatefulWidget {
   final OxOptionalUpdatePrompt prompt;
 
   @override
-  State<_OxOptionalUpdateDialog> createState() => _OxOptionalUpdateDialogState();
+  State<_OxOptionalUpdateDialog> createState() =>
+      _OxOptionalUpdateDialogState();
 }
 
 class _OxOptionalUpdateDialogState extends State<_OxOptionalUpdateDialog> {
-  final FocusScopeNode _focusScope = FocusScopeNode(debugLabel: 'OxOptionalUpdateDialog');
-  final FocusNode _primaryActionFocus = FocusNode(debugLabel: 'OxUpdatePrimaryAction');
+  final FocusScopeNode _focusScope =
+      FocusScopeNode(debugLabel: 'OxOptionalUpdateDialog');
+  final FocusNode _primaryActionFocus =
+      FocusNode(debugLabel: 'OxUpdatePrimaryAction');
 
   @override
   void initState() {
@@ -462,7 +582,8 @@ class _OxOptionalUpdateDialogState extends State<_OxOptionalUpdateDialog> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _requestInitialFocus();
       // Home TV rows can steal focus on the same frame they mount.
-      WidgetsBinding.instance.addPostFrameCallback((_) => _requestInitialFocus());
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _requestInitialFocus());
     });
   }
 
@@ -510,8 +631,14 @@ class _OxOptionalUpdateDialogState extends State<_OxOptionalUpdateDialog> {
             focusNode: _primaryActionFocus,
             autofocus: isDpad,
             onPressed: () async {
-              await OxUpdateService.openPlayStoreListing();
-              if (context.mounted) Navigator.of(context).pop();
+              if (prompt.canUseFlexibleUpdate) {
+                // Downloads in the background via Play's own UI — don't block the dialog on it.
+                if (context.mounted) Navigator.of(context).pop();
+                unawaited(OxUpdateService.startFlexibleUpdate());
+              } else {
+                await OxUpdateService.openPlayStoreListing();
+                if (context.mounted) Navigator.of(context).pop();
+              }
             },
             child: const Text('Update'),
           ),
@@ -546,6 +673,11 @@ final class OxUpdatePromptNavigatorObserver extends NavigatorObserver {
         OxUpdateService.showPendingOptionalPrompt();
       });
     }
+    if (OxUpdateService.hasPendingRestartPrompt) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        OxUpdateService.showPendingRestartPrompt();
+      });
+    }
     if (OxGitHubUpdateService.hasPendingOptionalPrompt) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         OxGitHubUpdateService.showPendingOptionalPrompt();
@@ -554,13 +686,16 @@ final class OxUpdatePromptNavigatorObserver extends NavigatorObserver {
   }
 
   @override
-  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) => _scheduleTryShow();
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      _scheduleTryShow();
 
   @override
-  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) => _scheduleTryShow();
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      _scheduleTryShow();
 
   @override
-  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) => _scheduleTryShow();
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) =>
+      _scheduleTryShow();
 }
 
 /// Defers optional-update UI until the widget tree has a [BuildContext].
@@ -583,6 +718,10 @@ class _OxUpdatePromptHostState extends State<OxUpdatePromptHost> {
       if (!mounted) return;
       if (OxUpdateService.hasPendingOptionalPrompt) {
         await OxUpdateService.showPendingOptionalPrompt();
+      }
+      if (!mounted) return;
+      if (OxUpdateService.hasPendingRestartPrompt) {
+        await OxUpdateService.showPendingRestartPrompt();
       }
       if (!mounted) return;
       if (OxGitHubUpdateService.hasPendingOptionalPrompt) {

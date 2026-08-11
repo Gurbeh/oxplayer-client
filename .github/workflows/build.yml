@@ -227,7 +227,7 @@ jobs:
           .github/scripts/retry_command.sh 5 60 -- \
             flutter build apk --debug --split-per-abi \
               --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
-              --flavor production \
+              --flavor direct \
               --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
 
       - name: Build Android APK and AAB
@@ -238,7 +238,7 @@ jobs:
             flutter build apk --release --split-per-abi \
               --split-debug-info=build/debug-info \
               --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
-              --flavor production \
+              --flavor direct \
               --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
           .github/scripts/retry_command.sh 5 60 -- \
             flutter build appbundle --release \
@@ -283,9 +283,9 @@ jobs:
         run: |
           mkdir -p build/app/outputs/android_artifacts
           SUF="${{ steps.meta.outputs.artifact_suffix }}"
-          cp "build/app/outputs/flutter-apk/app-armeabi-v7a-production-debug.apk" "build/app/outputs/android_artifacts/${SUF}-armeabi-v7a.apk" || true
-          cp "build/app/outputs/flutter-apk/app-arm64-v8a-production-debug.apk" "build/app/outputs/android_artifacts/${SUF}-arm64-v8a.apk" || true
-          cp "build/app/outputs/flutter-apk/app-x86_64-production-debug.apk" "build/app/outputs/android_artifacts/${SUF}-x86_64.apk" || true
+          cp "build/app/outputs/flutter-apk/app-armeabi-v7a-direct-debug.apk" "build/app/outputs/android_artifacts/${SUF}-armeabi-v7a.apk" || true
+          cp "build/app/outputs/flutter-apk/app-arm64-v8a-direct-debug.apk" "build/app/outputs/android_artifacts/${SUF}-arm64-v8a.apk" || true
+          cp "build/app/outputs/flutter-apk/app-x86_64-direct-debug.apk" "build/app/outputs/android_artifacts/${SUF}-x86_64.apk" || true
 
       - name: Collect Android artifacts (release)
         if: needs.fetch-info.outputs.build_type != 'development'
@@ -293,9 +293,9 @@ jobs:
         run: |
           mkdir -p build/app/outputs/android_artifacts
           SUF="${{ steps.meta.outputs.artifact_suffix }}"
-          cp "build/app/outputs/flutter-apk/app-armeabi-v7a-production-release.apk" "build/app/outputs/android_artifacts/${SUF}-armeabi-v7a.apk" || true
-          cp "build/app/outputs/flutter-apk/app-arm64-v8a-production-release.apk" "build/app/outputs/android_artifacts/${SUF}-arm64-v8a.apk" || true
-          cp "build/app/outputs/flutter-apk/app-x86_64-production-release.apk" "build/app/outputs/android_artifacts/${SUF}-x86_64.apk" || true
+          cp "build/app/outputs/flutter-apk/app-armeabi-v7a-direct-release.apk" "build/app/outputs/android_artifacts/${SUF}-armeabi-v7a.apk" || true
+          cp "build/app/outputs/flutter-apk/app-arm64-v8a-direct-release.apk" "build/app/outputs/android_artifacts/${SUF}-arm64-v8a.apk" || true
+          cp "build/app/outputs/flutter-apk/app-x86_64-direct-release.apk" "build/app/outputs/android_artifacts/${SUF}-x86_64.apk" || true
           mv "build/app/outputs/bundle/productionRelease/app-production-release.aab" "build/app/outputs/android_artifacts/${SUF}.aab"
 
       - name: Attest APKs

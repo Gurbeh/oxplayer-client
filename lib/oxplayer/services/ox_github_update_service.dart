@@ -3,11 +3,14 @@ import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:auto_route/auto_route.dart';
+import 'package:background_downloader/background_downloader.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
@@ -36,7 +39,9 @@ final class OxGitHubUpdatePrompt {
   final SharedPreferences sharedPreferences;
 }
 
-/// Desktop update check via GitHub Releases — opens the platform installer externally.
+/// Update check via GitHub Releases for Windows/macOS/Linux and sideloaded (non-Play)
+/// Android installs. Windows and Android download in the background and install
+/// themselves; macOS/Linux fall back to opening the release asset externally.
 abstract final class OxGitHubUpdateService {
   static final http.Client _httpClient = http.Client();
 
@@ -62,7 +67,8 @@ abstract final class OxGitHubUpdateService {
   }
 
   static String get _githubRepoSlug {
-    const define = String.fromEnvironment('OXPLAYER_GITHUB_REPO', defaultValue: '');
+    const define =
+        String.fromEnvironment('OXPLAYER_GITHUB_REPO', defaultValue: '');
     final fromDefine = define.trim();
     if (fromDefine.isNotEmpty) return fromDefine;
 
@@ -77,10 +83,11 @@ abstract final class OxGitHubUpdateService {
     required String currentVersion,
   }) async {
     if (!OxplayerConfig.isEnabled) return;
-    if (kIsWeb || !_isDesktopPlatform) return;
+    if (kIsWeb || !await _isSupportedPlatform()) return;
 
     try {
-      final current = OxSemver.parse(currentVersion) ?? const OxSemver(major: 0, minor: 0, patch: 0);
+      final current = OxSemver.parse(currentVersion) ??
+          const OxSemver(major: 0, minor: 0, patch: 0);
       final release = await _fetchLatestStableRelease();
       if (release == null) return;
 
@@ -111,32 +118,47 @@ abstract final class OxGitHubUpdateService {
     }
   }
 
-  static bool get _isDesktopPlatform =>
-      Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+  /// Desktop always qualifies; Android only when the app wasn't installed via Play
+  /// (Play-installed users are handled by [OxUpdateService]'s flexible update flow).
+  static Future<bool> _isSupportedPlatform() async {
+    if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) return true;
+    if (Platform.isAndroid) return !await OxUpdateSource.isPlayInstall();
+    return false;
+  }
 
-  static Future<({String version, String changelog, String? downloadUrl, String releasePageUrl})?>
-      _fetchLatestStableRelease() async {
+  /// Windows and Android download the release asset in-app and install it themselves;
+  /// macOS/Linux still hand off to the browser (no unattended-install story there).
+  static bool get _supportsInAppInstall =>
+      Platform.isWindows || Platform.isAndroid;
+
+  static Future<
+      ({
+        String version,
+        String changelog,
+        String? downloadUrl,
+        String releasePageUrl
+      })?> _fetchLatestStableRelease() async {
     final slug = _githubRepoSlug;
-    final response = await _httpClient
-        .get(
-          Uri.parse('https://api.github.com/repos/$slug/releases/latest'),
-          headers: const {'Accept': 'application/vnd.github+json'},
-        )
-        .timeout(const Duration(seconds: 12));
+    final response = await _httpClient.get(
+      Uri.parse('https://api.github.com/repos/$slug/releases/latest'),
+      headers: const {'Accept': 'application/vnd.github+json'},
+    ).timeout(const Duration(seconds: 12));
 
     if (response.statusCode != 200) return null;
 
     final body = jsonDecode(response.body);
     if (body is! Map<String, dynamic>) return null;
 
-    final tag = (body['tag_name'] as String?)?.replaceFirst(RegExp(r'^v'), '').trim();
+    final tag =
+        (body['tag_name'] as String?)?.replaceFirst(RegExp(r'^v'), '').trim();
     if (tag == null || tag.isEmpty) return null;
 
     final changelog = (body['body'] as String?)?.trim() ?? '';
-    final releasePageUrl = (body['html_url'] as String?)?.trim() ?? 'https://github.com/$slug/releases/latest';
+    final releasePageUrl = (body['html_url'] as String?)?.trim() ??
+        'https://github.com/$slug/releases/latest';
     final assets = body['assets'] as List<dynamic>? ?? [];
 
-    final downloadUrl = _resolveDownloadUrl(assets);
+    final downloadUrl = await _resolveDownloadUrl(assets);
     return (
       version: tag,
       changelog: changelog,
@@ -145,8 +167,8 @@ abstract final class OxGitHubUpdateService {
     );
   }
 
-  static String? _resolveDownloadUrl(List<dynamic> assets) {
-    final patterns = _downloadPatternsForPlatform();
+  static Future<String?> _resolveDownloadUrl(List<dynamic> assets) async {
+    final patterns = await _downloadPatternsForPlatform();
     if (patterns.isEmpty) return null;
 
     for (final pattern in patterns) {
@@ -162,7 +184,7 @@ abstract final class OxGitHubUpdateService {
     return null;
   }
 
-  static List<RegExp> _downloadPatternsForPlatform() {
+  static Future<List<RegExp>> _downloadPatternsForPlatform() async {
     if (Platform.isWindows) {
       return [
         RegExp(r'^OXPlayer-Windows-.+-Setup\.exe$'),
@@ -179,7 +201,25 @@ abstract final class OxGitHubUpdateService {
         RegExp(r'^OXPlayer-Linux-.+\.zip$'),
       ];
     }
+    if (Platform.isAndroid) {
+      final abis = await _androidSupportedAbis();
+      return [
+        for (final abi in abis)
+          RegExp('^OXPlayer-Android-.+-${RegExp.escape(abi)}\\.apk\$'),
+        // Fallback if ABI detection fails or reports an architecture we don't publish.
+        RegExp(r'^OXPlayer-Android-.+-arm64-v8a\.apk$'),
+      ];
+    }
     return const [];
+  }
+
+  static Future<List<String>> _androidSupportedAbis() async {
+    try {
+      final info = await DeviceInfoPlugin().androidInfo;
+      return info.supportedAbis;
+    } catch (_) {
+      return const [];
+    }
   }
 
   static Future<void> showPendingOptionalPrompt() async {
@@ -189,7 +229,9 @@ abstract final class OxGitHubUpdateService {
     if (!_isPastSplashScreen()) return;
 
     final context = _navigatorKey?.currentContext;
-    if (context == null || !context.mounted || Navigator.maybeOf(context) == null) {
+    if (context == null ||
+        !context.mounted ||
+        Navigator.maybeOf(context) == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         showPendingOptionalPrompt();
       });
@@ -202,7 +244,8 @@ abstract final class OxGitHubUpdateService {
         context: context,
         barrierDismissible: false,
         useRootNavigator: true,
-        builder: (dialogContext) => _OxGitHubOptionalUpdateDialog(prompt: prompt),
+        builder: (dialogContext) =>
+            _OxGitHubOptionalUpdateDialog(prompt: prompt),
       );
       _pendingOptionalPrompt = null;
     } finally {
@@ -210,11 +253,30 @@ abstract final class OxGitHubUpdateService {
     }
   }
 
+  /// Shows the in-app download/install progress dialog. Only valid when
+  /// [_supportsInAppInstall] and [OxGitHubUpdatePrompt.downloadUrl] is set.
+  static void showDownloadProgressDialog(OxGitHubUpdatePrompt prompt) {
+    final context = _navigatorKey?.currentContext;
+    if (context == null || !context.mounted) return;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      useRootNavigator: true,
+      builder: (_) => _OxDownloadProgressDialog(
+        downloadUrl: prompt.downloadUrl!,
+        releasePageUrl: prompt.releasePageUrl,
+      ),
+    );
+  }
+
   static Future<void> openDownloadPage({
     required String? downloadUrl,
     required String releasePageUrl,
   }) async {
-    final target = (downloadUrl != null && downloadUrl.isNotEmpty) ? downloadUrl : releasePageUrl;
+    final target = (downloadUrl != null && downloadUrl.isNotEmpty)
+        ? downloadUrl
+        : releasePageUrl;
     final uri = Uri.parse(target);
     if (!await canLaunchUrl(uri)) return;
     await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -242,6 +304,8 @@ class _OxGitHubOptionalUpdateDialog extends StatelessWidget {
         : changelog.length > 400
             ? '${changelog.substring(0, 400).trim()}…'
             : changelog;
+    final hasInAppInstall = OxGitHubUpdateService._supportsInAppInstall &&
+        (prompt.downloadUrl?.isNotEmpty ?? false);
 
     return AlertDialog(
       title: const Text('Update available'),
@@ -268,11 +332,16 @@ class _OxGitHubOptionalUpdateDialog extends StatelessWidget {
         TextButton(
           autofocus: true,
           onPressed: () async {
-            await OxGitHubUpdateService.openDownloadPage(
-              downloadUrl: prompt.downloadUrl,
-              releasePageUrl: prompt.releasePageUrl,
-            );
-            if (context.mounted) Navigator.of(context).pop();
+            if (hasInAppInstall) {
+              if (context.mounted) Navigator.of(context).pop();
+              OxGitHubUpdateService.showDownloadProgressDialog(prompt);
+            } else {
+              await OxGitHubUpdateService.openDownloadPage(
+                downloadUrl: prompt.downloadUrl,
+                releasePageUrl: prompt.releasePageUrl,
+              );
+              if (context.mounted) Navigator.of(context).pop();
+            }
           },
           child: const Text('Download'),
         ),
@@ -294,6 +363,149 @@ class _OxGitHubOptionalUpdateDialog extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+enum _OxUpdateDownloadState { downloading, installing, error }
+
+/// Downloads the release asset with a visible progress bar, then installs it:
+/// silently (Windows, via the Inno Setup `/VERYSILENT` flags) or by handing the
+/// downloaded APK to the system installer (Android).
+class _OxDownloadProgressDialog extends StatefulWidget {
+  const _OxDownloadProgressDialog({
+    required this.downloadUrl,
+    required this.releasePageUrl,
+  });
+
+  final String downloadUrl;
+  final String releasePageUrl;
+
+  @override
+  State<_OxDownloadProgressDialog> createState() =>
+      _OxDownloadProgressDialogState();
+}
+
+class _OxDownloadProgressDialogState extends State<_OxDownloadProgressDialog> {
+  double? _progress;
+  _OxUpdateDownloadState _state = _OxUpdateDownloadState.downloading;
+
+  @override
+  void initState() {
+    super.initState();
+    _run();
+  }
+
+  Future<void> _run() async {
+    try {
+      final segments = Uri.parse(widget.downloadUrl).pathSegments;
+      final filename = segments.isNotEmpty ? segments.last : 'oxplayer_update';
+
+      final task = DownloadTask(
+        url: widget.downloadUrl,
+        filename: filename,
+        baseDirectory: BaseDirectory.temporary,
+        updates: Updates.statusAndProgress,
+      );
+
+      final result = await FileDownloader().download(
+        task,
+        onProgress: (progress) {
+          if (!mounted) return;
+          setState(() =>
+              _progress = progress >= 0 && progress <= 1 ? progress : null);
+        },
+      );
+
+      if (result.status != TaskStatus.complete) {
+        throw StateError('Update download ended with status ${result.status}');
+      }
+
+      if (!mounted) return;
+      setState(() => _state = _OxUpdateDownloadState.installing);
+
+      if (Platform.isAndroid) {
+        final opened = await FileDownloader().openFile(
+          task: task,
+          mimeType: 'application/vnd.android.package-archive',
+        );
+        if (!opened) {
+          throw StateError('Could not launch the Android package installer');
+        }
+      } else if (Platform.isWindows) {
+        final filePath = await task.filePath();
+        await Process.start(
+          filePath,
+          [
+            '/VERYSILENT',
+            '/SUPPRESSMSGBOXES',
+            '/NORESTART',
+            '/CLOSEAPPLICATIONS',
+            '/RESTARTAPPLICATIONS'
+          ],
+          mode: ProcessStartMode.detached,
+        );
+        await windowManager.close();
+        return;
+      }
+
+      if (mounted) Navigator.of(context).pop();
+    } catch (error, stackTrace) {
+      developer.log(
+        'In-app update install failed',
+        name: 'OxGitHubUpdateService',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) setState(() => _state = _OxUpdateDownloadState.error);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isError = _state == _OxUpdateDownloadState.error;
+
+    return PopScope(
+      canPop: false,
+      child: AlertDialog(
+        title: Text(isError ? 'Update failed' : 'Downloading update'),
+        content: isError
+            ? const Text(
+                'The update could not be downloaded automatically. You can download it from the browser instead.')
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  LinearProgressIndicator(value: _progress),
+                  const SizedBox(height: 12),
+                  Text(
+                    _state == _OxUpdateDownloadState.installing
+                        ? 'Starting installer…'
+                        : '${((_progress ?? 0) * 100).toStringAsFixed(0)}%',
+                  ),
+                ],
+              ),
+        actionsAlignment: MainAxisAlignment.start,
+        actions: isError
+            ? [
+                TextButton(
+                  autofocus: true,
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    await OxGitHubUpdateService.openDownloadPage(
+                      downloadUrl: widget.downloadUrl,
+                      releasePageUrl: widget.releasePageUrl,
+                    );
+                  },
+                  child: const Text('Open in Browser'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+              ]
+            : const [],
+      ),
     );
   }
 }

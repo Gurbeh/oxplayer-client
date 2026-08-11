@@ -123,6 +123,13 @@ android {
             dimension "default"
             applicationIdSuffix ""
         }
+        // Same applicationId/signing as `production` — only the manifest differs (adds
+        // REQUEST_INSTALL_PACKAGES, see src/direct/AndroidManifest.xml). Used for the
+        // GitHub/website APK so the Play-submitted AAB never declares that permission.
+        direct {
+            dimension "default"
+            applicationIdSuffix ""
+        }
     }
 }
 

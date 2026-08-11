@@ -11,6 +11,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- background_downloader offline sync / download (UIDTJobService dataSync). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- REQUEST_INSTALL_PACKAGES is declared only in the `direct` flavor (src/direct/AndroidManifest.xml)
+         so the Play-submitted AAB (`production` flavor) never carries it. -->
+
 
     <uses-feature
         android:name="android.hardware.touchscreen"

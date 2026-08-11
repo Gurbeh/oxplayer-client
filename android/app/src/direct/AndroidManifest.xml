@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Only merged into the `direct` flavor build (GitHub/website APK). Lets the app
+         install a downloaded update APK itself. Deliberately kept out of `production`
+         (the flavor built as an AAB for Google Play) — see android/app/build.gradle. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+</manifest>
