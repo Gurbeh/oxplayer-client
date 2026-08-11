@@ -9,17 +9,7 @@ import 'package:fladder/models/video_stream_model.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_force_repair_interceptor.dart';
 import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
-import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
 import 'package:fladder/providers/video_player_provider.dart';
-
-bool oxplayerIsOxStreamUrl(String? url) {
-  if (url == null) return false;
-  if (url.contains('/stream.ts') || url.contains('stream.ts?')) return true;
-  final uri = Uri.tryParse(url);
-  if (uri == null) return false;
-  // Legacy numeric: /v/136.mkv ; Slug (encrypted variant id): /v/{base64url}.mkv
-  return RegExp(r'/v/[A-Za-z0-9_-]+\.[^/]+$').hasMatch(uri.path);
-}
 
 PlaybackType? _playbackTypeForModel(PlaybackModel model) => switch (model) {
       DirectPlaybackModel _ => PlaybackType.directStream,
@@ -29,7 +19,7 @@ PlaybackType? _playbackTypeForModel(PlaybackModel model) => switch (model) {
       _ => null,
     };
 
-/// Holds context for a runtime ox-stream repair while the player is open.
+/// Holds context for a runtime playback repair (force-refresh PlaybackInfo) while the player is open.
 class OxplayerStreamRepairBridge {
   static Ref? ref;
   static PlaybackModel? model;
@@ -89,36 +79,4 @@ Future<bool> oxplayerMaybeRetryPlayAfterLoadFailure({
   if (refreshed == null || refreshed.media?.url == null) return false;
 
   return read(videoPlayerProvider.notifier).loadPlaybackItem(refreshed, startPosition);
-}
-
-/// Called from lib_mpv when ox-stream load retries are exhausted; tries node failover then force-repair.
-Future<String?> oxplayerTryRepairStreamUrl(String deadUrl) async {
-  if (!OxplayerEnv.isEnabled || !oxplayerIsOxStreamUrl(deadUrl)) return null;
-
-  final r = OxplayerStreamRepairBridge.ref;
-  if (r != null) {
-    final failoverUrl = await oxplayerFailoverStreamUrl(r.read, deadUrl);
-    if (failoverUrl != null && failoverUrl != deadUrl) {
-      return failoverUrl;
-    }
-  }
-
-  if (OxplayerStreamRepairBridge.runtimeRepairUsed) return null;
-
-  final model = OxplayerStreamRepairBridge.model;
-  if (r == null || model == null) return null;
-
-  OxplayerStreamRepairBridge.runtimeRepairUsed = true;
-  final position = r.read(mediaPlaybackProvider).position;
-  final refreshed = await oxplayerRefreshPlaybackWithForceRepair(
-    r.read,
-    model,
-    startPosition: position,
-  );
-  final url = refreshed?.media?.url;
-  if (url == null || url == deadUrl) return null;
-  if (refreshed != null) {
-    OxplayerStreamRepairBridge.model = refreshed;
-  }
-  return url;
 }

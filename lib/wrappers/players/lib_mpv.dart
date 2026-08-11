@@ -20,18 +20,14 @@ import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/settings/subtitle_settings_model.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
-import 'package:fladder/oxplayer/oxplayer_iran_stream_edge.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
-import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_mpv.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
 import 'package:fladder/oxplayer/oxplayer_telegram_stream_cb.dart';
 import 'package:fladder/oxplayer/oxplayer_audio_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
-import 'package:fladder/oxplayer/oxplayer_stream_http_auth.dart';
 import 'package:fladder/oxplayer/playback/ox_subtitle_font.dart';
 import 'package:fladder/providers/settings/subtitle_settings_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
@@ -400,9 +396,6 @@ class LibMPV extends BasePlayer {
     ));
   }
 
-  /// ox-stream progressive remux (MPEG-TS); duration stays 0 on web until enough is buffered.
-  static bool _isOxStreamRemuxUrl(String url) => url.contains('/stream.ts') || url.contains('stream.ts?');
-
   @override
   Future<void> loadVideo(String url, bool play, {Duration startPosition = Duration.zero}) async {
     _loadCompleter = Completer<void>();
@@ -411,13 +404,9 @@ class LibMPV extends BasePlayer {
     _externalSubtitleLoadGen++;
     _externalSubtitleCache.clear();
 
-    final isOxStreamTs = _isOxStreamRemuxUrl(url);
-    // Progressive ox-stream TS: long-lived HTTP read — no 5s reopen on web or Android mpv.
-    final progressiveOxStream = isOxStreamTs;
-    // Telegram loopback bridge + ox-stream MKV: same progressive Range seek path.
+    // Telegram loopback bridge / stream_cb: progressive Range seek path.
     final oxStreamDirectMkv = oxplayerStreamProgressiveHttpUrl(url);
     final oxStreamResumeSeek = oxplayerStreamMpvResumeSeekGrace(url, startPosition);
-    final serverSeek = isOxStreamTs && url.contains('start=');
     // TdlibHttpBridgeServer is purely reactive to whatever byte range mpv's first request asks
     // for (see its serveFile()) — it never independently fetches byte 0. Pre-setting mpv's
     // native `start` property makes mpv jump straight to the target byte offset on open and
@@ -430,7 +419,7 @@ class LibMPV extends BasePlayer {
     // seek this avoids happens in mpv/ffmpeg's demuxer layer, not the HTTP stream driver
     // specifically, so it isn't specific to the HTTP bridge.
     final tdlibBridge = oxplayerIsTelegramDirectPlayUrl(url);
-    _remuxTimelineBase = serverSeek ? startPosition : Duration.zero;
+    _remuxTimelineBase = Duration.zero;
 
     if (oxStreamResumeSeek) {
       OxplayerStreamLog.event('mpv_resume_grace', fields: {
@@ -440,18 +429,7 @@ class LibMPV extends BasePlayer {
       });
     }
 
-    await setStartPosition((serverSeek || tdlibBridge) ? Duration.zero : startPosition);
-
-    if (OxplayerEnv.isEnabled && oxplayerIsOxStreamUrl(url)) {
-      if (OxplayerIranStreamEdge.isIranVanityStreamUrl(url)) {
-        url = await OxplayerIranStreamEdge.resolvePlaybackUrl(url);
-      }
-      if (kIsWeb) {
-        url = OxplayerIranStreamEdge.rewriteWebPlaybackUrl(url);
-      }
-    }
-
-    url = OxplayerStreamHttpAuth.stripAndRegister(url);
+    await setStartPosition(tdlibBridge ? Duration.zero : startPosition);
 
     // Telegram direct-play progressive (HTTP bridge or stream_cb): bigger demuxer cache so
     // forward seek doesn't underrun while MTProto fills the next window.
@@ -486,30 +464,6 @@ class LibMPV extends BasePlayer {
       } catch (_) {/* older libmpv */}
     }
 
-    // OX stream: always send Worker client signature; optional Bearer when enabled.
-    if (OxplayerEnv.isEnabled && oxplayerIsOxStreamUrl(url) && _player?.platform is mpv.NativePlayer) {
-      final bearer = OxplayerStreamHttpAuth.needsHeaderAuthForUrl(url)
-          ? OxplayerStreamHttpAuth.bearerFor(url)
-          : null;
-      await (_player?.platform as dynamic).setProperty(
-        'http-header-fields',
-        OxplayerStreamHttpAuth.mpvHttpHeaderFields(bearer: bearer),
-      );
-      if (OxplayerStreamHttpAuth.needsHeaderAuthForUrl(url)) {
-        if (bearer != null && bearer.isNotEmpty) {
-          OxplayerStreamLog.event('stream_header_auth', fields: {
-            'host': OxplayerStreamLog.describeHost(url),
-          });
-        } else {
-          OxplayerStreamLog.event('stream_header_auth_missing', fields: {
-            'host': OxplayerStreamLog.describeHost(url),
-            'hasBearer': false,
-            'nativeMpv': true,
-          });
-        }
-      }
-    }
-
     await _player?.open(mpv.Media(url), play: play);
     final openedVolume = _player?.state.volume ?? -1;
     if (_preferredVolume > 0 && openedVolume <= 0.5) {
@@ -530,9 +484,9 @@ class LibMPV extends BasePlayer {
     _retryTimer?.cancel();
     _retryTimer = null;
 
-    // Progressive remux / Telegram HTTP / ox-stream MKV: long-lived Range reads —
+    // Telegram HTTP bridge / stream_cb progressive: long-lived Range reads —
     // reopening every few seconds kills mid-seek buffering (jump-to-start / stall).
-    if (!progressiveOxStream && !oxStreamDirectMkv) {
+    if (!oxStreamDirectMkv) {
       final retryEvery =
           oxStreamResumeSeek ? oxplayerStreamMpvResumeRetryInterval : _currentRetryDuration;
       final maxRetry = oxStreamResumeSeek ? oxplayerStreamMpvResumeMaxRetry : _maxRetryDuration;
@@ -542,29 +496,6 @@ class LibMPV extends BasePlayer {
           await Future.delayed(const Duration(milliseconds: 150));
           if (DateTime.now().isAfter(_firstLoadAttempt.add(maxRetry))) {
             log("Max retry duration reached, stopping retries.");
-            if (OxplayerEnv.isEnabled && oxplayerIsOxStreamUrl(url)) {
-              final bridgeRef = OxplayerStreamRepairBridge.ref;
-              final failoverUrl = bridgeRef != null
-                  ? await oxplayerFailoverStreamUrl(bridgeRef.read, url)
-                  : null;
-              if (failoverUrl != null && failoverUrl != url) {
-                log("Failover ox-stream to alternate node");
-                _firstLoadAttempt = DateTime.now();
-                await setStartPosition(startPosition);
-                await _player?.open(mpv.Media(failoverUrl), play: play);
-                _retryTimer?.reset();
-                return;
-              }
-              final repairedUrl = await oxplayerTryRepairStreamUrl(url);
-              if (repairedUrl != null) {
-                log("Retrying ox-stream with force-repair URL");
-                _firstLoadAttempt = DateTime.now();
-                await setStartPosition(startPosition);
-                await _player?.open(mpv.Media(repairedUrl), play: play);
-                _retryTimer?.reset();
-                return;
-              }
-            }
             unawaited(OxplayerPlaybackTelemetry.reportFailure(
               stage: 'player_load',
               reason: 'max_retry_duration_reached',
@@ -574,20 +505,6 @@ class LibMPV extends BasePlayer {
             _retryTimer?.cancel();
             _retryTimer = null;
           } else {
-            if (OxplayerEnv.isEnabled && oxplayerIsOxStreamUrl(url)) {
-              final bridgeRef = OxplayerStreamRepairBridge.ref;
-              final failoverUrl = bridgeRef != null
-                  ? await oxplayerFailoverStreamUrl(bridgeRef.read, url)
-                  : null;
-              if (failoverUrl != null && failoverUrl != url) {
-                log("Failover ox-stream to alternate node (retry)");
-                _firstLoadAttempt = DateTime.now();
-                await setStartPosition(startPosition);
-                await _player?.open(mpv.Media(failoverUrl), play: play);
-                _retryTimer?.reset();
-                return;
-              }
-            }
             log("Retrying to load video $url");
             await setStartPosition(startPosition);
             await _player?.open(mpv.Media(url), play: play);
@@ -613,10 +530,10 @@ class LibMPV extends BasePlayer {
         subPlaying?.cancel();
       }
 
-      if (progressiveOxStream || oxStreamDirectMkv) {
+      if (oxStreamDirectMkv) {
         subPlaying = _player?.stream.playing.listen((event) {
           if (event) {
-            if ((serverSeek || oxStreamDirectMkv) && startPosition > Duration.zero) {
+            if (startPosition > Duration.zero) {
               setState(lastState.update(position: startPosition, buffering: false));
             }
             onReady();
@@ -656,8 +573,6 @@ class LibMPV extends BasePlayer {
 
     _loadCompleter?.future.then(
       (value) async {
-        // Remux URL already includes ?start= from PlaybackInfo; do not seek again on web.
-        if (serverSeek) return;
         if (startPosition == Duration.zero) return;
         if ((_player?.state.position.inSeconds ?? 0) >= startPosition.inSeconds - 5) return;
         await _player?.seek(startPosition);

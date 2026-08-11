@@ -13,7 +13,7 @@ bool oxplayerMediaSourceHasPlayableUrl(MediaSourceInfo source) {
 /// Resolves the playable [MediaSourceInfo] from a PlaybackInfo response.
 ///
 /// OX aligns [PlaybackInfoResponse.mediaSources] indices with catalog variants;
-/// only the resolved row carries an ox-stream URL — other slots are id-only stubs.
+/// only the resolved row carries a playable URL (a Telegram t.me link) — other slots are id-only stubs.
 MediaSourceInfo? oxplayerResolvePlaybackMediaSource(
   PlaybackInfoResponse? playbackInfo, {
   String? requestedMediaSourceId,

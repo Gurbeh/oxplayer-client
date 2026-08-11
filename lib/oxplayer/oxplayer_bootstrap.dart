@@ -8,8 +8,6 @@ import 'package:fladder/oxplayer/oxplayer_auth_file_service.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_desktop_deep_link.dart';
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
-import 'package:fladder/oxplayer/oxplayer_route_selector.dart';
-import 'package:fladder/oxplayer/oxplayer_route_resume.dart';
 import 'package:fladder/oxplayer/oxplayer_sentry_user_sync.dart';
 import 'package:fladder/oxplayer/services/ox_github_update_service.dart';
 import 'package:fladder/oxplayer/services/ox_update_service.dart';
@@ -24,7 +22,6 @@ import 'package:protocol_handler/protocol_handler.dart';
 abstract final class OxplayerBootstrap {
   static Future<void> beforeAppBootstrap(List<String> args) async {
     await OxplayerDotenv.ensureLoaded();
-    await OxplayerRouteSelector.resolveAtStartup();
     if (!OxplayerConfig.isEnabled) return;
     if (!kIsWeb && Platform.isWindows) {
       oxplayerRememberWindowsStartupArgs(args);
@@ -79,11 +76,9 @@ abstract final class OxplayerBootstrap {
         Platform.isLinux) {
       wrapped = OxUpdatePromptHost(child: wrapped);
     }
-    return OxplayerRouteResumeHost(
-      child: OxplayerPlaybackDetailsRefresh(
-        child: OxplayerShareDeepLinkHost(
-          child: OxplayerSentryUserSync(child: wrapped),
-        ),
+    return OxplayerPlaybackDetailsRefresh(
+      child: OxplayerShareDeepLinkHost(
+        child: OxplayerSentryUserSync(child: wrapped),
       ),
     );
   }

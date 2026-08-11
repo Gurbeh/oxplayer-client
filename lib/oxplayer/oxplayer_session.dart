@@ -6,7 +6,6 @@ import 'package:chopper/chopper.dart';
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/account_model.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_route_env.dart';
 import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
 import 'package:fladder/oxplayer/oxplayer_image_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_seerr_auto_config.dart';
@@ -27,6 +26,14 @@ const kOxSessionRestoreTimeout = Duration(seconds: 12);
 final oxplayerSessionRevokedProvider = StateProvider<int>((ref) => 0);
 
 OxplayerSessionStore _sessionStore(OxplayerRead read) => OxplayerSessionStore(read(sharedPreferencesProvider));
+
+/// Stored account URLs from before the kabazhe.ir → oxplayer.ir domain rename.
+String _rewriteLegacyDomain(String raw) {
+  return raw
+      .replaceAll('api.kabazhe.ir', 'api.oxplayer.ir')
+      .replaceAll('www.kabazhe.ir', 'www.oxplayer.ir')
+      .replaceAll('kabazhe.ir', 'oxplayer.ir');
+}
 
 Future<void> oxplayerPersistRefreshFromResponse(
   WidgetRef ref,
@@ -67,7 +74,7 @@ Future<bool> _restoreSession(OxplayerRead read, AccountModel incoming) async {
     );
     read(userProvider.notifier).updateUser(account);
   } else {
-    final migrated = OxplayerRouteEnv.rewriteLegacyIranUrl(account.credentials.url);
+    final migrated = _rewriteLegacyDomain(account.credentials.url);
     if (migrated != account.credentials.url) {
       account = account.copyWith(
         credentials: account.credentials.copyWith(url: migrated),

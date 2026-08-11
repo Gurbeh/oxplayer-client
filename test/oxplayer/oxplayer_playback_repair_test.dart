@@ -4,15 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('oxplayerIsOxStreamUrl', () {
-    test('detects ox-stream remux URLs', () {
-      expect(oxplayerIsOxStreamUrl('https://stream.example/v/1/stream.ts?jwt=abc'), isTrue);
-      expect(oxplayerIsOxStreamUrl('https://stream.example/stream.ts'), isTrue);
-      expect(oxplayerIsOxStreamUrl('https://cdn.example/video.mp4'), isFalse);
-      expect(oxplayerIsOxStreamUrl(null), isFalse);
-    });
-  });
-
   group('force repair single-shot flag', () {
     test('arms via provider and clears after use', () {
       final container = ProviderContainer();

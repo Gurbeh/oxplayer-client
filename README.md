@@ -42,3 +42,9 @@ export SENTRY_RELEASE=oxplayer-client@$(grep '^version:' pubspec.yaml | cut -d' 
 export SENTRY_DIST=<same build number as flutter --build-number>
 dart run sentry_dart_plugin
 ```
+
+## Archive
+
+Dual-edge (global/Iran) CDN routing and the legacy ox-stream HTTP playback path were removed in
+favor of single-edge API access + Telegram-native playback (TDLib). See
+[docs/archive/legacy-dual-edge-and-ox-stream.md](docs/archive/legacy-dual-edge-and-ox-stream.md).

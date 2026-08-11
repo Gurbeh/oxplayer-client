@@ -8,7 +8,6 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/oxplayer/oxplayer_catalog_http.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_route.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/util/item_base_model/item_base_model_extensions.dart';
 
@@ -30,7 +29,7 @@ abstract final class OxplayerFavoritesFeed {
   static Future<OxFavoritesFeedResult?> fetch(Ref ref) async {
     if (!OxplayerConfig.isEnabled) return null;
 
-    final base = (OxplayerRoute.apiBaseUrl ?? OxplayerEnv.apiBaseUrl)?.trim();
+    final base = OxplayerEnv.apiBaseUrl?.trim();
     final userId = ref.read(userProvider)?.id;
     if (base == null || base.isEmpty || userId == null || userId.isEmpty) {
       return null;

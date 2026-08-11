@@ -8,12 +8,8 @@ import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/oxplayer/ox_series_next_up.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_info_polling.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_media_source.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
-import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
-import 'package:fladder/oxplayer/oxplayer_stream_warmup.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/util/duration_extensions.dart';
@@ -84,7 +80,9 @@ abstract final class OxplayerPlaybackPrefetch {
     final sw = Stopwatch()..start();
     try {
       final api = read(jellyApiProvider);
-      final response = await oxplayerPollPlaybackInfoUntilReady(() {
+      // The call itself is the warm-up — it triggers the backend's synchronous public-copy
+      // hydrate (tryInlinePublicProviderCopy) so a play tap right after has a ready t.me link.
+      await oxplayerPollPlaybackInfoUntilReady(() {
         return api.itemsItemIdPlaybackInfoPost(
           itemId: itemId,
           body: PlaybackInfoDto(
@@ -99,24 +97,11 @@ abstract final class OxplayerPlaybackPrefetch {
         );
       });
 
-      final source = oxplayerResolvePlaybackMediaSource(
-        response.body,
-        requestedMediaSourceId: mediaSourceId,
-      );
-      final path = source?.path?.trim();
-      if (path == null || path.isEmpty || !oxplayerIsOxStreamUrl(path)) {
-        return;
-      }
-
-      final resolved = await oxplayerResolveStreamPlaybackUrl(read, path);
-      final streamUrl = resolved ?? path;
       OxplayerStreamLog.event('playback_prefetch', fields: {
         'itemId': itemId,
-        'streamUrl': OxplayerStreamLog.describeUrl(streamUrl),
         'playbackInfoMs': sw.elapsedMilliseconds,
       });
 
-      unawaited(oxplayerWarmStreamUrl(streamUrl));
       _recent[key] = DateTime.now();
     } catch (e) {
       OxplayerStreamLog.event('playback_prefetch', fields: {

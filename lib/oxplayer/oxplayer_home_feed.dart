@@ -9,7 +9,6 @@ import 'package:fladder/models/view_model.dart';
 import 'package:fladder/oxplayer/oxplayer_api_disk_cache.dart';
 import 'package:fladder/oxplayer/oxplayer_catalog_http.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_route.dart';
 import 'package:fladder/oxplayer/oxplayer_view_labels.dart';
 import 'package:fladder/oxplayer/providers/ox_favorites_dashboard.dart';
 import 'package:fladder/oxplayer/providers/ox_watchlist_dashboard.dart';
@@ -49,7 +48,7 @@ abstract final class OxplayerHomeFeed {
   static const _feedLimit = 16;
 
   static Uri? _feedUri(Ref ref) {
-    final base = (OxplayerRoute.apiBaseUrl ?? OxplayerEnv.apiBaseUrl)?.trim();
+    final base = OxplayerEnv.apiBaseUrl?.trim();
     final userId = ref.read(userProvider)?.id;
     if (base == null || base.isEmpty || userId == null || userId.isEmpty) {
       return null;

@@ -10,8 +10,6 @@ import 'package:fladder/models/login_screen_model.dart';
 import 'package:fladder/oxplayer/oxplayer_account_switch.dart';
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_route.dart';
-import 'package:fladder/oxplayer/oxplayer_route_selector.dart';
 import 'package:fladder/oxplayer/oxplayer_pending_route.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_login_panel.dart';
@@ -58,11 +56,7 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
     });
 
     await OxplayerDotenv.ensureLoaded();
-    await OxplayerRouteSelector.resolveAtStartup();
-    OxplayerRouteSelector.syncFladderMediaBaseUrl();
-    final media = OxplayerRoute.connectBaseUrl ??
-        OxplayerRoute.apiBaseUrl ??
-        OxplayerEnv.effectiveMediaServerUrl;
+    final media = OxplayerEnv.effectiveMediaServerUrl;
     if (media == null) {
       if (!mounted) return;
       setState(() {

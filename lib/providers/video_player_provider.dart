@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,7 +19,6 @@ import 'package:fladder/oxplayer/oxplayer_memory_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_native_playback.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
-import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/settings/video_player_settings_provider.dart';
@@ -89,16 +87,9 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     );
   }
 
-  static bool _isOxStreamRemuxUrl(String? url) =>
-      kIsWeb && url != null && (url.contains('/stream.ts') || url.contains('stream.ts?'));
-
   Future<void> updateDuration(Duration duration) async {
     final catalog = ref.read(playBackModel)?.item.overview.runTime;
-    final mediaUrl = ref.read(playBackModel)?.media?.url;
-    if (_isOxStreamRemuxUrl(mediaUrl) && catalog != null && catalog > Duration.zero) {
-      // Fragmented remux reports growing buffer duration; keep catalog runtime for the scrubber.
-      duration = catalog;
-    } else if (duration == Duration.zero && catalog != null && catalog > Duration.zero) {
+    if (duration == Duration.zero && catalog != null && catalog > Duration.zero) {
       duration = catalog;
     }
     mediaState.update((state) {
@@ -187,7 +178,6 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     final effectiveStartPosition = await model.resolvedStartPosition(startPosition);
 
     if (media != null) {
-      OxplayerStreamNodeSession.reset();
       OxplayerStreamLog.event('player_load', fields: {
         'itemId': model.item.id,
         'startPosition': OxplayerStreamLog.formatDuration(effectiveStartPosition),
@@ -252,7 +242,7 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
 
       await state.play();
 
-      if (_isOxStreamRemuxUrl(media.url) || (OxplayerEnv.isEnabled && oxplayerIsOxStreamUrl(media.url))) {
+      if (OxplayerEnv.isEnabled) {
         OxplayerStreamRepairBridge.register(ref, newPlaybackModel);
         final runtime = model.item.overview.runTime;
         // Keep buffering=true until ExoPlayer reports STATE_READY — premature false

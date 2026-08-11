@@ -15,9 +15,6 @@ import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_force_repair_interceptor.dart';
 import 'package:fladder/oxplayer/oxplayer_http_performance_interceptor.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_http_interceptor.dart';
-import 'package:fladder/oxplayer/oxplayer_route.dart';
-import 'package:fladder/oxplayer/oxplayer_route_env.dart';
-import 'package:fladder/oxplayer/oxplayer_route_interceptor.dart';
 import 'package:fladder/oxplayer/oxplayer_session_interceptor.dart';
 import 'package:fladder/oxplayer/oxplayer_swr_http_client.dart';
 import 'package:fladder/providers/auth_provider.dart';
@@ -35,11 +32,7 @@ final serverUrlProvider = StateProvider<String?>((ref) {
   if (localUrlAvailable && userCredentials?.localUrl?.isNotEmpty == true) {
     newUrl = userCredentials?.localUrl;
   } else if (OxplayerConfig.isEnabled) {
-    newUrl = OxplayerRoute.connectBaseUrl ??
-        OxplayerRoute.apiBaseUrl ??
-        userCredentials?.url ??
-        tempUrl ??
-        OxplayerEnv.apiBaseUrl;
+    newUrl = userCredentials?.url ?? tempUrl ?? OxplayerEnv.apiBaseUrl;
   } else if (userCredentials?.url.isNotEmpty == true) {
     newUrl = userCredentials?.url;
   } else if (tempUrl?.isNotEmpty == true) {
@@ -48,7 +41,7 @@ final serverUrlProvider = StateProvider<String?>((ref) {
     newUrl = null;
   }
 
-  return OxplayerRouteEnv.rewriteLegacyIranUrl(normalizeUrl(newUrl ?? ""));
+  return normalizeUrl(newUrl ?? "");
 });
 
 @riverpod
@@ -67,7 +60,6 @@ class JellyApi extends _$JellyApi {
       JellyfinOpenApi.create(
         httpClient: httpClient,
         interceptors: [
-          if (OxplayerEnv.isEnabled) OxplayerRouteInterceptor(ref),
           JellyRequest(ref),
           if (OxplayerEnv.isEnabled) OxplayerHttpPerformanceInterceptor(),
           if (OxplayerEnv.isEnabled) OxplayerPlaybackHttpInterceptor(ref),
@@ -143,9 +135,6 @@ class JellyRequest implements Interceptor {
     }
 
     final headers = loginModel.header(ref);
-    if (OxplayerEnv.isEnabled) {
-      headers.addAll(OxplayerRoute.connectHeaders);
-    }
 
     for (var attempt = 0; attempt <= _maxRetries; attempt++) {
       try {

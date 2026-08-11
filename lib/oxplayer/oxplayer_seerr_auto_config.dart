@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_route.dart';
 import 'package:fladder/oxplayer/oxplayer_session.dart';
 import 'package:fladder/providers/user_provider.dart';
 
@@ -24,7 +23,7 @@ Future<void> oxplayerConfigureSeerrFromServer(WidgetRef ref) async {
   final token = account?.credentials.token.trim() ?? '';
   if (token.isEmpty) return;
 
-  final base = OxplayerRoute.apiBaseUrl ?? OxplayerEnv.apiBaseUrl;
+  final base = OxplayerEnv.apiBaseUrl;
   if (base == null) return;
 
   try {

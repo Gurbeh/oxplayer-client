@@ -10,7 +10,6 @@ import 'package:fladder/models/recommended_model.dart';
 import 'package:fladder/models/view_model.dart';
 import 'package:fladder/oxplayer/oxplayer_catalog_http.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_route.dart';
 import 'package:fladder/providers/user_provider.dart';
 
 /// Library tab shelves from GET /Users/{id}/Views/{viewId}/Feed.
@@ -19,7 +18,7 @@ abstract final class OxplayerLibraryFeed {
 
   /// One HTTP round-trip for continue watching, next up, and latest.
   static Future<List<RecommendedModel>?> fetchShelves(Ref ref, ViewModel viewModel) async {
-    final base = (OxplayerRoute.apiBaseUrl ?? OxplayerEnv.apiBaseUrl)?.trim();
+    final base = OxplayerEnv.apiBaseUrl?.trim();
     final userId = ref.read(userProvider)?.id;
     final viewId = viewModel.id;
     if (base == null || base.isEmpty || userId == null || userId.isEmpty || viewId.isEmpty) {
