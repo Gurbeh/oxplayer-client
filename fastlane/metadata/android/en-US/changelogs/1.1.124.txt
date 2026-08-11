@@ -1,0 +1,1 @@
+Auto android-update from GitHub releases; drop Infisical market version
