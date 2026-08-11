@@ -45,10 +45,16 @@ abstract final class OxplayerBootstrap {
     if (kIsWeb) return;
 
     if (Platform.isAndroid) {
+      // Play installs → Play in-app update API.
+      // Sideloaded APKs → GitHub Releases download/install (OxUpdateService no-ops).
       await OxUpdateService.checkOnLaunch(
         sharedPreferences: result.sharedPreferences,
         currentVersion: result.applicationInfo.version,
         currentBuildNumber: result.applicationInfo.buildNumber,
+      );
+      await OxGitHubUpdateService.checkOnLaunch(
+        sharedPreferences: result.sharedPreferences,
+        currentVersion: result.applicationInfo.version,
       );
       return;
     }

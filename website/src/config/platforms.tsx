@@ -32,7 +32,7 @@ export const platforms: Platform[] = [
     id: "AndroidTV",
     label: "TV & old Android",
     Icon: FaTv,
-    heroMobile: false,
+    heroMobile: true,
   },
   { id: "iOS", label: "iOS", Icon: FaApple, heroMobile: true },
   { id: "macOS", label: "macOS", Icon: FaApple, heroMobile: false },

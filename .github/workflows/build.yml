@@ -1033,6 +1033,21 @@ jobs:
           echo "::error::Create Release failed (gh + softprops)"
           exit 1
 
+      # Website short links (/dl/*) redirect to R2 releases/latest/* — not GitHub CDN.
+      # Nightly must not overwrite stable latest keys.
+      - name: Mirror release assets to R2
+        if: needs.fetch-info.outputs.build_type == 'release'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${CLOUDFLARE_S3_ACCESS_KEY_ID:?CLOUDFLARE_S3_ACCESS_KEY_ID missing from Infisical /core/client-ci}"
+          : "${CLOUDFLARE_S3_SECRET_ACCESS_KEY:?CLOUDFLARE_S3_SECRET_ACCESS_KEY missing}"
+          : "${CLOUDFLARE_S3_API_ENDPOINT:?CLOUDFLARE_S3_API_ENDPOINT missing}"
+          export CLOUDFLARE_R2_BUCKET="${CLOUDFLARE_R2_BUCKET:-oxplayer-channel-news}"
+          bash scripts/mirror-release-to-r2.sh
+
       - name: Notify admins (Telegram via oxplayer API)
         if: success()
         env:

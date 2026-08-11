@@ -4,6 +4,13 @@ export const GITHUB_REPO = "Gurbeh/oxplayer-client";
 
 export const RELEASES_PAGE_URL = `https://github.com/${GITHUB_REPO}/releases/latest`;
 
+/**
+ * Public R2 origin for stable "latest" release binaries.
+ * Same bucket as channel-news; objects live under `releases/` (no TTL on that prefix).
+ */
+export const RELEASES_CDN_ORIGIN =
+  "https://pub-620251e8a4724a0b8a0b01903c727616.r2.dev";
+
 /** Google Play listing for the Android phone app. */
 export const PLAY_STORE_ANDROID_URL =
   "https://play.google.com/store/apps/details?id=app.oxplayer";
@@ -24,14 +31,28 @@ export type PlatformId =
   | "Linux"
   | "Web";
 
-/** Match primary release asset per platform from GitHub Releases. */
+/**
+ * Stable R2 object keys under `releases/latest/` (overwritten each stable release).
+ * Filenames intentionally omit version so short links stay forever.
+ */
+export const PLATFORM_LATEST_KEYS: Record<
+  Exclude<PlatformId, "Web" | "Android">,
+  string
+> = {
+  AndroidPhone: "releases/latest/OXPlayer-Android-arm64-v8a.apk",
+  AndroidTV: "releases/latest/OXPlayer-Android-armeabi-v7a.apk",
+  iOS: "releases/latest/OXPlayer-iOS.ipa",
+  macOS: "releases/latest/OXPlayer-macOS.dmg",
+  Windows: "releases/latest/OXPlayer-Windows-Setup.exe",
+  Linux: "releases/latest/OXPlayer-Linux.AppImage",
+};
+
+/** Match versioned GitHub/CI asset names → stable latest key (for mirror upload). */
 export const PLATFORM_ASSET_PATTERNS: Record<
   Exclude<PlatformId, "Web" | "Android">,
   RegExp
 > = {
-  /** Modern phones (64-bit ARM). */
   AndroidPhone: /^OXPlayer-Android-.+-arm64-v8a\.apk$/,
-  /** Android TV + older 32-bit phones. */
   AndroidTV: /^OXPlayer-Android-.+-armeabi-v7a\.apk$/,
   iOS: /^OXPlayer-iOS-.+\.ipa$/,
   macOS: /^OXPlayer-macOS-.+\.dmg$/,
@@ -39,10 +60,8 @@ export const PLATFORM_ASSET_PATTERNS: Record<
   Linux: /^OXPlayer-Linux-.+\.AppImage$/,
 };
 
-export function resolvePlatformUrl(
-  platformId: PlatformId,
-  assets: { name: string; browser_download_url: string }[],
-): string {
+/** Resolve download URL for a platform — R2 latest for binaries, store/web otherwise. */
+export function resolvePlatformUrl(platformId: PlatformId): string {
   if (platformId === "Web") {
     return WEB_APP_URL;
   }
@@ -51,9 +70,7 @@ export function resolvePlatformUrl(
     return PLAY_STORE_ANDROID_URL;
   }
 
-  const pattern = PLATFORM_ASSET_PATTERNS[platformId];
-  const asset = assets.find((a) => pattern.test(a.name));
-  return asset?.browser_download_url ?? RELEASES_PAGE_URL;
+  return `${RELEASES_CDN_ORIGIN}/${PLATFORM_LATEST_KEYS[platformId]}`;
 }
 
 /** Short-link slug served at oxplayer.app/dl/{slug} — kept in sync with oxplayer-be main-bot. */

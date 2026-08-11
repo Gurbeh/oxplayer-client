@@ -51,7 +51,9 @@ Root: HKCU; Subkey: "Software\Classes\oxplayer\DefaultIcon"; ValueType: string; 
 Root: HKCU; Subkey: "Software\Classes\oxplayer\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\fladder.exe"" ""%1"""
 
 [Run]
-Filename: "{app}\fladder.exe"; Description: "{cm:LaunchProgram,OXPlayer}"; Flags: nowait postinstall skipifsilent
+; Do not use skipifsilent — in-app updates run Setup with /VERYSILENT and must
+; relaunch the app when install finishes. Interactive installs still show the checkbox.
+Filename: "{app}\fladder.exe"; Description: "{cm:LaunchProgram,OXPlayer}"; Flags: nowait postinstall
 
 [Code]
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

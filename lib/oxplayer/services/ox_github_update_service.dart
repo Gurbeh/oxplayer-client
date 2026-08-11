@@ -167,7 +167,15 @@ abstract final class OxGitHubUpdateService {
     );
   }
 
+  /// Public R2 origin for stable latest binaries (same as website `/dl/*` redirects).
+  /// GitHub `objects.githubusercontent.com` often stalls at 100% for end users.
+  static const String _releasesCdnOrigin =
+      'https://pub-620251e8a4724a0b8a0b01903c727616.r2.dev';
+
   static Future<String?> _resolveDownloadUrl(List<dynamic> assets) async {
+    final r2Url = await _r2LatestUrlForPlatform();
+    if (r2Url != null) return r2Url;
+
     final patterns = await _downloadPatternsForPlatform();
     if (patterns.isEmpty) return null;
 
@@ -181,6 +189,29 @@ abstract final class OxGitHubUpdateService {
       }
     }
 
+    return null;
+  }
+
+  static Future<String?> _r2LatestUrlForPlatform() async {
+    if (Platform.isWindows) {
+      return '$_releasesCdnOrigin/releases/latest/OXPlayer-Windows-Setup.exe';
+    }
+    if (Platform.isMacOS) {
+      return '$_releasesCdnOrigin/releases/latest/OXPlayer-macOS.dmg';
+    }
+    if (Platform.isLinux) {
+      return '$_releasesCdnOrigin/releases/latest/OXPlayer-Linux.AppImage';
+    }
+    if (Platform.isAndroid) {
+      final abis = await _androidSupportedAbis();
+      const published = {'arm64-v8a', 'armeabi-v7a', 'x86_64'};
+      for (final abi in abis) {
+        if (published.contains(abi)) {
+          return '$_releasesCdnOrigin/releases/latest/OXPlayer-Android-$abi.apk';
+        }
+      }
+      return '$_releasesCdnOrigin/releases/latest/OXPlayer-Android-arm64-v8a.apk';
+    }
     return null;
   }
 
