@@ -173,9 +173,11 @@ abstract final class OxUpdateService {
       final currentVersionCode = int.tryParse(currentBuildNumber);
 
       AppUpdateInfo? updateInfo;
+      var playCheckFailed = false;
       try {
         updateInfo = await InAppUpdate.checkForUpdate();
       } catch (error, stackTrace) {
+        playCheckFailed = true;
         developer.log(
           'Play in-app update check failed; falling back to server semver',
           name: 'OxUpdateService',
@@ -202,8 +204,13 @@ abstract final class OxUpdateService {
               currentVersionCode == null ||
               playVersionCode > currentVersionCode);
 
-      final configuredTargets = await _fetchConfiguredTargetSemvers();
-      final backendTarget = _newestSemver(configuredTargets);
+      // Only consult /ox/client/android-update when Play's API itself failed.
+      // If Play answered "no update", trust that — GitHub can be ahead of Play rollout.
+      OxSemver? backendTarget;
+      if (playCheckFailed) {
+        final configuredTargets = await _fetchConfiguredTargetSemvers();
+        backendTarget = _newestSemver(configuredTargets);
+      }
       final backendSignalsUpdate =
           backendTarget != null && backendTarget.isNewerThan(current);
 
