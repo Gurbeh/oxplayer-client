@@ -4,6 +4,7 @@ import {
   FaAndroid,
   FaApple,
   FaGlobe,
+  FaGooglePlay,
   FaLinux,
   FaTv,
   FaWindows,
@@ -20,8 +21,19 @@ export type Platform = {
 };
 
 export const platforms: Platform[] = [
-  { id: "Android", label: "Android", Icon: FaAndroid, heroMobile: true },
-  { id: "AndroidTV", label: "Android TV", Icon: FaTv, heroMobile: false },
+  { id: "Android", label: "Google Play", Icon: FaGooglePlay, heroMobile: true },
+  {
+    id: "AndroidPhone",
+    label: "Android",
+    Icon: FaAndroid,
+    heroMobile: true,
+  },
+  {
+    id: "AndroidTV",
+    label: "TV & old Android",
+    Icon: FaTv,
+    heroMobile: false,
+  },
   { id: "iOS", label: "iOS", Icon: FaApple, heroMobile: true },
   { id: "macOS", label: "macOS", Icon: FaApple, heroMobile: false },
   { id: "Windows", label: "Windows", Icon: FaWindows, heroMobile: false },

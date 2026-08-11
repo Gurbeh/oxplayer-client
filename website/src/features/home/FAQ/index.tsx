@@ -37,8 +37,9 @@ const faqs: { q: string; a: ReactNode }[] = [
     q: "Which platforms are available?",
     a: (
       <>
-        OXPlayer is available on Android, Android TV, iOS, macOS, Windows, and Linux. Use the download links on this
-        page for native apps. The Web app is coming soon.
+        OXPlayer is available on Google Play, as direct Android APKs (Android phones, plus TV & old Android), and on
+        iOS, macOS, Windows, and Linux. Use the download links on this page for native apps. The Web app is coming
+        soon.
       </>
     ),
   },
