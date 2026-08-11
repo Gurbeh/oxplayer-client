@@ -24,6 +24,8 @@ git commit -m "chore: bump version to M.m.p"
 git push origin main
 ```
 
+CI skips the **nightly** build for commits that match `chore: bump version…`, `chore: prepare release…`, or `Release M.m.p:…` — otherwise release would build twice (main nightly + tag `v*`). Do **not** put `[skip ci]` on those commits: GitHub would also skip the tag-triggered release workflow.
+
 ---
 
 ## Nightly

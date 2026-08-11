@@ -1,5 +1,6 @@
 # CI aligned with upstream Fladder (DonutWare/fladder).
 # Tag v* → release. Schedule / push main / workflow_dispatch → nightly. PR → development (Android debug only).
+# Main push skips nightly when commit is release-related (bump / prepare / Release X.Y.Z) so tag alone builds.
 # Build workflow on PRs only when pubspec.yaml, build.yml, or .fvmrc change (same as Fladder).
 # OX additions: oxplayer-flutter-env, Infisical /core/client-ci, Sentry symbols, Play app.oxplayer, admin Telegram notify.
 # Bootstrap GitHub secrets: INFISICAL_API_URL, INFISICAL_MACHINE_CLIENT_ID, INFISICAL_MACHINE_CLIENT_SECRET, TS_CI_AUTHKEY
@@ -68,6 +69,20 @@ jobs:
               exit 0
             fi
           elif [[ "${{ github.event_name }}" == "push" ]] && [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            # Release flow pushes main then tags the same commit. Without this skip we
+            # build twice: nightly (main) + release (v*). Tag workflow owns the build.
+            # Do NOT use [skip ci] on release commits — GitHub skips tag push workflows too.
+            MSG="$(git log -1 --pretty=%B)"
+            if echo "${MSG}" | grep -qiE '^(Release [0-9]+\.[0-9]+\.[0-9]+:|chore: prepare release|chore: bump version)'; then
+              echo "Release-related commit on main — skip nightly (tag v* builds release)"
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if git tag --points-at HEAD 2>/dev/null | grep -qE '^v[0-9]'; then
+              echo "HEAD already tagged v* — skip nightly"
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             BUILD_TYPE="nightly"
           else
             BUILD_TYPE="development"

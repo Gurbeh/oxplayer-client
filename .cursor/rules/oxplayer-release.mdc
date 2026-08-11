@@ -49,6 +49,7 @@ Before tagging:
 | Schedule / manual nightly | nightly | prerelease `nightly` | internal (completed) |
 | PR | development | no | no |
 | Push to `main` | nightly | prerelease `nightly` | internal (completed) |
+| Push to `main` (release commit / version bump) | **skipped** | — | — (tag `v*` builds instead) |
 
 ## OX-only additions (keep when syncing from Fladder)
 
