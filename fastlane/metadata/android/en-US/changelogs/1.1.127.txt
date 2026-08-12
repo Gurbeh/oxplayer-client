@@ -1,0 +1,1 @@
+Refactor subtitle handling and prefetching logic
