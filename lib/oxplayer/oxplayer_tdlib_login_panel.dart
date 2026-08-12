@@ -51,6 +51,9 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
   final _phoneFocus = FocusNode();
   final _codeFocus = FocusNode();
   final _passwordFocus = FocusNode();
+  final _phoneFieldKey = GlobalKey<OxplayerDpadTextFieldState>();
+  final _codeFieldKey = GlobalKey<OxplayerDpadTextFieldState>();
+  final _passwordFieldKey = GlobalKey<OxplayerDpadTextFieldState>();
   final _submitFocus = FocusNode();
   final _eyeFocus = FocusNode();
   final _qrFocus = FocusNode();
@@ -66,6 +69,10 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
   bool _oxExchangeStarted = false;
   bool _qrSheetOpen = false;
   OxTdlibAuthStateKind? _lastKind;
+  /// Phone last submitted to Telegram — shown on code step + used after back.
+  String? _submittedPhone;
+  /// Bump when entering WaitCode so TextField remounts with a fresh input connection.
+  int _codeFieldGeneration = 0;
 
   @override
   void initState() {
@@ -133,44 +140,50 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
     SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
   }
 
-  void _showKeyboard() {
-    SystemChannels.textInput.invokeMethod<void>('TextInput.show');
-  }
-
-  void _focusAuthField(OxTdlibAuthStateKind kind, {required bool showIme}) {
-    switch (kind) {
-      case OxTdlibAuthStateKind.waitingForPhoneNumber:
-        _phoneFocus.requestFocus();
-      case OxTdlibAuthStateKind.waitingForCode:
-        _codeFocus.requestFocus();
-      case OxTdlibAuthStateKind.waitingForPassword:
-        _passwordFocus.requestFocus();
-      default:
-        return;
+  void _focusAuthField(OxTdlibAuthStateKind kind, {required bool showIme, int retry = 0}) {
+    final field = switch (kind) {
+      OxTdlibAuthStateKind.waitingForPhoneNumber => _phoneFieldKey.currentState,
+      OxTdlibAuthStateKind.waitingForCode => _codeFieldKey.currentState,
+      OxTdlibAuthStateKind.waitingForPassword => _passwordFieldKey.currentState,
+      _ => null,
+    };
+    if (field == null) {
+      final expectsField = kind == OxTdlibAuthStateKind.waitingForPhoneNumber ||
+          kind == OxTdlibAuthStateKind.waitingForCode ||
+          kind == OxTdlibAuthStateKind.waitingForPassword;
+      if (showIme && expectsField && retry < 8) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _focusAuthField(kind, showIme: showIme, retry: retry + 1);
+        });
+      }
+      return;
     }
-    if (!showIme) return;
-    // TV: Select/OK opens system IME (or mini KB if useSystemIme=false). Don't auto-open.
-    if (AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _showKeyboard();
-    });
+    // TV: ring only. Phone: EditableText + correct keyboardType (never bare TextInput.show).
+    if (!showIme || AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad) {
+      field.requestFocus();
+      return;
+    }
+    field.requestFocusAndShowIme();
   }
 
   /// Close previous IME, then open the correct keyboard for the new auth step.
-  /// Numeric code → text 2FA must dismiss first or Android keeps the number pad.
+  /// Phone → code and code → 2FA must dismiss first or Android keeps the wrong pad.
   /// QR → 2FA handoff must NOT dismiss first (nothing to reset; dismiss fights IME open).
   void _syncKeyboardForAuthStep({
     required OxTdlibAuthStateKind? from,
     required OxTdlibAuthStateKind to,
   }) {
     if (from == to) return;
-    final needsImeReset = from == OxTdlibAuthStateKind.waitingForCode &&
-        to == OxTdlibAuthStateKind.waitingForPassword;
+    final needsImeReset = (from == OxTdlibAuthStateKind.waitingForPhoneNumber &&
+            to == OxTdlibAuthStateKind.waitingForCode) ||
+        (from == OxTdlibAuthStateKind.waitingForCode &&
+            to == OxTdlibAuthStateKind.waitingForPassword);
     if (needsImeReset) {
       _dismissKeyboard();
     }
-    final delayMs = needsImeReset ? 200 : 80;
+    // Android needs a beat after hide before a different keyboardType can attach.
+    final delayMs = needsImeReset ? 400 : 80;
     Future<void>.delayed(Duration(milliseconds: delayMs), () {
       if (!mounted) return;
       _focusAuthField(to, showIme: true);
@@ -199,6 +212,14 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
     setState(() {
       if (advancedPastSubmit) {
         _busy = false;
+        // WaitCode can arrive before submitPhoneNumber's finally — unlock so the
+        // code field is enabled and can take focus + numeric IME.
+        _submitLocked = false;
+        if (kind == OxTdlibAuthStateKind.waitingForCode &&
+            prev == OxTdlibAuthStateKind.waitingForPhoneNumber) {
+          _codeFieldGeneration++;
+          _codeController.clear();
+        }
         // Late success after a timeout error — clear stale message.
         // Keep error when re-entering waitingForPassword after a wrong-password attempt.
         if (kind != OxTdlibAuthStateKind.waitingForPassword || prev != kind) {
@@ -271,8 +292,11 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
             setState(() => _error = 'Finish QR sign-in, or cancel it first.');
             break;
           case OxTdlibAuthStateKind.waitingForPhoneNumber:
-            await _controller.submitPhoneNumber(_phoneController.text);
+            // Dismiss before RPC — Android keeps IME open if focus moves later without hide.
             _dismissKeyboard();
+            final phone = _phoneController.text.trim();
+            _submittedPhone = phone;
+            await _controller.submitPhoneNumber(phone);
             break;
           default:
             throw OxplayerTdlibBridgeException(
@@ -288,6 +312,34 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
     }
   }
 
+  Future<void> _backToPhoneNumber() async {
+    if (_busy || _submitLocked) return;
+    _dismissKeyboard();
+    setState(() {
+      _busy = true;
+      _error = null;
+      _codeController.clear();
+      _passwordController.clear();
+      _lockOnTwoFactor = false;
+    });
+    try {
+      await _controller.resetForPhoneLogin();
+      if (!mounted) return;
+      // Prefer previously typed number so user can edit instead of retyping.
+      if (_submittedPhone != null && _submittedPhone!.isNotEmpty) {
+        _phoneController.text = _submittedPhone!;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _focusAuthField(OxTdlibAuthStateKind.waitingForPhoneNumber, showIme: true);
+      });
+    } catch (e) {
+      if (mounted) setState(() => _error = oxTdlibAuthUserMessage(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _cancelQrAndReturnToPhone() async {
     setState(() {
       _busy = true;
@@ -295,7 +347,12 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
     });
     try {
       await _controller.resetForPhoneLogin();
-      if (mounted) _phoneFocus.requestFocus();
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _focusAuthField(OxTdlibAuthStateKind.waitingForPhoneNumber, showIme: true);
+        });
+      }
     } catch (e) {
       if (mounted) setState(() => _error = oxTdlibAuthUserMessage(e));
     } finally {
@@ -406,6 +463,7 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
     };
     final showQrOption = widget.showQrShortcut && onPhoneContinueStep;
     final showBackToQr = widget.onBackToQr != null && onPhoneContinueStep;
+    final showBackToPhone = showPasswordStep || kind == OxTdlibAuthStateKind.waitingForCode;
 
     if (kind == OxTdlibAuthStateKind.waitingForQrConfirmation && !_qrSheetOpen) {
       return Column(
@@ -459,35 +517,56 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
         showPasswordStep ? OxTdlibAuthStateKind.waitingForPassword : kind;
     switch (effectiveKind) {
       case OxTdlibAuthStateKind.waitingForCode:
-        field = OxplayerDpadTextField(
-          key: const ValueKey('tdlib-auth-code'),
-          controller: _codeController,
-          focusNode: _codeFocus,
-          label: 'Code',
-          hint: '• • • • •',
-          keyboardType: TextInputType.number,
-          textAlign: TextAlign.center,
-          autofocus: true,
-          enabled: !_busy && !_submitLocked,
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-            LengthLimitingTextInputFormatter(5),
+        final phoneLabel = (_submittedPhone?.trim().isNotEmpty ?? false)
+            ? _submittedPhone!.trim()
+            : (_phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : 'your number');
+        field = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'A login code was sent to $phoneLabel in Telegram. Enter the code from your Telegram account.',
+              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            KeyedSubtree(
+              key: ValueKey('tdlib-auth-code-$_codeFieldGeneration'),
+              child: OxplayerDpadTextField(
+                key: _codeFieldKey,
+                controller: _codeController,
+                focusNode: _codeFocus,
+                label: 'Code',
+                hint: '• • • • •',
+                // Phone dialpad on Android/Gboard (TextInputType.number often opens QWERTY+row).
+                // digitsOnly still strips non-digits.
+                keyboardType: TextInputType.phone,
+                textAlign: TextAlign.center,
+                autofocus: false,
+                enabled: !_busy && !_submitLocked,
+                autofillHints: const [AutofillHints.oneTimeCode],
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(5),
+                ],
+                style: theme.textTheme.headlineSmall?.copyWith(letterSpacing: 8),
+                onChanged: (value) {
+                  setState(() {});
+                  // Telegram login codes are 5 digits — submit as soon as it's complete.
+                  if (value.trim().length == 5 && !_submitLocked && !_busy) {
+                    _dismissKeyboard();
+                    unawaited(_submit());
+                  }
+                },
+                onKeyboardClosed: () {
+                  if (_codeController.text.trim().isNotEmpty && !_submitLocked && !_busy) {
+                    _dismissKeyboard();
+                    unawaited(_submit());
+                  }
+                },
+                onMoveFocusDown: () => _submitFocus.requestFocus(),
+              ),
+            ),
           ],
-          style: theme.textTheme.headlineSmall?.copyWith(letterSpacing: 8),
-          onChanged: (value) {
-            setState(() {});
-            // Telegram login codes are 5 digits — submit as soon as it's complete.
-            if (value.trim().length == 5 && !_submitLocked && !_busy) {
-              _dismissKeyboard();
-              unawaited(_submit());
-            }
-          },
-          onKeyboardClosed: () {
-            if (_codeController.text.trim().isNotEmpty && !_submitLocked && !_busy) {
-              _submitFocus.requestFocus();
-            }
-          },
-          onMoveFocusDown: () => _submitFocus.requestFocus(),
         );
         buttonLabel = 'Confirm code';
         break;
@@ -499,14 +578,14 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
           children: [
             Expanded(
               child: OxplayerDpadTextField(
-                key: const ValueKey('tdlib-auth-password'),
+                key: _passwordFieldKey,
                 controller: _passwordController,
                 focusNode: _passwordFocus,
                 label: 'Two-factor password',
                 hint: (hint != null && hint.isNotEmpty) ? hint : null,
                 obscureText: !_passwordVisible,
                 keyboardType: TextInputType.visiblePassword,
-                autofocus: true,
+                autofocus: false,
                 enabled: fieldsEnabled,
                 onChanged: (_) => setState(() {}),
                 onKeyboardClosed: () {
@@ -578,6 +657,7 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
         );
       default:
         field = OxplayerDpadTextField(
+          key: _phoneFieldKey,
           controller: _phoneController,
           focusNode: _phoneFocus,
           label: 'Phone number',
@@ -588,8 +668,9 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
           autofillHints: const [AutofillHints.telephoneNumber],
           onChanged: (_) => setState(() {}),
           onKeyboardClosed: () {
+            // Enter/Done: dismiss IME + submit so WaitCode can autofocus code field.
             if (_phoneController.text.trim().isNotEmpty && !_submitLocked && !_busy) {
-              _submitFocus.requestFocus();
+              unawaited(_submit());
             }
           },
           onMoveFocusDown: () => _submitFocus.requestFocus(),
@@ -687,6 +768,17 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
               ],
             ],
           ),
+          if (showBackToPhone) ...[
+            const SizedBox(height: 10),
+            FocusTraversalOrder(
+              order: const NumericFocusOrder(3.5),
+              child: TextButton.icon(
+                onPressed: actionsEnabled ? () => unawaited(_backToPhoneNumber()) : null,
+                icon: const Icon(IconsaxPlusLinear.arrow_left_2, size: 18),
+                label: const Text('Change phone number'),
+              ),
+            ),
+          ],
           if (showBackToQr) ...[
             const SizedBox(height: 10),
             FocusTraversalOrder(

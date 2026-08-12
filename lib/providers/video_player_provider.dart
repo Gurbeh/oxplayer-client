@@ -30,7 +30,9 @@ final playBackModel = StateProvider<PlaybackModel?>((ref) => null);
 
 final videoPlayerProvider = StateNotifierProvider<VideoPlayerNotifier, MediaControlsWrapper>((ref) {
   final videoPlayer = VideoPlayerNotifier(ref);
-  videoPlayer.init();
+  // Warm player in background; [init] is serialized so a concurrent
+  // [loadPlaybackItem] joins this future instead of double-creating mpv.
+  unawaited(videoPlayer.init());
   return videoPlayer;
 });
 
@@ -41,11 +43,36 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
 
   List<StreamSubscription> subscriptions = [];
 
+  /// In-flight [init] — Dart is single-threaded so assigning before first await
+  /// makes concurrent callers share one create/dispose cycle.
+  Future<void>? _initFuture;
+
   late final mediaState = ref.read(mediaPlaybackProvider.notifier);
 
   MediaPlaybackModel get playbackState => ref.read(mediaPlaybackProvider);
 
-  Future<void> init() async {
+  Future<void> init() {
+    final inFlight = _initFuture;
+    if (inFlight != null) {
+      if (OxplayerEnv.isEnabled) {
+        OxplayerStreamLog.event('video_player_init_join', fields: {
+          'hasPlayer': state.hasPlayer,
+        });
+      }
+      return inFlight;
+    }
+
+    late final Future<void> future;
+    future = _initImpl().whenComplete(() {
+      if (identical(_initFuture, future)) {
+        _initFuture = null;
+      }
+    });
+    _initFuture = future;
+    return future;
+  }
+
+  Future<void> _initImpl() async {
     final settings = ref.read(videoPlayerSettingsProvider);
     if (state.hasPlayer && state.matchesSettings(settings)) {
       return;
@@ -62,6 +89,7 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     for (final s in subscriptions) {
       s.cancel();
     }
+    subscriptions.clear();
 
     final subscription = state.stateStream.listen((value) {
       updateBuffering(value.buffering);
@@ -150,9 +178,8 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
       });
     }
 
-    if (!state.hasPlayer) {
-      await init();
-    }
+    // Always await: joins provider warm-up init if still running (avoids double mpv create).
+    await init();
 
     ref.read(playBackModel)?.dispose();
     await state.stop();

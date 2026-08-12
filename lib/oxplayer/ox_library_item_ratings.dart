@@ -8,10 +8,11 @@ import 'package:http/http.dart' as http;
 
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/item_base_model.dart';
-import 'package:fladder/util/duration_extensions.dart';
+import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
 import 'package:fladder/oxplayer/oxplayer_api_disk_cache.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_user_data_derive.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/seerr_api_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
@@ -132,23 +133,34 @@ Future<void> oxPatchLibraryItemPlaybackInCache(
     final decoded = jsonDecode(entry.body);
     if (decoded is! Map<String, dynamic>) return;
 
-    final ticks = position.toRuntimeTicks;
-    final userData = decoded['UserData'];
-    if (userData is Map<String, dynamic>) {
-      userData['PlaybackPositionTicks'] = ticks;
-      final runTimeTicks = decoded['RunTimeTicks'];
-      if (runTimeTicks is num && runTimeTicks > 0) {
-        userData['PlayedPercentage'] = (ticks / runTimeTicks * 100).clamp(0, 100);
-      }
-      userData['Played'] = false;
-    } else {
-      decoded['UserData'] = {
-        'PlaybackPositionTicks': ticks,
-        'Played': false,
-        if (decoded['RunTimeTicks'] is num && (decoded['RunTimeTicks'] as num) > 0)
-          'PlayedPercentage': (ticks / (decoded['RunTimeTicks'] as num) * 100).clamp(0, 100),
-      };
-    }
+    final runTimeTicks = decoded['RunTimeTicks'];
+    final runTime = runTimeTicks is num && runTimeTicks > 0
+        ? Duration(milliseconds: (runTimeTicks / 10000).round())
+        : Duration.zero;
+    final existing = decoded['UserData'];
+    final current = existing is Map<String, dynamic>
+        ? UserData(
+            isFavourite: existing['IsFavorite'] == true,
+            playCount: existing['PlayCount'] is num ? (existing['PlayCount'] as num).toInt() : 0,
+            playbackPositionTicks:
+                existing['PlaybackPositionTicks'] is num ? (existing['PlaybackPositionTicks'] as num).toInt() : 0,
+            progress: existing['PlayedPercentage'] is num ? (existing['PlayedPercentage'] as num).toDouble() : 0,
+            played: existing['Played'] == true,
+          )
+        : const UserData();
+    final next = oxDerivePlaybackUserData(
+      current: current,
+      position: position,
+      runTime: runTime,
+    );
+    decoded['UserData'] = {
+      if (existing is Map<String, dynamic>) ...existing,
+      'PlaybackPositionTicks': next.playbackPositionTicks,
+      'PlayedPercentage': next.progress,
+      'Played': next.played,
+      'PlayCount': next.playCount,
+      if (next.lastPlayed != null) 'LastPlayedDate': next.lastPlayed!.toUtc().toIso8601String(),
+    };
 
     await OxplayerApiDiskCache.write(
       cacheKey,

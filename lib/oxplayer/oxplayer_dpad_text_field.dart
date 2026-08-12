@@ -11,6 +11,9 @@ import 'package:fladder/widgets/keyboard/slide_in_keyboard.dart';
 ///
 /// [useSystemIme]: when true (default), Select/OK opens the Android TV system keyboard.
 /// When false, uses Fladder's slide-in mini keyboard.
+///
+/// Phone/tablet: single [FocusNode] on the [TextField] so Android opens the correct
+/// IME for [keyboardType]. TV keeps a wrapper focus ring + separate EditableText node.
 class OxplayerDpadTextField extends StatefulWidget {
   const OxplayerDpadTextField({
     required this.controller,
@@ -65,8 +68,9 @@ class OxplayerDpadTextField extends StatefulWidget {
 }
 
 class OxplayerDpadTextFieldState extends State<OxplayerDpadTextField> {
-  late final FocusNode _wrapperFocus = widget.focusNode ?? FocusNode();
-  final FocusNode _textFocus = FocusNode();
+  late final FocusNode _externalOrOwned = widget.focusNode ?? FocusNode();
+  /// TV-only: EditableText node under the wrapper ring.
+  final FocusNode _tvTextFocus = FocusNode();
   bool _hasFocus = false;
   bool _ownsFocus = false;
 
@@ -74,12 +78,15 @@ class OxplayerDpadTextFieldState extends State<OxplayerDpadTextField> {
 
   bool get _useCustomKb => _isDpad && !widget.useSystemIme;
 
+  /// Node that owns the [TextField] on the current device.
+  FocusNode get _fieldFocus => _isDpad ? _tvTextFocus : _externalOrOwned;
+
   @override
   void initState() {
     super.initState();
     _ownsFocus = widget.focusNode == null;
-    _wrapperFocus.addListener(_onFocusChange);
-    _textFocus.addListener(_onFocusChange);
+    _externalOrOwned.addListener(_onFocusChange);
+    _tvTextFocus.addListener(_onFocusChange);
     if (widget.autofocus) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) requestFocus();
@@ -89,29 +96,50 @@ class OxplayerDpadTextFieldState extends State<OxplayerDpadTextField> {
 
   void _onFocusChange() {
     if (!mounted) return;
-    setState(() => _hasFocus = _wrapperFocus.hasFocus || _textFocus.hasFocus);
+    setState(() {
+      _hasFocus = _externalOrOwned.hasFocus || _tvTextFocus.hasFocus;
+    });
   }
 
-  /// Focus wrapper (visible ring). Select then opens IME / custom keyboard.
+  /// Phone: focus EditableText (correct [keyboardType] IME).
+  /// TV: focus wrapper ring; Select opens IME.
   void requestFocus() {
+    _externalOrOwned.requestFocus();
+  }
+
+  /// Focus + open system IME after the field is attached (phone login step changes).
+  void requestFocusAndShowIme() {
     if (_isDpad) {
-      _wrapperFocus.requestFocus();
-    } else {
-      _textFocus.requestFocus();
+      requestFocus();
+      return;
     }
+    // Two frames: first attach EditableText connection (keyboardType), then show IME.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !widget.enabled) return;
+      _externalOrOwned.requestFocus();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !widget.enabled) return;
+        if (!_externalOrOwned.hasFocus) {
+          _externalOrOwned.requestFocus();
+        }
+        if (_externalOrOwned.hasFocus) {
+          SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+        }
+      });
+    });
   }
 
   @override
   void dispose() {
-    _wrapperFocus.removeListener(_onFocusChange);
-    _textFocus.removeListener(_onFocusChange);
-    if (_ownsFocus) _wrapperFocus.dispose();
-    _textFocus.dispose();
+    _externalOrOwned.removeListener(_onFocusChange);
+    _tvTextFocus.removeListener(_onFocusChange);
+    if (_ownsFocus) _externalOrOwned.dispose();
+    _tvTextFocus.dispose();
     super.dispose();
   }
 
   void _showSystemIme() {
-    _textFocus.requestFocus();
+    _tvTextFocus.requestFocus();
     SystemChannels.textInput.invokeMethod<void>('TextInput.show');
   }
 
@@ -128,7 +156,7 @@ class OxplayerDpadTextFieldState extends State<OxplayerDpadTextField> {
     );
     if (!mounted) return;
     widget.onKeyboardClosed?.call();
-    _wrapperFocus.requestFocus();
+    _externalOrOwned.requestFocus();
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
@@ -141,8 +169,8 @@ class OxplayerDpadTextFieldState extends State<OxplayerDpadTextField> {
     }
 
     if (event.logicalKey == LogicalKeyboardKey.arrowDown && widget.onMoveFocusDown != null) {
-      if (_textFocus.hasFocus) {
-        _textFocus.unfocus();
+      if (_tvTextFocus.hasFocus) {
+        _tvTextFocus.unfocus();
         SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
       }
       widget.onMoveFocusDown!();
@@ -168,7 +196,7 @@ class OxplayerDpadTextFieldState extends State<OxplayerDpadTextField> {
 
     final textField = TextField(
       controller: widget.controller,
-      focusNode: _textFocus,
+      focusNode: _fieldFocus,
       enabled: enabled,
       readOnly: _useCustomKb || !enabled,
       showCursor: enabled && !_useCustomKb,
@@ -218,24 +246,28 @@ class OxplayerDpadTextFieldState extends State<OxplayerDpadTextField> {
       ),
     );
 
-    return Opacity(
-      opacity: enabled ? 1 : 0.55,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            width: _hasFocus && enabled ? 3 : 2,
-            color: _hasFocus && enabled ? theme.colorScheme.primary : Colors.transparent,
-          ),
-        ),
-        child: Focus(
-          focusNode: _wrapperFocus,
-          canRequestFocus: enabled,
-          onKeyEvent: _onKey,
-          child: ExcludeFocusTraversal(child: textField),
+    final ring = AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          width: _hasFocus && enabled ? 3 : 2,
+          color: _hasFocus && enabled ? theme.colorScheme.primary : Colors.transparent,
         ),
       ),
+      child: _isDpad
+          ? Focus(
+              focusNode: _externalOrOwned,
+              canRequestFocus: enabled,
+              onKeyEvent: _onKey,
+              child: ExcludeFocusTraversal(child: textField),
+            )
+          : textField,
+    );
+
+    return Opacity(
+      opacity: enabled ? 1 : 0.55,
+      child: ring,
     );
   }
 }

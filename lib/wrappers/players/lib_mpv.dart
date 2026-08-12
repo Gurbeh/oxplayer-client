@@ -765,13 +765,26 @@ class LibMPV extends BasePlayer {
   }
 
   /// SRT/VTT need Flutter overlay via sub-text; libass sub-ass=yes blocks that on Android.
+  /// Hide mpv OSD (`sub-visibility=no`) so only Flutter paints — otherwise double soft sub
+  /// (small mpv + sized Flutter). `sub-text` events still fire with visibility off.
   Future<void> _configureMpvForTextSubtitle(String codec) async {
     if (_player?.platform is! mpv.NativePlayer || !_settings.useLibass) return;
     if (_isAssSubtitleCodec(codec)) return;
     final native = _player!.platform as dynamic;
     try {
       await native.setProperty('sub-ass', 'no');
-      await native.setProperty('sub-visibility', 'yes');
+      // OX: hide mpv soft OSD; Flutter `_VideoSubtitles` paints sized text.
+      final hideMpvOsd = OxplayerConfig.isEnabled;
+      await native.setProperty('sub-visibility', hideMpvOsd ? 'no' : 'yes');
+      if (OxplayerConfig.isEnabled) {
+        OxplayerStreamLog.event('subtitle_mpv_text_path', fields: {
+          'codec': codec,
+          'subAss': 'no',
+          'subVisibility': hideMpvOsd ? 'no' : 'yes',
+          'flutterOverlay': 'expected',
+          'mpvOsd': hideMpvOsd ? 'hidden' : 'visible',
+        });
+      }
     } catch (_) {}
   }
 
@@ -1031,15 +1044,29 @@ class LibMPV extends BasePlayer {
       }
       if (!_isAssSubtitleCodec(_currentSubtitleCodec)) {
         await native.setProperty('sub-ass', 'no');
-        await native.setProperty('sub-visibility', 'yes');
+        final hideMpvOsd = OxplayerConfig.isEnabled;
+        await native.setProperty('sub-visibility', hideMpvOsd ? 'no' : 'yes');
+        OxplayerStreamLog.event('subtitle_mpv_style_sync', fields: {
+          'path': 'flutter_text',
+          'codec': _currentSubtitleCodec,
+          'subVisibility': hideMpvOsd ? 'no' : 'yes',
+          'mpvOsd': hideMpvOsd ? 'hidden' : 'visible',
+        });
         return;
       }
+      await native.setProperty('sub-visibility', 'yes');
       await _applyOxLibassFontDir(native);
       await native.setProperty('sub-ass-override', 'force');
       await native.setProperty(
         'sub-ass-force-style',
         OxSubtitleFont.assForceStyle(settings, language: _currentSubtitleLanguage),
       );
+      OxplayerStreamLog.event('subtitle_mpv_style_sync', fields: {
+        'path': 'libass_burn',
+        'codec': _currentSubtitleCodec,
+        'subVisibility': 'yes',
+        'flutterOverlay': 'suppressed',
+      });
     } catch (_) {}
   }
 
@@ -1147,6 +1174,7 @@ class _VideoSubtitlesState extends ConsumerState<_VideoSubtitles> {
   StreamSubscription<List<String>>? subscription;
 
   double? _cachedMenuHeight;
+  String? _lastPaintDecisionLog;
 
   @override
   void initState() {
@@ -1190,24 +1218,32 @@ class _VideoSubtitlesState extends ConsumerState<_VideoSubtitles> {
         : playbackSubLanguage;
 
     final bool isLibassEnabled = widget.controller.player.platform?.configuration.libass ?? false;
+    final currentSubCodec = widget.currentSubtitleCodec.toLowerCase();
+    final bool isAssSubtitle = currentSubCodec.contains('ass') || currentSubCodec.contains('ssa');
+    final bool isDesktop = defaultTargetPlatform == TargetPlatform.linux ||
+        defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.macOS;
 
+    String paintPath = 'flutter_overlay';
     if (isLibassEnabled) {
       // On desktop (Linux/Windows/macOS), mpv burns ALL subtitle formats into the video when libass is enabled.
       // On mobile (Android/iOS), only ASS/SSA subs are burned in by libass; other formats need the Flutter overlay.
-      final bool isDesktop = defaultTargetPlatform == TargetPlatform.linux ||
-          defaultTargetPlatform == TargetPlatform.windows ||
-          defaultTargetPlatform == TargetPlatform.macOS;
       if (isDesktop) {
+        paintPath = 'libass_desktop_burn';
+        _logSubtitlePaintDecision(paintPath, text: text, libass: true, isAss: isAssSubtitle);
         return const SizedBox.shrink();
       }
-      final currentSubCodec = widget.currentSubtitleCodec.toLowerCase();
-      final bool isAssSubtitle = currentSubCodec.contains('ass') || currentSubCodec.contains('ssa');
       if (isAssSubtitle || text.isEmpty) {
+        paintPath = isAssSubtitle ? 'libass_ass_burn' : 'empty';
+        _logSubtitlePaintDecision(paintPath, text: text, libass: true, isAss: isAssSubtitle);
         return const SizedBox.shrink();
       }
     } else if (text.isEmpty) {
+      _logSubtitlePaintDecision('empty', text: text, libass: false, isAss: isAssSubtitle);
       return const SizedBox.shrink();
     }
+
+    _logSubtitlePaintDecision(paintPath, text: text, libass: isLibassEnabled, isAss: isAssSubtitle);
 
     final offset = SubtitlePositionCalculator.calculateOffset(
       settings: settings,
@@ -1223,6 +1259,29 @@ class _VideoSubtitlesState extends ConsumerState<_VideoSubtitles> {
       text: text,
       subtitleLanguage: subtitleLanguage,
     );
+  }
+
+  void _logSubtitlePaintDecision(
+    String path, {
+    required String text,
+    required bool libass,
+    required bool isAss,
+  }) {
+    if (!OxplayerConfig.isEnabled) return;
+    if (text.isEmpty && path == 'empty') return;
+    final key = '$path|${widget.currentSubtitleCodec}|$libass|$isAss|${text.isEmpty}';
+    if (key == _lastPaintDecisionLog) return;
+    _lastPaintDecisionLog = key;
+    final preview = text.trim();
+    OxplayerStreamLog.event('subtitle_flutter_paint', fields: {
+      'path': path,
+      'codec': widget.currentSubtitleCodec.isEmpty ? '(none)' : widget.currentSubtitleCodec,
+      'libass': libass,
+      'isAss': isAss,
+      'platform': defaultTargetPlatform.name,
+      'chars': preview.length,
+      'preview': preview.length > 40 ? '${preview.substring(0, 40)}…' : preview,
+    });
   }
 
   void _measureMenuHeight() {

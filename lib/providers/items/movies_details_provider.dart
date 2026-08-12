@@ -5,6 +5,7 @@ import 'package:chopper/chopper.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:fladder/models/item_base_model.dart';
+import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
@@ -126,5 +127,14 @@ class MovieDetails extends _$MovieDetails {
 
   void setMediaStreamHelper(MediaStreamsModel changed) {
     state = state?.copyWith(mediaStreams: changed);
+  }
+
+  /// Local UserData patch after playback stop — avoids waiting on a stale post-play refetch.
+  void patchUserData(UserData userData) {
+    final current = state;
+    if (current == null) return;
+    // Invalidate in-flight fetchDetails from post-play (often started before stop persisted).
+    _loadGeneration++;
+    state = current.copyWith(userData: userData);
   }
 }
