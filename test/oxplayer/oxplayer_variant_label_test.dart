@@ -96,10 +96,22 @@ void main() {
 
   test('formats soft sub without language suffix', () async {
     final l10n = await loadEn();
-    final label = oxplayerLocalizedVersionStreamLabel(
-      l10n,
-      _stream(name: '720p - soft sub - PSA', height: 720, hasSubs: true),
+    final label = oxplayerVersionStreamLabel(
+      _stream(name: '720p - soft sub - PSA x264 - 302 MB', height: 720, hasSubs: true),
+      l10n: l10n,
     );
-    expect(label, '720p - soft sub - PSA');
+    expect(label, '720p - soft sub - PSA x264 - 302 MB');
+  });
+
+  test('localizes server soft sub webdl label in persian locale', () async {
+    final l10n = await loadFa();
+    final label = oxplayerVersionStreamLabel(
+      _stream(
+        name: '1080p - soft sub - 10Bit WEB-DL x265 - 500 MB',
+        hasSubs: true,
+      ),
+      l10n: l10n,
+    );
+    expect(label, '1080p - ${l10n.oxplayerVariantSoftSub} - 10Bit WEB-DL x265 - 500 MB');
   });
 }

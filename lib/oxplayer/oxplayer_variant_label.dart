@@ -28,14 +28,21 @@ String oxplayerVersionStreamLabel(
   VersionStreamModel stream, {
   AppLocalizations? l10n,
 }) {
+  final serverName = stream.name.trim();
+  if (OxplayerConfig.isEnabled && serverName.isNotEmpty) {
+    if (l10n != null) {
+      return _localizeServerVariantLabel(l10n, serverName);
+    }
+    return serverName;
+  }
   if (OxplayerConfig.isEnabled && l10n != null) {
     final localized = oxplayerLocalizedVersionStreamLabel(l10n, stream);
     if (localized.isNotEmpty) {
       return localized;
     }
   }
-  if (stream.name.trim().isNotEmpty) {
-    return stream.name.trim();
+  if (serverName.isNotEmpty) {
+    return serverName;
   }
   final resolution = stream.detailedResolutionLabel.trim();
   if (resolution.isNotEmpty && resolution != 'Unknown Unknown') {
@@ -46,6 +53,65 @@ String oxplayerVersionStreamLabel(
     return id.replaceFirst(RegExp(r'^ms_'), 'Variant ');
   }
   return 'Variant ${stream.index + 1}';
+}
+
+/// Localize delivery/language tokens in a server-built label; keep technical segments intact.
+String _localizeServerVariantLabel(AppLocalizations l10n, String serverName) {
+  final parts = serverName.split(' - ').map((part) => part.trim()).where((part) => part.isNotEmpty).toList();
+  if (parts.isEmpty) {
+    return serverName;
+  }
+  final localized = parts.map((part) => _localizeServerVariantSegment(l10n, part)).toList();
+  return localized.join(' - ');
+}
+
+String _localizeServerVariantSegment(AppLocalizations l10n, String segment) {
+  final lower = segment.toLowerCase();
+  if (lower == 'soft sub' || lower == 'softsub') {
+    return l10n.oxplayerVariantSoftSub;
+  }
+  if (lower == 'hard sub' || lower == 'hardsub') {
+    return l10n.oxplayerVariantHardSubGeneric;
+  }
+  if (lower == 'dubbed') {
+    return l10n.oxplayerVariantDubbedGeneric;
+  }
+  final dubbed = RegExp(r'^dubbed\s*\(([^)]+)\)$', caseSensitive: false).firstMatch(segment);
+  if (dubbed != null) {
+    final lang = _localizedLanguageName(l10n, dubbed.group(1));
+    return l10n.oxplayerVariantDubbed(lang);
+  }
+  final hardSub = RegExp(r'^hard sub\s*\(([^)]+)\)$', caseSensitive: false).firstMatch(segment);
+  if (hardSub != null) {
+    final lang = _localizedLanguageName(l10n, hardSub.group(1));
+    return l10n.oxplayerVariantHardSub(lang);
+  }
+  if (_looksLikeLanguageSegment(segment)) {
+    return _localizedLanguageName(l10n, segment);
+  }
+  return segment;
+}
+
+bool _looksLikeLanguageSegment(String segment) {
+  switch (segment.toLowerCase()) {
+    case 'english':
+    case 'persian':
+    case 'farsi':
+    case 'arabic':
+    case 'german':
+    case 'french':
+    case 'spanish':
+    case 'russian':
+    case 'japanese':
+    case 'korean':
+    case 'chinese':
+    case 'turkish':
+    case 'original':
+    case 'dual':
+      return true;
+    default:
+      return RegExp(r'^[a-z]{2,3}$', caseSensitive: false).hasMatch(segment);
+  }
 }
 
 String _resolutionLabel(OxVersionStreamMeta meta, VersionStreamModel stream) {
