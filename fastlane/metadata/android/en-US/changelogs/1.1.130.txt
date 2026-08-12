@@ -1,0 +1,1 @@
+Watch progress sync, subtitle overlay fix, phone login keyboard
