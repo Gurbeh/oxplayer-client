@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_login_attempt_api.dart' show OxplayerLoginAttemptPollResult;
+import 'package:fladder/oxplayer/oxplayer_tdlib_session_cache.dart';
 import 'package:fladder/oxplayer/oxplayer_telegram_webapp_auth_api.dart';
 import 'package:fladder/oxplayer/oxplayer_telegram_windows_bridge_stub.dart'
     if (dart.library.io) 'package:fladder/oxplayer/oxplayer_telegram_windows_bridge.dart';
@@ -135,6 +136,10 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
       '${state.errorMessage != null ? ' err=${state.errorMessage}' : ''}',
     );
     _state = state;
+    if (state.kind == OxTdlibAuthStateKind.uninitialized ||
+        state.kind == OxTdlibAuthStateKind.closed) {
+      _configured = false;
+    }
     notifyListeners();
   }
 
@@ -413,8 +418,16 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
     return _api.startPlaybackSession(source);
   }
 
-  Future<void> stopPlaybackSession(String sessionUri) =>
-      _useWindows ? _windows!.stopPlaybackSession(sessionUri) : _api.stopPlaybackSession(sessionUri);
+  Future<void> stopPlaybackSession(String sessionUri) async {
+    // Resolved gotdstream/http-bridge urls die with the playback session — drop cache so
+    // the next play re-runs startPlaybackSession against the still-warm TDLib client.
+    OxplayerTdlibSessionCache.clearAll();
+    if (_useWindows) {
+      await _windows!.stopPlaybackSession(sessionUri);
+    } else {
+      await _api.stopPlaybackSession(sessionUri);
+    }
+  }
 
   /// Fetches a Telegram-signed Mini App initData payload for TELEGRAM_WEBAPP_BOT_USERNAME (falls
   /// back to OXPLAYER_BOT_USERNAME/main-bot when no dedicated auth bot is configured).

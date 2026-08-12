@@ -18,10 +18,12 @@ Options:
   --dry-run      Show plan only
   -y, --yes      Skip confirmation
   --no-push      Commit and tag locally only
-  --skip-verify  Skip verify-all / pre-push hook
+  --skip-verify  Default: skip local verify (CI is the gate)
+  --verify       Run verify-all locally before push
 
 Example:
-  bash scripts/release-client.sh "Iran web API routing fixes"
+  bash scripts/release-client.sh -y "Iran web API routing fixes"
+  # Both repos: from oxplayer-be → pnpm release:all -y "…"
 EOF
 }
 

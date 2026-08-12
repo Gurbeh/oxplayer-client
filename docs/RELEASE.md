@@ -79,9 +79,18 @@ Do **not** create a `v*` tag for a prerelease.
 
 ## Release (stable)
 
+**Preferred (no agent):** from sibling `oxplayer-be`:
+
+```bash
+pnpm release:all -y "One-line summary"
+# client-only: bash scripts/release-client.sh -y "…"
+```
+
+Bumps version, writes Play changelog, tags `v{M.m.p}`, pushes. Local verify skipped; **Build OXPlayer** CI is the gate.
+
 Stable release = semver tag `v{M.m.p}` + draft GitHub release + Play production path (promote draft in Console after upload).
 
-### 1. Bump version (see top)
+### 1. Bump version (see top) — or use script above
 
 Confirm the tag does not exist yet:
 
@@ -110,6 +119,7 @@ git pull origin main
 ```
 
 > **Prepare Release** pushes the tag with `GITHUB_TOKEN`, which does **not** start **Build OXPlayer**. You must dispatch the release build yourself (step 3).
+> Prefer `release-client.sh` / `pnpm release:all` — those push the tag with your credentials so the release build starts automatically.
 
 ### 3. Build release artifacts
 

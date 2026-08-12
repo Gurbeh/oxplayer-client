@@ -236,22 +236,21 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
     }
 
     /**
-     * Closes the whole client rather than just cancelling the download: proven against a real
-     * chat-heavy account under TDLib that keeping any Telegram client open indefinitely between
-     * plays costs continuous background CPU — kept as a deliberate lifecycle choice here too.
-     * Re-auth isn't needed on the next play (the session persists on disk) and reconnect is fast.
+     * End the active download/session but keep the TDLib client alive (READY).
+     * Closing the whole client after every play forced the next play to reconfigure from
+     * UNINITIALIZED (~0.5–2s+), which dominated first-frame latency. Session auth stays on disk
+     * either way; keeping the live client just avoids that reconnect tax between plays.
      */
     private fun closeAfterPlayback(fileId: Int) {
         if (currentPlaybackFileId != fileId) return
         currentPlaybackFileId = null
         val fetcher = fileFetcher
-        val activeClient = client
+        fileFetcher = null
         if (fetcher != null) {
             scope.launch { runCatching { fetcher.cancelDownload(fileId) } }
         }
         OxTelegramStreamBridge.unregisterSession(fileId)
-        activeClient?.close()
-        clearNativeSession()
+        Log.i("OXPLAY_TDLIB", "closeAfterPlayback fileId=$fileId — client kept alive")
     }
 
     override fun fetchWebAppInitData(

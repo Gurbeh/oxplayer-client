@@ -13,6 +13,7 @@ import 'package:fladder/oxplayer/oxplayer_playback_media_source.dart';
 import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
@@ -92,6 +93,20 @@ abstract final class OxplayerPlaybackPrefetch {
     if (userId == null || userId.isEmpty) return;
 
     final sw = Stopwatch()..start();
+    // Overlap TDLib READY with PlaybackInfo (copyMessage) — next play must not serialize them.
+    final tdlibReady = () async {
+      try {
+        await OxplayerTdlibBridgeController.instance().ensureConfigured(
+          readyTimeout: const Duration(seconds: 30),
+        );
+      } catch (e) {
+        OxplayerStreamLog.event('tdlib_ready_prefetch', fields: {
+          'itemId': itemId,
+          'error': e.runtimeType.toString(),
+        });
+      }
+    }();
+
     try {
       final api = read(jellyApiProvider);
       final response = await oxplayerPollPlaybackInfoUntilReady(() {
@@ -109,18 +124,24 @@ abstract final class OxplayerPlaybackPrefetch {
         );
       });
 
+      final playbackInfoMs = sw.elapsedMilliseconds;
       if (response.isSuccessful && response.body != null) {
         OxplayerPlaybackLinkCache.putFromResponse(response.body);
+        await tdlibReady;
         await _warmTdlibFromResponse(read, response.body!);
+      } else {
+        await tdlibReady;
       }
 
       OxplayerStreamLog.event('playback_prefetch', fields: {
         'itemId': itemId,
         'mediaSourceId': mediaSourceId,
         'cached': response.body != null,
-        'playbackInfoMs': sw.elapsedMilliseconds,
+        'playbackInfoMs': playbackInfoMs,
+        'totalMs': sw.elapsedMilliseconds,
       });
     } catch (e) {
+      await tdlibReady;
       OxplayerStreamLog.event('playback_prefetch', fields: {
         'itemId': itemId,
         'mediaSourceId': mediaSourceId,

@@ -6,7 +6,27 @@ description: >
   checklist. Use when the user asks to cut a release, bump the version, tag a
   release, publish to Play Console, or debug a Play Console "can't upgrade
   existing users" / versionCode error. Mirrors .cursor/rules/oxplayer-release.mdc —
-  keep both in sync if either changes.
+  keep both in sync if either changes. For coordinated BE+client release, prefer
+  oxplayer-be `pnpm release:all` / `.cursor/skills/release`.
+---
+
+# Preferred: one command (no manual bump)
+
+From `oxplayer-be` (sibling of this repo):
+
+```bash
+pnpm release:all -y "One-line summary"
+```
+
+Client-only:
+
+```bash
+bash scripts/release-client.sh -y "One-line summary"
+# or: release-client.cmd -y "…"
+```
+
+Script bumps `pubspec.yaml` + Play changelog, tags `vM.m.p`, pushes. **Local verify skipped by default** — CI **Build OXPlayer** is the gate. Opt-in: `--verify`.
+
 ---
 
 Same model as upstream [DonutWare/fladder](https://github.com/DonutWare/fladder) Android pipeline.
@@ -31,7 +51,7 @@ grep '^version:' pubspec.yaml
 ls fastlane/metadata/android/en-US/changelogs/
 ```
 
-Before tagging:
+Prefer `release-client.sh` / `pnpm release:all` over hand-editing. If tagging by hand:
 
 1. Bump **version name** in `pubspec.yaml` (e.g. `0.0.3+8` → `0.0.4+8` — the `+` suffix is for local builds only).
 2. Confirm `v{versionName}` tag does **not** exist.
@@ -39,10 +59,11 @@ Before tagging:
 
 ## Release steps
 
-1. **Prepare Release** (workflow_dispatch on `main`) → fastlane `changelogs/{versionName}.txt` + tag `v*`
-2. Tag push → **Build OXPlayer** (`build_type=release`) → signed APK/AAB + GitHub draft release
-3. **Play upload** (if `SERVICE_ACCOUNT_JSON` set): release → `production` / `draft`; nightly → `internal` / `completed`
-4. Publish GitHub draft when green.
+1. **Script path (preferred):** `pnpm release:all -y "…"` or `release-client.sh -y "…"` → tag push triggers build.
+2. **Alt:** **Prepare Release** (workflow_dispatch on `main`) → fastlane changelog + tag `v*`
+3. Tag push → **Build OXPlayer** (`build_type=release`) → signed APK/AAB + GitHub draft release
+4. **Play upload** (if `SERVICE_ACCOUNT_JSON` set): release → `production` / `draft`; nightly → `internal` / `completed`
+5. Publish GitHub draft when green.
 
 ## Triggers (Android)
 
@@ -66,6 +87,7 @@ Before tagging:
 - Use pubspec `+N` or raw `github.run_number` as CI `--build-number` (breaks upgrade path vs legacy split APKs on Play).
 - Upload split APKs from GitHub Releases to Play Console — **AAB only**.
 - Re-tag an existing `v*` without bumping version name in pubspec.
+- Re-run full local `verify-all` on every release push — CI is the gate (use `--verify` only if needed).
 
 ## Play Console: "can't upgrade existing users"
 

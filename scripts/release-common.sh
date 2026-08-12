@@ -16,8 +16,43 @@ release_require_cmd() {
   done
 }
 
+release_ensure_gh_on_path() {
+  if command -v gh &>/dev/null; then
+    return 0
+  fi
+  # Git Bash / WSL often lack WinGet PATH for Windows gh.exe.
+  local candidate dir
+  for candidate in \
+    "/mnt/c/Program Files/GitHub CLI/gh.exe" \
+    "/mnt/c/Program Files (x86)/GitHub CLI/gh.exe" \
+    "/c/Program Files/GitHub CLI/gh.exe" \
+    "/c/Program Files (x86)/GitHub CLI/gh.exe"; do
+    if [[ -f "${candidate}" ]]; then
+      dir="$(dirname "${candidate}")"
+      PATH="${dir}:${PATH}"
+      export PATH
+      if command -v gh &>/dev/null; then
+        return 0
+      fi
+      # WSL: Windows binaries need the .exe name unless wrapped.
+      if command -v gh.exe &>/dev/null; then
+        gh() { command gh.exe "$@"; }
+        export -f gh
+        return 0
+      fi
+    fi
+  done
+  return 1
+}
+
 release_require_gh_auth() {
-  release_require_cmd gh git
+  release_ensure_gh_on_path || true
+  release_require_cmd git
+  if ! command -v gh &>/dev/null; then
+    echo "error: required command not found: gh" >&2
+    echo "Install GitHub CLI, or on WSL install: sudo apt install gh" >&2
+    exit 1
+  fi
   if ! gh auth status &>/dev/null; then
     echo "error: GitHub CLI not authenticated." >&2
     echo "Run: gh auth login" >&2
@@ -62,8 +97,9 @@ release_preflight() {
 release_run_verify() {
   local root
   root="$(release_root)"
-  if [[ "${RELEASE_SKIP_VERIFY:-0}" == "1" ]]; then
-    echo "Skipping verify-all (--skip-verify)"
+  # Default: skip local verify — CI is the gate (faster release push).
+  if [[ "${RELEASE_SKIP_VERIFY:-1}" == "1" ]]; then
+    echo "Skipping local verify-all (CI is the gate; pass --verify to run locally)"
     return 0
   fi
   if [[ -f "${root}/scripts/verify-all.sh" ]]; then
@@ -105,7 +141,8 @@ Options:
   --dry-run      Show plan only; no file edits
   -y, --yes      Skip confirmation prompt
   --no-push      Commit and tag locally only
-  --skip-verify  Skip scripts/verify-all.sh and pre-push verify (OX_SKIP_VERIFY=1)
+  --skip-verify  Default: skip local verify-all / pre-push (CI is the gate)
+  --verify       Run scripts/verify-all.sh locally before bump/push
 
 Requires: gh auth login, clean main, up to date with origin/main
 EOF
@@ -115,7 +152,8 @@ release_parse_args() {
   RELEASE_DRY_RUN=0
   RELEASE_YES=0
   RELEASE_NO_PUSH=0
-  RELEASE_SKIP_VERIFY=0
+  # Default skip: version bump + push first; CI runs verify once.
+  RELEASE_SKIP_VERIFY=1
   RELEASE_SUMMARY=""
 
   while [[ $# -gt 0 ]]; do
@@ -134,6 +172,10 @@ release_parse_args() {
         ;;
       --skip-verify)
         RELEASE_SKIP_VERIFY=1
+        shift
+        ;;
+      --verify)
+        RELEASE_SKIP_VERIFY=0
         shift
         ;;
       -h | --help)
@@ -173,7 +215,7 @@ release_push() {
     return 0
   fi
 
-  if [[ "${RELEASE_SKIP_VERIFY:-0}" == "1" ]]; then
+  if [[ "${RELEASE_SKIP_VERIFY:-1}" == "1" ]]; then
     export OX_SKIP_VERIFY=1
   fi
 
