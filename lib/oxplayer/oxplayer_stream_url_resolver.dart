@@ -1,6 +1,8 @@
-import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
+import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_session_cache.dart';
 import 'package:fladder/providers/settings/video_player_settings_provider.dart';
 
 /// Resolves a PlaybackInfo-minted URL to a playable one. Telegram-native links resolve via the
@@ -20,8 +22,35 @@ Future<String?> oxplayerResolveStreamPlaybackUrl(
   // including Android. Product default was Android → tdlib-file:// + Exo; restore later
   // by gating Android to preferHttpBridge=false again. gotd-only either way.
   final useHttpBridge = wantedPlayer != PlayerOptions.nativePlayer;
-  return oxplayerResolveTdlibPlaybackUrl(
-    apiMintedUrl!,
+  final telegramUrl = apiMintedUrl!;
+
+  if (forceRefreshNodes) {
+    OxplayerTdlibSessionCache.invalidateTelegramUrl(telegramUrl);
+  }
+
+  final sw = Stopwatch()..start();
+  final cached = OxplayerTdlibSessionCache.get(telegramUrl, preferHttpBridge: useHttpBridge);
+  if (cached != null && !forceRefreshNodes) {
+    OxplayerStreamLog.event('tdlib_cache_hit', fields: {
+      'url': OxplayerStreamLog.describeUrl(telegramUrl),
+      'resolved': OxplayerStreamLog.describeUrl(cached),
+    });
+    return cached;
+  }
+
+  final resolved = await OxplayerTdlibSessionCache.resolveOrStart(
+    telegramUrl,
     preferHttpBridge: useHttpBridge,
+    start: () => oxplayerResolveTdlibPlaybackUrl(
+      telegramUrl,
+      preferHttpBridge: useHttpBridge,
+    ),
   );
+  OxplayerStreamLog.event('tdlib_resolve', fields: {
+    'url': OxplayerStreamLog.describeUrl(telegramUrl),
+    'resolved': OxplayerStreamLog.describeUrl(resolved),
+    'tdlibResolveMs': sw.elapsedMilliseconds,
+    'cacheHit': false,
+  });
+  return resolved;
 }

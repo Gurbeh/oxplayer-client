@@ -40,6 +40,7 @@ import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_session_cache.dart';
 import 'package:fladder/profiles/default_profile.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/connectivity_provider.dart';
@@ -448,11 +449,18 @@ class PlaybackModelHelper {
       }
 
       PlaybackInfoResponse? playbackInfo;
-      if (OxplayerEnv.isEnabled && requestedMediaSourceId != null) {
-        playbackInfo = OxplayerPlaybackLinkCache.get(requestedMediaSourceId);
-        if (playbackInfo == null) {
-          await OxplayerPlaybackPrefetch.waitInFlightForMediaSource(requestedMediaSourceId);
+      if (OxplayerEnv.isEnabled) {
+        if (requestedMediaSourceId != null) {
           playbackInfo = OxplayerPlaybackLinkCache.get(requestedMediaSourceId);
+        }
+        if (playbackInfo == null) {
+          await OxplayerPlaybackPrefetch.waitInFlightForItem(
+            item.id,
+            mediaSourceId: requestedMediaSourceId,
+          );
+          if (requestedMediaSourceId != null) {
+            playbackInfo = OxplayerPlaybackLinkCache.get(requestedMediaSourceId);
+          }
         }
         if (playbackInfo != null) {
           OxplayerStreamLog.event('playback_link_cache_hit', fields: {
@@ -490,6 +498,7 @@ class PlaybackModelHelper {
           debugPrint(
             '$oxplayTdlibLogTag: file missing ($e) for itemId=${item.id} — force-repair retry',
           );
+          OxplayerTdlibSessionCache.invalidateTelegramUrl(mediaPath);
           final repairedInfo = await fetchPlaybackInfo(forceRepair: true);
           final repairedSource = repairedInfo == null
               ? null
@@ -499,7 +508,11 @@ class PlaybackModelHelper {
             debugPrint('$oxplayTdlibLogTag: force-repair produced no usable media source, giving up');
             return null;
           }
-          resolvedMediaPath = await oxplayerResolveStreamPlaybackUrl(ref.read, repairedPath);
+          resolvedMediaPath = await oxplayerResolveStreamPlaybackUrl(
+            ref.read,
+            repairedPath,
+            forceRefreshNodes: true,
+          );
           debugPrint('$oxplayTdlibLogTag: force-repair retry succeeded');
           playbackInfo = repairedInfo;
           mediaSource = repairedSource;

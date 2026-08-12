@@ -630,7 +630,12 @@ extension ItemBaseModelExtensions on ItemBaseModel? {
     final read = _playbackRead(playContext);
 
     if (OxplayerEnv.isEnabled) {
-      OxplayerPlaybackPrefetch.scheduleForItem(read, itemModel.id, startPosition: startPosition);
+      OxplayerPlaybackPrefetch.scheduleForItem(
+        read,
+        itemModel.id,
+        startPosition: startPosition,
+        mediaSourceId: itemModel.streamModel?.currentVersionStream?.id,
+      );
     }
 
     final op = CancelableOperation.fromFuture((() async {

@@ -9,15 +9,19 @@ import 'package:fladder/oxplayer/ox_series_next_up.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_info_polling.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_link_cache.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_media_source.dart';
 import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
+import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/util/duration_extensions.dart';
 
 /// Warms PlaybackInfo (public-provider copy) and caches the playable t.me link in-memory.
 abstract final class OxplayerPlaybackPrefetch {
-  static final Map<String, Future<void>> _inFlight = {};
+  /// In-flight keyed by itemId — any mediaSourceId for same item shares one flight.
+  static final Map<String, Future<void>> _inFlightByItem = {};
 
   /// Fire-and-forget when detail screen knows the likely play target.
   static void scheduleForSeries(OxplayerRead read, SeriesModel? series) {
@@ -42,7 +46,7 @@ abstract final class OxplayerPlaybackPrefetch {
     );
   }
 
-  /// Detail open / quality change / Play tap — coalesce identical in-flight only.
+  /// Detail open / quality change / Play tap — coalesce by itemId.
   /// Always refreshes the in-memory link cache when the call succeeds (process TTL = 2h).
   static void scheduleForItem(
     OxplayerRead read,
@@ -51,29 +55,31 @@ abstract final class OxplayerPlaybackPrefetch {
     String? mediaSourceId,
   }) {
     if (!OxplayerConfig.isEnabled || itemId.isEmpty || kIsWeb) return;
-    final key = _cacheKey(itemId, mediaSourceId);
-    if (_inFlight.containsKey(key)) return;
+    if (_inFlightByItem.containsKey(itemId)) return;
 
-    _inFlight[key] = _run(read, itemId, startPosition: startPosition, mediaSourceId: mediaSourceId)
-        .whenComplete(() => _inFlight.remove(key));
-    unawaited(_inFlight[key]);
+    _inFlightByItem[itemId] = _run(read, itemId, startPosition: startPosition, mediaSourceId: mediaSourceId)
+        .whenComplete(() => _inFlightByItem.remove(itemId));
+    unawaited(_inFlightByItem[itemId]);
   }
 
-  /// Play path: wait for an in-flight prefetch for this MediaSource before falling back to API.
-  static Future<void> waitInFlightForMediaSource(String? mediaSourceId) async {
-    final ms = mediaSourceId?.trim() ?? '';
-    if (ms.isEmpty) return;
-    final pending = _inFlight.entries
-        .where((e) => e.key.endsWith('|$ms') || e.key == '|$ms')
-        .map((e) => e.value)
-        .toList();
+  /// Play path: wait for any in-flight prefetch for this item (and optional MediaSource match).
+  static Future<void> waitInFlightForItem(String itemId, {String? mediaSourceId}) async {
+    final id = itemId.trim();
+    if (id.isEmpty) return;
+    final pending = <Future<void>>[];
+    final byItem = _inFlightByItem[id];
+    if (byItem != null) pending.add(byItem);
     if (pending.isEmpty) return;
     await Future.wait(pending);
   }
 
-  static String _cacheKey(String itemId, String? mediaSourceId) {
-    final ms = mediaSourceId?.trim() ?? '';
-    return '$itemId|$ms';
+  /// Legacy helper — prefers item-scoped wait when [itemId] known.
+  static Future<void> waitInFlightForMediaSource(String? mediaSourceId, {String? itemId}) async {
+    if (itemId != null && itemId.trim().isNotEmpty) {
+      await waitInFlightForItem(itemId, mediaSourceId: mediaSourceId);
+      return;
+    }
+    // Without itemId we cannot safely match coalesced flights; no-op.
   }
 
   static Future<void> _run(
@@ -105,6 +111,7 @@ abstract final class OxplayerPlaybackPrefetch {
 
       if (response.isSuccessful && response.body != null) {
         OxplayerPlaybackLinkCache.putFromResponse(response.body);
+        await _warmTdlibFromResponse(read, response.body!);
       }
 
       OxplayerStreamLog.event('playback_prefetch', fields: {
@@ -119,6 +126,28 @@ abstract final class OxplayerPlaybackPrefetch {
         'mediaSourceId': mediaSourceId,
         'error': e.runtimeType.toString(),
         'elapsedMs': sw.elapsedMilliseconds,
+      });
+    }
+  }
+
+  /// Warm TDLib session so play tap hits session cache. Errors are logged; prefetch still succeeds.
+  static Future<void> _warmTdlibFromResponse(OxplayerRead read, PlaybackInfoResponse body) async {
+    final source = oxplayerResolvePlaybackMediaSource(body);
+    final path = source?.path?.trim();
+    if (!oxplayerIsTelegramProviderLink(path)) return;
+    final sw = Stopwatch()..start();
+    try {
+      await oxplayerResolveStreamPlaybackUrl(read, path);
+      OxplayerStreamLog.event('tdlib_warm', fields: {
+        'url': OxplayerStreamLog.describeUrl(path),
+        'tdlibWarmMs': sw.elapsedMilliseconds,
+        'ok': true,
+      });
+    } catch (e) {
+      OxplayerStreamLog.event('tdlib_warm', fields: {
+        'url': OxplayerStreamLog.describeUrl(path),
+        'tdlibWarmMs': sw.elapsedMilliseconds,
+        'error': e.runtimeType.toString(),
       });
     }
   }
