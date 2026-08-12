@@ -8,5 +8,10 @@ ROOT="$(git rev-parse --show-toplevel)"
 command -v git-lfs >/dev/null 2>&1 || { printf >&2 "\n%s\n\n" "This repository is configured for Git LFS but 'git-lfs' was not found on your path. If you no longer wish to use Git LFS, remove this line from scripts/git-hooks/pre-push."; exit 2; }
 git lfs pre-push "$@"
 
+if [ "${OX_SKIP_VERIFY:-}" = "1" ]; then
+	echo "pre-push: OX_SKIP_VERIFY=1 — skipping verify-all (release / tiny pushes; CI is the gate)"
+	exit 0
+fi
+
 echo "pre-push (required): running scripts/verify-all.sh ..."
 bash "${ROOT}/scripts/verify-all.sh"
