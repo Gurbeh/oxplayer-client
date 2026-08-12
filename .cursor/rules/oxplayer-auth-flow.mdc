@@ -7,26 +7,24 @@ alwaysApply: false
 # OXPlayer Auth Flow
 
 Vanilla Fladder logs in with a Jellyfin username/password.
-OXPlayer replaces this with **TDLib Telegram sign-in**: the user logs into their real Telegram
-account on-device (phone+code+2FA, or QR on TV), and the app exchanges a Telegram-signed Mini App
-`initData` payload (obtained from TDLib itself, no manual bot-approval step) for an OX session.
+OXPlayer replaces this with **two** supported paths only:
 
-This supersedes the earlier bot-deep-link/code-approval flow (`oxplayer_telegram_login_panel.dart`
-+ `oxplayer_login_attempt_api.dart`'s `OxplayerLoginAttemptApi.createAttempt`/`pollUntilComplete`,
-backed by the backend's `/auth/login-attempt` route) for **new** client builds only. The client-side
-panel and API class were deleted (2026-08-08) — `oxplayer_login_attempt_api.dart` now only holds
-`OxplayerLoginAttemptPollResult`/`OxplayerLoginAttemptException`, reused by the TDLib flow below.
+1. **TDLib Telegram Mini App** — on-device Telegram sign-in (phone+code+2FA, or QR on TV), then
+   POST `/auth/telegram` with TDLib-signed `initData`.
+2. **Google Play tester** — `oxplayer_test_account_*` UI → POST `/auth/test-account`.
 
-The backend route (`createLoginAttempt`/`pollLoginAttempt` in `auth_login_attempt.go`, incl.
-`issueSessionForTelegramUser` — shared with `auth_telegram_webapp.go`) was restored right after
-that deletion (2026-08-08): pre-TDLib app installs already in the wild still call
-`/auth/login-attempt`, so the backend must keep serving both flows side by side until those
-versions age out. **Do not delete the backend route/handlers again without a client-version gate
-confirming no active installs still use it.** The main-bot side of the old flow
-(`apps/main-bot/internal/bot/login_attempt.go` + handlers/keyboard/i18n) and
-`packages/db/login_attempt.go` are both still live and required for this.
+## Purged (do not revive in the client)
 
-## Login sequence
+Old claim-code / bot deep-link / `/auth/login-attempt` UI and helpers are **gone** from this app
+(`oxplayer_claim_code_login_panel`, bot QR/login actions, `oxplayerAuthenticateWithClaimCode`,
+`telegramBotLoginLink` / `telegramBotLoginAttemptLink`). Backend old login-attempt / claim-code
+routes were **removed** from `oxplayer-be` — do not reintroduce client callers for them.
+
+`oxplayer_login_attempt_api.dart` still exports `OxplayerLoginAttemptPollResult` /
+`OxplayerLoginAttemptException` as the **shared response wrapper** for `/auth/telegram` (historical
+names only — not a bot login-attempt poll client).
+
+## Login sequence (TDLib)
 
 ```
 1. App starts
@@ -40,21 +38,25 @@ confirming no active installs still use it.** The main-bot side of the old flow
    └─ On Ready: OxplayerTdlibBridgeController.authenticateWithOxApi() —
         1. TdlibWebAppAuth.fetchInitData (TdApi SearchPublicChat → CreatePrivateChat →
            GetWebAppLinkUrl/GetWebAppUrl/GetMainWebApp) — TDLib itself signs the Mini App
-           initData, since it's a real Telegram client; no raw session ever leaves the device
+           initData; no raw session leaves the device
         2. OxplayerTelegramWebAppAuthApi.exchangeInitData — POST /auth/telegram
-   └─ Backend verifies initData (HMAC-SHA256 per Telegram's Mini App spec,
-      apps/api/internal/server/auth_telegram_webapp.go) → EnsureUserForTelegram (match by
-      Telegram user ID) → issueSessionForTelegramUser (same session issuance as the old
-      login-attempt flow) → writeJellyfinAuthenticationResult
+   └─ Backend verifies initData (HMAC-SHA256, auth_telegram_webapp.go) → EnsureUserForTelegram
+      → issueSessionForTelegramUser → writeJellyfinAuthenticationResult
 
-3. Response: access token (JSON body) + `X-Ox-Refresh-Token` header — same shape as the old
-   login-attempt poll response, so oxplayerAuthenticateFromLoginAttemptPoll(ref, result) applies
-   it unchanged (OxplayerLoginAttemptPollResult is reused as the common response wrapper)
+3. Response: access token (JSON body) + `X-Ox-Refresh-Token` header
+   └─ oxplayerAuthenticateFromLoginAttemptPoll(ref, result) applies it
+      (OxplayerLoginAttemptPollResult = shared wrapper)
 
 4. Token stored → FladderConfig.baseUrl = OxplayerEnv.apiBaseUrl
-   └─ Fladder treats api-v2 as its Jellyfin server
 
 5. During use: OxplayerSessionInterceptor on 401 → refresh once → retry; else logout → /ox-login
+```
+
+## Login sequence (Play tester)
+
+```
+OxplayerLoginScreen (or QR hold on TV) → oxplayer_test_account_* → POST /auth/test-account
+→ same AuthenticationResult / X-Ox-Refresh-Token shape → session store
 ```
 
 ## Key files
@@ -67,7 +69,9 @@ confirming no active installs still use it.** The main-bot side of the old flow
 | `oxplayer_tdlib_bridge_controller.dart` | Pigeon wrapper; `authenticateWithOxApi()` orchestrates fetch+exchange |
 | `oxplayer_telegram_webapp_auth_api.dart` | POST /auth/telegram (initData exchange) |
 | `android/ox_tdlib_bridge/.../auth/TdlibWebAppAuth.kt` | Native TdApi GetWebAppLinkUrl fetch |
-| `oxplayer_jellyfin_auth.dart` | `oxplayerAuthenticateFromLoginAttemptPoll` — applies the response to `authProvider` |
+| `oxplayer_jellyfin_auth.dart` | `oxplayerAuthenticateFromLoginAttemptPoll` — applies response to `authProvider` |
+| `oxplayer_login_attempt_api.dart` | Shared poll-result / exception types for `/auth/telegram` |
+| `oxplayer_test_account_*.dart` | Google Play tester sign-in → `/auth/test-account` |
 | `oxplayer_session.dart` | Cold-start restore, refresh, invalidate |
 | `oxplayer_session_interceptor.dart` | 401 → refresh or logout |
 | `oxplayer_session_store.dart` | Persist `X-Ox-Refresh-Token` per account |
@@ -78,22 +82,30 @@ confirming no active installs still use it.** The main-bot side of the old flow
 
 - **New login step** → extend `OxplayerLoginScreen` or the two TDLib panels under `lib/oxplayer/`.
 - **Sign-out / add account routing** → `oxplayerSignOutRouteList()` / `oxplayerAddAccountRoute()`, not hardcoded `LoginRoute()` for OX.
-- A Mini App must be registered on the bot (`OXPLAYER_BOT_USERNAME`) via @BotFather — short name
+- A Mini App must be registered via @BotFather on `TELEGRAM_WEBAPP_BOT_USERNAME` — short name
   and/or a hosted HTTPS Mini App URL — or `GetWebAppLinkUrl`/`GetWebAppUrl` fail. See
   `TELEGRAM_WEBAPP_SHORT_NAME` / `TELEGRAM_HOSTED_WEBAPP_HTTPS_URL` in `oxplayer_env.dart`.
+  Deliberately a bot OTHER than `OXPLAYER_BOT_USERNAME` (main-bot): a Main Mini App also makes
+  Telegram show a persistent "OPEN" button on that bot's own chat screen for every user, and
+  main-bot is customer-facing. `telegramWebAppBotUsername` falls back to `botUsername` when unset.
 
 ## Env
 
 - `OXPLAYER=true`
 - `OXPLAYER_API_BASE_URL=http://<LAN_IP>:3004` (physical devices cannot use host `localhost`)
-- `OXPLAYER_BOT_USERNAME=@YourMainBot` (also the Mini App's bot — see above)
-- `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` (from my.telegram.org — the TDLib user-session client's own app credentials)
+- `OXPLAYER_BOT_USERNAME=@YourMainBot` (customer-facing bot — chat, help, delete-account link)
+- `TELEGRAM_WEBAPP_BOT_USERNAME=@YourAuthBot` (optional Mini App bot; falls back to `OXPLAYER_BOT_USERNAME`;
+  prod builds use `@OxplayerPublicProviderBot`, dev-flavor builds use `@OxplayerPublicProviderDevBot`)
+- `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` (from my.telegram.org — TDLib user-session credentials)
 - `TELEGRAM_WEBAPP_SHORT_NAME` and/or `TELEGRAM_HOSTED_WEBAPP_HTTPS_URL`
-- Backend: `TELEGRAM_MAIN_BOT_TOKEN` (HMAC secret for initData verification — must match the bot above)
+- Backend: `TELEGRAM_AUTH_BOT_TOKEN`/`TELEGRAM_AUTH_BOT_TOKEN_DEV` (HMAC secrets for initData — must
+  match the prod/dev webapp bots above; both live on the same api.oxplayer.app deployment, which
+  tries each in turn — see `Config.TelegramAuthBotTokens`; defaults to `TELEGRAM_MAIN_BOT_TOKEN`)
 
 ## Avoid
 
 - Hardcoding ngrok URLs; set LAN IP in `default.env` or `--dart-define`.
+- Reviving claim-code / bot deep-link / `/auth/login-attempt` client paths.
 - Changing the `X-Ox-Refresh-Token`/`AuthenticationResult` response shape without checking
   `oxplayerAuthenticateFromLoginAttemptPoll` (client) and `writeJellyfinAuthenticationResult`
-  (server) — both still named after the old flow but are the shared plumbing the TDLib path uses.
+  (server) — shared plumbing for the TDLib path (historical names).

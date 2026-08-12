@@ -8,17 +8,24 @@ abstract final class OxplayerEnv {
   static const String _cBotUsername = String.fromEnvironment('OXPLAYER_BOT_USERNAME', defaultValue: '');
   static const String _cSentryDsn = String.fromEnvironment('SENTRY_DSN', defaultValue: '');
   static const String _cSentryEnvironment = String.fromEnvironment('SENTRY_ENVIRONMENT', defaultValue: '');
-  // Telegram *user*-session (MTProto/TDLib) app credentials for client-side direct play — from
-  // my.telegram.org, distinct from OXPLAYER_BOT_USERNAME (the bot-based OX login above).
+  // Telegram *user*-session (MTProto/TDLib) app credentials — from my.telegram.org, distinct from
+  // OXPLAYER_BOT_USERNAME (customer-facing main bot) and TELEGRAM_WEBAPP_BOT_USERNAME (Mini App).
   static const String _cTelegramApiId = String.fromEnvironment('TELEGRAM_API_ID', defaultValue: '');
   static const String _cTelegramApiHash = String.fromEnvironment('TELEGRAM_API_HASH', defaultValue: '');
-  // Mini App identity used to sign in — a Web App must be registered on OXPLAYER_BOT_USERNAME via
-  // @BotFather (short name and/or a hosted HTTPS Mini App URL) for GetWebAppLinkUrl/GetWebAppUrl
-  // to succeed. See ox_tdlib_bridge's TdlibWebAppAuth.kt.
+  // Mini App identity used to sign in — a Web App must be registered via @BotFather (short name
+  // and/or a hosted HTTPS Mini App URL) on TELEGRAM_WEBAPP_BOT_USERNAME for GetWebAppLinkUrl/
+  // GetWebAppUrl to succeed. See go/oxtelegram/webapp.go's FetchWebAppInitData.
   static const String _cTelegramWebAppShortName =
       String.fromEnvironment('TELEGRAM_WEBAPP_SHORT_NAME', defaultValue: '');
   static const String _cTelegramHostedWebAppHttpsUrl =
       String.fromEnvironment('TELEGRAM_HOSTED_WEBAPP_HTTPS_URL', defaultValue: '');
+  // Deliberately a separate bot from OXPLAYER_BOT_USERNAME: registering a bot's Main Mini App also
+  // makes Telegram show a persistent "OPEN" button on that bot's own chat screen for every user,
+  // and OXPLAYER_BOT_USERNAME (main-bot) is customer-facing — that dead-looking button (this fetch
+  // never actually opens the page a human would land on) is confusing there. Falls back to
+  // OXPLAYER_BOT_USERNAME so builds that haven't provisioned a dedicated auth bot keep working.
+  static const String _cTelegramWebAppBotUsername =
+      String.fromEnvironment('TELEGRAM_WEBAPP_BOT_USERNAME', defaultValue: '');
 
   static String _pick(List<String> keys, String define) {
     final d = define.trim();
@@ -49,18 +56,12 @@ abstract final class OxplayerEnv {
     return b == null ? null : 'https://telegram.me/$b';
   }
 
-  static String? get telegramBotLoginLink {
-    final b = botUsername;
-    return b == null ? null : 'https://telegram.me/$b?start=login';
-  }
-
   /// Deep link for self-service account delete in the main bot.
   static String? get telegramBotDeleteAccountLink {
     final b = botUsername;
     return b == null ? null : 'https://telegram.me/$b?start=delete_account';
   }
 
-  /// Deep link for app login attempt: ?start=li_<32-char hex attemptId>.
   static String? get sentryDsn {
     final t = _pick(['SENTRY_DSN'], _cSentryDsn);
     return t.isEmpty ? null : t;
@@ -69,13 +70,6 @@ abstract final class OxplayerEnv {
   static String? get sentryEnvironment {
     final t = _pick(['SENTRY_ENVIRONMENT'], _cSentryEnvironment);
     return t.isEmpty ? null : t;
-  }
-
-  static String? telegramBotLoginAttemptLink(String attemptId) {
-    final b = botUsername;
-    final id = attemptId.trim();
-    if (b == null || id.isEmpty) return null;
-    return 'https://telegram.me/$b?start=li_$id';
   }
 
   /// my.telegram.org app id for the user-session (MTProto/TDLib) direct-play client.
@@ -103,5 +97,13 @@ abstract final class OxplayerEnv {
   static String? get telegramHostedWebAppHttpsUrl {
     final t = _pick(['TELEGRAM_HOSTED_WEBAPP_HTTPS_URL'], _cTelegramHostedWebAppHttpsUrl);
     return t.isEmpty ? null : t;
+  }
+
+  /// Bot the Mini App initData fetch resolves against (see fetchWebAppInitData) — falls back to
+  /// botUsername (main-bot) when no dedicated auth bot is configured for this build.
+  static String? get telegramWebAppBotUsername {
+    final t = _pick(['TELEGRAM_WEBAPP_BOT_USERNAME'], _cTelegramWebAppBotUsername)
+        .replaceFirst(RegExp(r'^@'), '');
+    return t.isEmpty ? botUsername : t;
   }
 }

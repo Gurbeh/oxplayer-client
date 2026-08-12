@@ -7,8 +7,9 @@ import 'package:fladder/providers/auth_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
-const kOxJellyfinLoginUsername = 'ox';
-
+/// Applies a successful `/auth/telegram` (or test-account) response to [authProvider].
+///
+/// [OxplayerLoginAttemptPollResult] is the shared response wrapper — not a bot login-attempt poll.
 Future<Response<AccountModel>?> oxplayerAuthenticateFromLoginAttemptPoll(
   WidgetRef ref,
   OxplayerLoginAttemptPollResult poll,
@@ -27,19 +28,4 @@ Future<Response<AccountModel>?> oxplayerAuthenticateFromLoginAttemptPoll(
     await oxplayerPersistRefreshFromResponse(ref, account, accountResponse);
   }
   return accountResponse;
-}
-
-Future<Response<AccountModel>?> oxplayerAuthenticateWithClaimCode(
-  WidgetRef ref,
-  String code,
-) async {
-  final response = await ref.read(authProvider.notifier).authenticateByName(
-        kOxJellyfinLoginUsername,
-        code.trim().toUpperCase(),
-      );
-  final account = response?.body;
-  if (response != null && account != null) {
-    await oxplayerPersistRefreshFromResponse(ref, account, response);
-  }
-  return response;
 }

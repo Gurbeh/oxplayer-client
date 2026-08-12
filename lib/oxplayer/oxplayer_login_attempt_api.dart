@@ -1,10 +1,9 @@
-/// Shared response types for Telegram-identity login exchanges.
+/// Shared auth response wrapper for Telegram Mini App / TDLib login.
 ///
-/// The original bot-deep-link/code-approval flow (`OxplayerLoginAttemptApi.createAttempt`/
-/// `pollUntilComplete`, backed by the now-removed `/auth/login-attempt` route) has been replaced by
-/// TDLib sign-in (see `oxplayer_tdlib_bridge_controller.dart`). These two types are still shared by
-/// that flow and by `oxplayer_telegram_webapp_auth_api.dart` since both paths return the same
-/// AuthenticationResult/`X-Ox-Refresh-Token` shape — see `oxplayer_jellyfin_auth.dart`.
+/// Used by `OxplayerTelegramWebAppAuthApi.exchangeInitData` (POST `/auth/telegram`) and applied via
+/// `oxplayerAuthenticateFromLoginAttemptPoll`. Names are historical — this is **not** a bot
+/// `/auth/login-attempt` poll client. Keep [OxplayerLoginAttemptPollResult] /
+/// [OxplayerLoginAttemptException]; both are still used by the TDLib webapp path.
 class OxplayerLoginAttemptPollResult {
   const OxplayerLoginAttemptPollResult._({this.jellyfinBody, this.refreshToken});
 

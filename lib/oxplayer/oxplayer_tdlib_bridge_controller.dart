@@ -416,11 +416,12 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
   Future<void> stopPlaybackSession(String sessionUri) =>
       _useWindows ? _windows!.stopPlaybackSession(sessionUri) : _api.stopPlaybackSession(sessionUri);
 
-  /// Fetches a Telegram-signed Mini App initData payload for OXPLAYER_BOT_USERNAME.
+  /// Fetches a Telegram-signed Mini App initData payload for TELEGRAM_WEBAPP_BOT_USERNAME (falls
+  /// back to OXPLAYER_BOT_USERNAME/main-bot when no dedicated auth bot is configured).
   Future<String> fetchWebAppInitData() {
-    final botUsername = OxplayerEnv.botUsername;
+    final botUsername = OxplayerEnv.telegramWebAppBotUsername;
     if (botUsername == null) {
-      throw OxplayerTdlibBridgeException('OXPLAYER_BOT_USERNAME not configured');
+      throw OxplayerTdlibBridgeException('TELEGRAM_WEBAPP_BOT_USERNAME not configured');
     }
     if (_useWindows) {
       return _windows!.fetchWebAppInitData(

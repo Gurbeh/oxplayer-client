@@ -51,6 +51,11 @@ runs:
         hosted_webapp = env_first("TELEGRAM_HOSTED_WEBAPP_HTTPS_URL")
         if hosted_webapp:
             keys["TELEGRAM_HOSTED_WEBAPP_HTTPS_URL"] = hosted_webapp
+        # Dedicated Mini App auth bot (e.g. @OxplayerPublicProviderBot) — falls back to
+        # BOT_USERNAME/main-bot client-side when unset, see oxplayer_env.dart.
+        webapp_bot = env_first("TELEGRAM_WEBAPP_BOT_USERNAME")
+        if webapp_bot:
+            keys["TELEGRAM_WEBAPP_BOT_USERNAME"] = webapp_bot
 
         sentry_dsn = env_first("SENTRY_DSN")
         require_sentry = env_first("REQUIRE_SENTRY_DSN").lower() in ("1", "true", "yes")
