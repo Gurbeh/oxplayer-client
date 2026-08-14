@@ -48,6 +48,23 @@ private fun oxStreamLog(message: String) {
     Log.d(OX_NATIVE_PLY_TAG, message)
 }
 
+/**
+ * The synthetic playback-session id inside a Telegram-sourced url, or null for anything else.
+ *
+ * Both transports put it in the last path segment: `tdlib-file://{fileId}` (ExoPlayer's
+ * OxRoutingDataSource) and `http://127.0.0.1:{port}/{fileId}` (TdlibHttpBridgeServer). The scheme
+ * and host are checked first so an ordinary media/subtitle url that happens to end in digits is
+ * never mistaken for a session handle.
+ */
+private fun telegramPlaybackFileId(url: String?): Int? {
+    if (url.isNullOrBlank()) return null
+    val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return null
+    val isTelegramTransport = uri.scheme == "tdlib-file" ||
+        (uri.host == "127.0.0.1" || uri.host == "localhost")
+    if (!isTelegramTransport) return null
+    return url.substringAfterLast('/').toIntOrNull()
+}
+
 private fun redactStreamUrl(url: String): String {
     val uri = Uri.parse(url)
     val path = uri.encodedPath ?: uri.path ?: ""
@@ -123,13 +140,18 @@ class VideoPlayerImplementation(
     }
 
     fun clearSession() {
+        // Read the url BEFORE clearing playbackData: it carries the fileId of the playback that is
+        // ending, which is what TdlibBridgeObject must release. Handing it the "current" session id
+        // instead would release whichever playback started most recently — and Dart resolves the
+        // next play's url before tearing this one down, so that is routinely the wrong one.
+        val endedFileId = telegramPlaybackFileId(playbackData.value?.url)
         playbackData.value = null
         savedPositionMs = 0L
         wasPlayingBeforeBackground = false
         pendingOpenUrl = null
         initialPositionLogPosted = false
         // No-op unless this session's video actually came from Telegram — see doc there.
-        TdlibBridgeObject.onTelegramPlaybackEnded()
+        TdlibBridgeObject.onTelegramPlaybackEnded(endedFileId)
     }
 
     private fun publishPlaybackState(exo: ExoPlayer) {

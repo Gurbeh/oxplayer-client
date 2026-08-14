@@ -90,6 +90,34 @@ enum class OxTdlibAuthStateKind(val raw: Int) {
   }
 }
 
+/**
+ * Liveness of the MTProto socket — deliberately a different question from [OxTdlibAuthStateKind].
+ *
+ * A device can hold perfectly valid credentials (auth `ready`) while its connection is dead, in
+ * which case every byte fetch fails. Treating that as "logged out" is what sent TV users to a
+ * login screen for something a silent reconnect fixes, so the two states are reported separately
+ * and only [OxTdlibAuthStateKind.failed] may ever drive a re-login prompt.
+ */
+enum class OxTdlibConnectionHealth(val raw: Int) {
+  /** configure() has not completed successfully yet. */
+  UNINITIALIZED(0),
+  /** A connection attempt (first connect, or a reconnect) is in flight. */
+  CONNECTING(1),
+  /** Socket is live; RPCs and playback downloads can be issued. */
+  READY(2),
+  /**
+   * Socket died while credentials remain valid. The native side is already retrying with
+   * backoff — surface it as a transient banner at most, never as a login prompt.
+   */
+  DEGRADED(3);
+
+  companion object {
+    fun ofRaw(raw: Int): OxTdlibConnectionHealth? {
+      return values().firstOrNull { it.raw == raw }
+    }
+  }
+}
+
 /** Generated class from Pigeon that represents data sent in messages. */
 data class OxTdlibAuthState (
   val kind: OxTdlibAuthStateKind,
@@ -274,21 +302,26 @@ private open class TdlibBridgePigeonCodec : StandardMessageCodec() {
         }
       }
       130.toByte() -> {
-        return (readValue(buffer) as? List<Any?>)?.let {
-          OxTdlibAuthState.fromList(it)
+        return (readValue(buffer) as Long?)?.let {
+          OxTdlibConnectionHealth.ofRaw(it.toInt())
         }
       }
       131.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          OxTdlibPlaybackSource.fromList(it)
+          OxTdlibAuthState.fromList(it)
         }
       }
       132.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          OxTdlibProviderBot.fromList(it)
+          OxTdlibPlaybackSource.fromList(it)
         }
       }
       133.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          OxTdlibProviderBot.fromList(it)
+        }
+      }
+      134.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
           OxTdlibDeliveryRef.fromList(it)
         }
@@ -302,20 +335,24 @@ private open class TdlibBridgePigeonCodec : StandardMessageCodec() {
         stream.write(129)
         writeValue(stream, value.raw.toLong())
       }
-      is OxTdlibAuthState -> {
+      is OxTdlibConnectionHealth -> {
         stream.write(130)
-        writeValue(stream, value.toList())
+        writeValue(stream, value.raw.toLong())
       }
-      is OxTdlibPlaybackSource -> {
+      is OxTdlibAuthState -> {
         stream.write(131)
         writeValue(stream, value.toList())
       }
-      is OxTdlibProviderBot -> {
+      is OxTdlibPlaybackSource -> {
         stream.write(132)
         writeValue(stream, value.toList())
       }
-      is OxTdlibDeliveryRef -> {
+      is OxTdlibProviderBot -> {
         stream.write(133)
+        writeValue(stream, value.toList())
+      }
+      is OxTdlibDeliveryRef -> {
+        stream.write(134)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)
@@ -337,6 +374,19 @@ interface OxTdlibBridgeApi {
    * Synchronous — this just reads cached state, no TDLib round-trip.
    */
   fun currentAuthState(): OxTdlibAuthState
+  /**
+   * Current socket liveness; also pushed via OxTdlibBridgeEvents.onConnectionHealthChanged.
+   * Synchronous — an in-memory read on the Go side, no round-trip.
+   */
+  fun connectionHealth(): OxTdlibConnectionHealth
+  /**
+   * Rebuilds the connection if its run loop has died; a no-op when already healthy.
+   *
+   * The native side reconnects on its own with backoff, so this is only for the moments where
+   * waiting beats failing: app resume, and immediately before a playback download. Completes when
+   * the connection is usable, or fails if it could not be re-established.
+   */
+  fun reconnect(callback: (Result<Unit>) -> Unit)
   /** Phone/tablet flow, step 1. Async: waits on the real TdApi round-trip. */
   fun submitPhoneNumber(phoneNumber: String, callback: (Result<Unit>) -> Unit)
   /** Phone/tablet flow, step 2. */
@@ -457,6 +507,38 @@ interface OxTdlibBridgeApi {
               TdlibBridgePigeonUtils.wrapError(exception)
             }
             reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.connectionHealth$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              listOf(api.connectionHealth())
+            } catch (exception: Throwable) {
+              TdlibBridgePigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.reconnect$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.reconnect{ result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(TdlibBridgePigeonUtils.wrapError(error))
+              } else {
+                reply.reply(TdlibBridgePigeonUtils.wrapResult(null))
+              }
+            }
           }
         } else {
           channel.setMessageHandler(null)
@@ -723,6 +805,27 @@ class OxTdlibBridgeEvents(private val binaryMessenger: BinaryMessenger, private 
     val channelName = "dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeEvents.onAuthStateChanged$separatedMessageChannelSuffix"
     val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
     channel.send(listOf(stateArg)) {
+      if (it is List<*>) {
+        if (it.size > 1) {
+          callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))
+        } else {
+          callback(Result.success(Unit))
+        }
+      } else {
+        callback(Result.failure(TdlibBridgePigeonUtils.createConnectionError(channelName)))
+      } 
+    }
+  }
+  /**
+   * Pushed whenever socket liveness changes. Independent of onAuthStateChanged — see
+   * [OxTdlibConnectionHealth] for why the two must not be collapsed into one signal.
+   */
+  fun onConnectionHealthChanged(healthArg: OxTdlibConnectionHealth, callback: (Result<Unit>) -> Unit)
+{
+    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+    val channelName = "dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeEvents.onConnectionHealthChanged$separatedMessageChannelSuffix"
+    val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
+    channel.send(listOf(healthArg)) {
       if (it is List<*>) {
         if (it.size > 1) {
           callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))

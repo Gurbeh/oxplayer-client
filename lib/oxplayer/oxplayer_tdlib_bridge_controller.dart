@@ -97,6 +97,7 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
   final _api = OxTdlibBridgeApi();
   OxTelegramWindowsBridge? _windows;
   OxTdlibAuthState _state = OxTdlibAuthState(kind: OxTdlibAuthStateKind.uninitialized);
+  OxTdlibConnectionHealth _health = OxTdlibConnectionHealth.uninitialized;
   bool _configured = false;
   /// Login-screen prepare/reset must not silently [submitBotToken] from cache.
   /// That would land TDLib on [OxTdlibAuthStateKind.ready] and the phone/QR UI
@@ -106,6 +107,28 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
   bool get _useWindows => _windows != null;
 
   OxTdlibAuthState get state => _state;
+
+  /// Socket liveness, independent of [state] — see [OxTdlibConnectionHealth].
+  ///
+  /// Windows drives playback through its own bridge and does not report health, so it stays at
+  /// [OxTdlibConnectionHealth.uninitialized] there; treat that value as "unknown, don't block".
+  OxTdlibConnectionHealth get connectionHealth => _health;
+
+  /// True when credentials are valid but the socket is not usable right now.
+  ///
+  /// The native side is already retrying with backoff when this is true, so it is a "show a
+  /// transient notice / wait" signal — never a reason to send the user back to login. Only
+  /// [OxTdlibAuthStateKind.failed] means the credentials themselves need replacing.
+  bool get isConnectionDegraded =>
+      _state.kind == OxTdlibAuthStateKind.ready && _health == OxTdlibConnectionHealth.degraded;
+
+  /// True when a login exists AND its connection can carry a playback download.
+  ///
+  /// `uninitialized` health counts as usable so this never blocks the Windows bridge or a build
+  /// whose native side predates health reporting: playback then fails the old way (a real error
+  /// from the download call) rather than being refused by a gate that has no information.
+  bool get canStartPlayback =>
+      _state.kind == OxTdlibAuthStateKind.ready && _health != OxTdlibConnectionHealth.degraded;
 
   /// True when native TDLib is logged in with a personal bot token (not a user phone/QR session).
   bool get nativeSessionIsBot => _activeBotToken != null && _activeBotToken!.isNotEmpty;
@@ -156,6 +179,38 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
       _configured = false;
     }
     notifyListeners();
+  }
+
+  @override
+  void onConnectionHealthChanged(OxTdlibConnectionHealth health) {
+    if (_health == health) return;
+    _log('connection health → ${health.name} (auth=${_state.kind.name})');
+    _health = health;
+    notifyListeners();
+  }
+
+  /// Revives a dead connection, returning whether playback can proceed afterwards.
+  ///
+  /// Cheap and safe to call on every play: the native side no-ops when the socket is already
+  /// healthy. A false result means the connection could not be re-established — a network problem
+  /// to report as such, NOT a reason to prompt for login, since the credentials were never in
+  /// question (see [isConnectionDegraded]).
+  Future<bool> ensureConnected() async {
+    // Windows drives its own connection lifecycle through OxTelegramWindowsBridge and exposes no
+    // health signal; there is nothing to revive from here.
+    if (_useWindows) return _state.kind == OxTdlibAuthStateKind.ready;
+    if (_state.kind != OxTdlibAuthStateKind.ready) return false;
+    if (_health == OxTdlibConnectionHealth.ready) return true;
+    try {
+      await _api.reconnect();
+      _health = await _api.connectionHealth();
+      _log('ensureConnected → ${_health.name}');
+      notifyListeners();
+      return _health != OxTdlibConnectionHealth.degraded;
+    } catch (e) {
+      _log('ensureConnected failed: $e');
+      return false;
+    }
   }
 
   /// Serializes concurrent ensureConfigured callers onto one in-flight attempt instead of each
@@ -771,8 +826,9 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
   }
 
   Future<void> stopPlaybackSession(String sessionUri) async {
-    // Resolved gotdstream/http-bridge urls die with the playback session — drop cache so
-    // the next play re-runs startPlaybackSession against the still-warm TDLib client.
+    // Belt and braces: OxplayerTdlibSessionCache refuses to store session-bound urls in the first
+    // place, so this normally clears nothing. Kept so that a resolved url reaching the cache by any
+    // future path still cannot outlive the session being torn down here.
     OxplayerTdlibSessionCache.clearAll();
     if (_useWindows) {
       await _windows!.stopPlaybackSession(sessionUri);

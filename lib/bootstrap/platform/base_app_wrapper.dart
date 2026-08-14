@@ -4,8 +4,10 @@ import 'dart:io';
 
 import 'package:fladder/background/update_notifications_worker.dart' as update_worker;
 import 'package:fladder/models/account_model.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_session.dart';
 import 'package:fladder/oxplayer/oxplayer_sidebar_defaults.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_tv_ui_limits.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
@@ -98,6 +100,14 @@ abstract class BaseAppWrapperState<T extends BaseAppWrapper> extends ConsumerSta
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Runs before the ignore checks below on purpose: a TV that slept for hours almost certainly
+    // dropped its MTProto socket, and that is exactly the case the lock-screen/native-activity
+    // guards would skip. Fire-and-forget and a no-op on a healthy connection, so it costs nothing
+    // on a quick app switch.
+    if (state == AppLifecycleState.resumed && OxplayerEnv.isEnabled) {
+      unawaited(OxplayerTdlibBridgeController.instance().ensureConnected());
+    }
+
     final ignoreLifeCycle = ref.read(lockScreenActiveProvider) ||
         ref.read(userProvider) == null ||
         ref.read(videoPlayerProvider).lastState?.playing == true ||

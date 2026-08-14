@@ -422,7 +422,18 @@ class PlaybackModelHelper {
       final requestedMediaSourceId = newStreamModel?.currentVersionStream?.id;
 
       if (OxplayerEnv.isEnabled) {
-        await oxplayerEnsureTdlibMatchesOxUser(ref.read(userProvider)?.credentials.token);
+        final readerSync =
+            await oxplayerEnsureTdlibMatchesOxUser(ref.read(userProvider)?.credentials.token);
+        // A confirmed mismatch means the native session is reading a different inbox than the one
+        // the API is about to copy this file into, so there is nothing to wait for. Failing here
+        // with a real reason beats the 20s stall then 424 that continuing produced. `unknown` is
+        // deliberately allowed through — see OxplayerReaderSyncResult.
+        if (readerSync == OxplayerReaderSyncResult.mismatched) {
+          throw Exception(
+            'Telegram account mismatch: this device is signed into a different Telegram '
+            'session than the one your videos are delivered to. Reconnect via /connectbot.',
+          );
+        }
       }
 
       Future<PlaybackInfoResponse?> fetchPlaybackInfo({required bool forceRepair}) async {

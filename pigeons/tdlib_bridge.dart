@@ -26,6 +26,27 @@ enum OxTdlibAuthStateKind {
   failed,
 }
 
+/// Liveness of the MTProto socket — deliberately a different question from [OxTdlibAuthStateKind].
+///
+/// A device can hold perfectly valid credentials (auth `ready`) while its connection is dead, in
+/// which case every byte fetch fails. Treating that as "logged out" is what sent TV users to a
+/// login screen for something a silent reconnect fixes, so the two states are reported separately
+/// and only [OxTdlibAuthStateKind.failed] may ever drive a re-login prompt.
+enum OxTdlibConnectionHealth {
+  /// configure() has not completed successfully yet.
+  uninitialized,
+
+  /// A connection attempt (first connect, or a reconnect) is in flight.
+  connecting,
+
+  /// Socket is live; RPCs and playback downloads can be issued.
+  ready,
+
+  /// Socket died while credentials remain valid. The native side is already retrying with
+  /// backoff — surface it as a transient banner at most, never as a login prompt.
+  degraded,
+}
+
 class OxTdlibAuthState {
   final OxTdlibAuthStateKind kind;
   // Set when kind == waitingForQrConfirmation: the tg:// login URL to render as a QR code.
@@ -105,6 +126,18 @@ abstract class OxTdlibBridgeApi {
   /// Current auth state; also pushed via OxTdlibBridgeEvents.onAuthStateChanged.
   /// Synchronous — this just reads cached state, no TDLib round-trip.
   OxTdlibAuthState currentAuthState();
+
+  /// Current socket liveness; also pushed via OxTdlibBridgeEvents.onConnectionHealthChanged.
+  /// Synchronous — an in-memory read on the Go side, no round-trip.
+  OxTdlibConnectionHealth connectionHealth();
+
+  /// Rebuilds the connection if its run loop has died; a no-op when already healthy.
+  ///
+  /// The native side reconnects on its own with backoff, so this is only for the moments where
+  /// waiting beats failing: app resume, and immediately before a playback download. Completes when
+  /// the connection is usable, or fails if it could not be re-established.
+  @async
+  void reconnect();
 
   /// Phone/tablet flow, step 1. Async: waits on the real TdApi round-trip.
   @async
@@ -196,4 +229,8 @@ abstract class OxTdlibBridgeApi {
 @FlutterApi()
 abstract class OxTdlibBridgeEvents {
   void onAuthStateChanged(OxTdlibAuthState state);
+
+  /// Pushed whenever socket liveness changes. Independent of onAuthStateChanged — see
+  /// [OxTdlibConnectionHealth] for why the two must not be collapsed into one signal.
+  void onConnectionHealthChanged(OxTdlibConnectionHealth health);
 }

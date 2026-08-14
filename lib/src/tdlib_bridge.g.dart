@@ -53,6 +53,24 @@ enum OxTdlibAuthStateKind {
   failed,
 }
 
+/// Liveness of the MTProto socket — deliberately a different question from [OxTdlibAuthStateKind].
+///
+/// A device can hold perfectly valid credentials (auth `ready`) while its connection is dead, in
+/// which case every byte fetch fails. Treating that as "logged out" is what sent TV users to a
+/// login screen for something a silent reconnect fixes, so the two states are reported separately
+/// and only [OxTdlibAuthStateKind.failed] may ever drive a re-login prompt.
+enum OxTdlibConnectionHealth {
+  /// configure() has not completed successfully yet.
+  uninitialized,
+  /// A connection attempt (first connect, or a reconnect) is in flight.
+  connecting,
+  /// Socket is live; RPCs and playback downloads can be issued.
+  ready,
+  /// Socket died while credentials remain valid. The native side is already retrying with
+  /// backoff — surface it as a transient banner at most, never as a login prompt.
+  degraded,
+}
+
 class OxTdlibAuthState {
   OxTdlibAuthState({
     required this.kind,
@@ -291,17 +309,20 @@ class _PigeonCodec extends StandardMessageCodec {
     }    else if (value is OxTdlibAuthStateKind) {
       buffer.putUint8(129);
       writeValue(buffer, value.index);
-    }    else if (value is OxTdlibAuthState) {
+    }    else if (value is OxTdlibConnectionHealth) {
       buffer.putUint8(130);
-      writeValue(buffer, value.encode());
-    }    else if (value is OxTdlibPlaybackSource) {
+      writeValue(buffer, value.index);
+    }    else if (value is OxTdlibAuthState) {
       buffer.putUint8(131);
       writeValue(buffer, value.encode());
-    }    else if (value is OxTdlibProviderBot) {
+    }    else if (value is OxTdlibPlaybackSource) {
       buffer.putUint8(132);
       writeValue(buffer, value.encode());
-    }    else if (value is OxTdlibDeliveryRef) {
+    }    else if (value is OxTdlibProviderBot) {
       buffer.putUint8(133);
+      writeValue(buffer, value.encode());
+    }    else if (value is OxTdlibDeliveryRef) {
+      buffer.putUint8(134);
       writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
@@ -315,12 +336,15 @@ class _PigeonCodec extends StandardMessageCodec {
         final int? value = readValue(buffer) as int?;
         return value == null ? null : OxTdlibAuthStateKind.values[value];
       case 130: 
-        return OxTdlibAuthState.decode(readValue(buffer)!);
+        final int? value = readValue(buffer) as int?;
+        return value == null ? null : OxTdlibConnectionHealth.values[value];
       case 131: 
-        return OxTdlibPlaybackSource.decode(readValue(buffer)!);
+        return OxTdlibAuthState.decode(readValue(buffer)!);
       case 132: 
-        return OxTdlibProviderBot.decode(readValue(buffer)!);
+        return OxTdlibPlaybackSource.decode(readValue(buffer)!);
       case 133: 
+        return OxTdlibProviderBot.decode(readValue(buffer)!);
+      case 134: 
         return OxTdlibDeliveryRef.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
@@ -394,6 +418,64 @@ class OxTdlibBridgeApi {
       );
     } else {
       return (pigeonVar_replyList[0] as OxTdlibAuthState?)!;
+    }
+  }
+
+  /// Current socket liveness; also pushed via OxTdlibBridgeEvents.onConnectionHealthChanged.
+  /// Synchronous — an in-memory read on the Go side, no round-trip.
+  Future<OxTdlibConnectionHealth> connectionHealth() async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.connectionHealth$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as OxTdlibConnectionHealth?)!;
+    }
+  }
+
+  /// Rebuilds the connection if its run loop has died; a no-op when already healthy.
+  ///
+  /// The native side reconnects on its own with backoff, so this is only for the moments where
+  /// waiting beats failing: app resume, and immediately before a playback download. Completes when
+  /// the connection is usable, or fails if it could not be re-established.
+  Future<void> reconnect() async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.reconnect$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
     }
   }
 
@@ -761,6 +843,10 @@ abstract class OxTdlibBridgeEvents {
 
   void onAuthStateChanged(OxTdlibAuthState state);
 
+  /// Pushed whenever socket liveness changes. Independent of onAuthStateChanged — see
+  /// [OxTdlibConnectionHealth] for why the two must not be collapsed into one signal.
+  void onConnectionHealthChanged(OxTdlibConnectionHealth health);
+
   static void setUp(OxTdlibBridgeEvents? api, {BinaryMessenger? binaryMessenger, String messageChannelSuffix = '',}) {
     messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
     {
@@ -779,6 +865,31 @@ abstract class OxTdlibBridgeEvents {
               'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeEvents.onAuthStateChanged was null, expected non-null OxTdlibAuthState.');
           try {
             api.onAuthStateChanged(arg_state!);
+            return wrapResponse(empty: true);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          }
+        });
+      }
+    }
+    {
+      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeEvents.onConnectionHealthChanged$messageChannelSuffix', pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          assert(message != null,
+          'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeEvents.onConnectionHealthChanged was null.');
+          final List<Object?> args = (message as List<Object?>?)!;
+          final OxTdlibConnectionHealth? arg_health = (args[0] as OxTdlibConnectionHealth?);
+          assert(arg_health != null,
+              'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeEvents.onConnectionHealthChanged was null, expected non-null OxTdlibConnectionHealth.');
+          try {
+            api.onConnectionHealthChanged(arg_health!);
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);

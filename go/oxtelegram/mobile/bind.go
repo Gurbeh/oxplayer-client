@@ -44,10 +44,27 @@ type storageAdapter struct{ s SessionStorage }
 func (a storageAdapter) Load() ([]byte, error)   { return a.s.Load() }
 func (a storageAdapter) Store(data []byte) error { return a.s.Store(data) }
 
+// ConnectionSink is implemented by the host platform to receive connection-health transitions —
+// values match oxtelegram.ConnectionHealth ("uninitialized"/"connecting"/"ready"/"degraded") and
+// OxTdlibConnectionHealth's Pigeon-generated names 1:1.
+//
+// Deliberately separate from AuthEventSink: auth answers "does this device have valid
+// credentials", health answers "can it talk to Telegram right now". Conflating them is what made a
+// dropped socket look like a logged-out account.
+type ConnectionSink interface {
+	OnConnectionHealthChanged(state string)
+}
+
 type sinkAdapter struct{ sink AuthEventSink }
 
 func (a sinkAdapter) OnAuthStateChanged(kind, qrURL, hint, errMsg string) {
 	a.sink.OnAuthStateChanged(kind, qrURL, hint, errMsg)
+}
+
+type connectionSinkAdapter struct{ sink ConnectionSink }
+
+func (a connectionSinkAdapter) OnConnectionHealthChanged(state string) {
+	a.sink.OnConnectionHealthChanged(state)
 }
 
 // Client is the gomobile-bound handle for one login/playback session's connection — mirrors
@@ -62,7 +79,41 @@ func NewClient(apiID int, apiHash string, storage SessionStorage) *Client {
 }
 
 // Configure starts the connection and blocks until ready for auth input (or 30s elapse).
+//
+// Safe and meaningful to call again later: if the run loop has since died, this rebuilds it from
+// the same on-disk session. Callers must therefore not short-circuit it on "already configured"
+// without first checking [ConnectionHealth] — doing so is what left a dead socket unrecoverable
+// short of restarting the app.
 func (c *Client) Configure(sink AuthEventSink) error {
+	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+	defer cancel()
+	return c.inner.Configure(ctx, sinkAdapter{sink})
+}
+
+// SetConnectionSink registers the health listener; the current state is replayed immediately. Pass
+// nil to clear. Purely for surfacing state — reconnection happens regardless.
+func (c *Client) SetConnectionSink(sink ConnectionSink) {
+	if sink == nil {
+		c.inner.SetConnectionSink(nil)
+		return
+	}
+	c.inner.SetConnectionSink(connectionSinkAdapter{sink})
+}
+
+// ConnectionHealth is "uninitialized", "connecting", "ready" or "degraded" — a cheap in-memory
+// read, safe to call on any thread before deciding whether to start playback.
+func (c *Client) ConnectionHealth() string {
+	return string(c.inner.Health())
+}
+
+// EnsureConnected rebuilds the connection if the run loop has died, and is a no-op when it is
+// healthy. Blocking; call it off the UI thread. The background healer already retries on its own,
+// so this exists for the moments where waiting is better than failing — resuming the app, and
+// immediately before starting a playback download.
+func (c *Client) EnsureConnected(sink AuthEventSink) error {
+	if c.inner.Health() == oxtelegram.HealthReady {
+		return nil
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
 	defer cancel()
 	return c.inner.Configure(ctx, sinkAdapter{sink})

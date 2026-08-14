@@ -5,6 +5,7 @@ import OxTdlibAuthState
 import OxTdlibAuthStateKind
 import OxTdlibBridgeApi
 import OxTdlibBridgeEvents
+import OxTdlibConnectionHealth
 import OxTdlibDeliveryRef
 import OxTdlibPlaybackSource
 import OxTdlibProviderBot
@@ -19,11 +20,13 @@ import app.oxplayer.tdlibbridge.player.TdlibHttpBridgeServer
 import app.oxplayer.tdlibbridge.session.OxTelegramClient
 import app.oxplayer.tdlibbridge.session.OxTelegramSessionStorage
 import io.flutter.plugin.common.BinaryMessenger
+import mobile.ConnectionSink
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -32,12 +35,23 @@ import java.util.concurrent.atomic.AtomicInteger
  * implementing the generated Pigeon interface directly.
  *
  * Backed by the gomobile-bound github.com/gotd/td facade (go/oxtelegram) — replacing TDLib per
- * prancy-rolling-kernighan.md. The underlying OxTelegramClient is created lazily on the first
- * [configure] call and deliberately NOT kept alive between playback sessions:
- * [onTelegramPlaybackEnded] closes it as soon as a Telegram-sourced playback session ends
- * (matches the idle-close discipline already proven this migration's predecessor session, kept
- * here even though gotd/td has no TDLib-style forced-backlog-sync problem to work around); the
- * on-disk session persists so the next play just reconnects rather than needing a fresh login.
+ * prancy-rolling-kernighan.md.
+ *
+ * Two lifetimes live here and must not be confused — conflating them is what produced the
+ * "No active TDLib session for playback" reports from TV devices whose login was perfectly healthy:
+ *
+ *  - The **OxTelegramClient** (MTProto socket + auth) is created lazily on the first [configure]
+ *    call and then kept alive for the whole process. Nothing closes it except [logOut]. It is
+ *    cheap to hold — a socket, session keys, and three self-pruning maps in go/oxtelegram's
+ *    Client — whereas rebuilding it costs a ~0.5-2s reconnect that lands squarely on first-frame
+ *    latency. An earlier revision closed it after every play as a precaution against memory use
+ *    that was never actually measured; that is deliberately not done any more.
+ *  - A **playback session** ([OxTelegramFileFetcher] over a gotd/td PlaybackSession) lives for
+ *    exactly one play. It is registered in [fetchers] under the synthetic fileId minted into its
+ *    uri, and released by [onTelegramPlaybackEnded] — which must be told WHICH fileId ended, since
+ *    the next play's session may already have been started by the time the previous player's
+ *    teardown runs. Its bytes land in an on-disk .part file, so holding one costs a file handle
+ *    and a DC connection, not video-sized memory.
  *
  * WebApp/Mini-App auth ([fetchWebAppInitData], the separate OX-account login-via-Telegram flow)
  * is not yet ported to gotd/td — see plan Phase 4 (hard requirement, not yet investigated).
@@ -63,27 +77,55 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
     private var client: OxTelegramClient? = null
     private var authController: OxTelegramAuthController? = null
     private var sessionStorage: OxTelegramSessionStorage? = null
-    private var fileFetcher: OxTelegramFileFetcher? = null
 
     /** Synthetic per-session token (gotd/td's PlaybackSession has no TDLib-style int fileId of
      *  its own) minted into the tdlib-file://{id} / http://127.0.0.1:{port}/{id} URI so
-     *  stopPlaybackSession can round-trip it back to [closeAfterPlayback]. Only one playback
-     *  session is ever live at a time (this module's whole scope), so uniqueness across restarts
-     *  is all that's needed, not a real lookup key. */
+     *  stopPlaybackSession can round-trip it back to [closeAfterPlayback]. */
     private val playbackIdCounter = AtomicInteger(0)
 
-    /** id of the in-flight/just-finished Telegram-sourced playback session, if any — lets
-     *  [onTelegramPlaybackEnded] no-op for non-Telegram playback and know what to cancel. */
+    /**
+     * Live playback sessions by fileId.
+     *
+     * Normally holds at most one. It is a map rather than a single field because the two events
+     * that bound a session's life are not ordered: Dart resolves the NEXT play's url (minting a new
+     * fileId and fetcher) before the PREVIOUS player's teardown runs. With a single field the new
+     * fetcher was already installed when teardown fired, so teardown nulled the wrong one and the
+     * about-to-start playback opened a url with no byte pipe behind it — the TV bug. Keyed by
+     * fileId, each teardown releases exactly the session it owned, and no session is orphaned
+     * un-Closed either.
+     */
+    private val fetchers = ConcurrentHashMap<Int, OxTelegramFileFetcher>()
+
+    /** id of the most recently started Telegram-sourced playback session, if any. Only used to
+     *  answer [currentFileFetcher] for callers that have no fileId in hand; teardown always goes
+     *  through an explicit id instead. */
     @Volatile
     private var currentPlaybackFileId: Int? = null
 
     /** mpv/mdk path (see TdlibHttpBridgeServer doc) — created once, outlives individual
-     *  OxTelegramClient instances; always reads whichever [fileFetcher] is live at request time. */
-    private val httpBridgeServer = TdlibHttpBridgeServer(fileFetcher = { fileFetcher })
+     *  OxTelegramClient instances; always reads whichever session is live at request time. */
+    private val httpBridgeServer = TdlibHttpBridgeServer(fileFetcher = { id -> fileFetcherFor(id) })
 
     @Volatile
     private var lastAuthState: OxTdlibAuthState =
         OxTdlibAuthState(kind = OxTdlibAuthStateKind.UNINITIALIZED)
+
+    @Volatile
+    private var lastConnectionHealth: OxTdlibConnectionHealth = OxTdlibConnectionHealth.UNINITIALIZED
+
+    /** Forwards go/oxtelegram's health transitions to Dart. Held as a field so the same instance is
+     *  reused across configure calls rather than stacking listeners on the Go side. */
+    private val connectionSink = ConnectionSink { state ->
+        val mapped = when (state) {
+            "connecting" -> OxTdlibConnectionHealth.CONNECTING
+            "ready" -> OxTdlibConnectionHealth.READY
+            "degraded" -> OxTdlibConnectionHealth.DEGRADED
+            else -> OxTdlibConnectionHealth.UNINITIALIZED
+        }
+        lastConnectionHealth = mapped
+        Log.i("OXPLAY_TDLIB", "connection health -> $state")
+        runOnMain { events?.onConnectionHealthChanged(mapped) { } }
+    }
 
     /** Call once from MainActivity.configureFlutterEngine, alongside OxTdlibBridgeApi.setUp. */
     fun attach(context: Context, binaryMessenger: BinaryMessenger) {
@@ -97,6 +139,12 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
         if (existing != null && existingAuth != null) {
             // Hot restart / re-prepare: client already live — push current auth to Dart immediately.
             onAuthStateChanged(existingAuth.state.value)
+            // A live client object is NOT proof of a live connection: gotd does not resurrect a run
+            // loop that exited, and the client keeps answering as if healthy afterwards. Returning
+            // here unconditionally (as this did) made the Go-side rebuild unreachable from Dart, so
+            // a dropped socket could only be fixed by killing the app. Kick a reconnect instead —
+            // it is a no-op when the connection really is healthy.
+            scope.launch { runCatching { existing.ensureConnected(existingAuth.sink) } }
             callback(Result.success(Unit))
             return
         }
@@ -111,6 +159,8 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
         client = oxClient
         authController = controller
         sessionStorage = storage
+        // Before configure, so the connecting -> ready transitions of this very run reach Dart.
+        oxClient.setConnectionSink(connectionSink)
 
         scope.launch {
             controller.state.collect { state ->
@@ -132,10 +182,42 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
 
     override fun currentAuthState(): OxTdlibAuthState = lastAuthState
 
-    /** Current OxTelegramFileFetcher, if a playback session is active — looked up fresh per
-     *  playback open (not cached at composable-remember time) since a new startPlaybackSession
-     *  swaps it out. */
-    fun currentFileFetcher(): OxTelegramFileFetcher? = fileFetcher
+    override fun connectionHealth(): OxTdlibConnectionHealth = lastConnectionHealth
+
+    override fun reconnect(callback: (Result<Unit>) -> Unit) {
+        val oxClient = client
+        val controller = authController
+        if (oxClient == null || controller == null) {
+            // Never configured (or logged out): there is no session to revive, and reporting this as
+            // a connection failure would push the UI toward a reconnect spinner when what is
+            // actually needed is configure/login.
+            replyOnMain(callback, Result.failure(IllegalStateException("Telegram client not configured")))
+            return
+        }
+        scope.launch {
+            runCatching { oxClient.ensureConnected(controller.sink) }.fold(
+                onSuccess = { replyOnMain(callback, Result.success(Unit)) },
+                onFailure = { error ->
+                    Log.w("OXPLAY_TDLIB", "reconnect failed", error)
+                    replyOnMain(callback, Result.failure(error))
+                },
+            )
+        }
+    }
+
+    /** Most recently started playback session, if one is still live — looked up fresh per playback
+     *  open (not cached at composable-remember time) since a new startPlaybackSession swaps it out.
+     *  Prefer [fileFetcherFor] wherever the caller already knows which fileId it is opening. */
+    fun currentFileFetcher(): OxTelegramFileFetcher? = currentPlaybackFileId?.let { fetchers[it] }
+
+    /** The session behind `tdlib-file://{fileId}` / the HTTP bridge's `/{fileId}`, or null if it
+     *  already ended. Exact rather than "whatever is current", so a stale uri can never be served
+     *  bytes from a different play. */
+    fun fileFetcherFor(fileId: Int): OxTelegramFileFetcher? = fetchers[fileId]
+
+    /** Whether any Telegram login is live, for telling "not logged in" apart from "this playback's
+     *  session ended" when a fetcher lookup misses. */
+    fun hasLiveAuth(): Boolean = lastAuthState.kind == OxTdlibAuthStateKind.READY
 
     override fun submitPhoneNumber(phoneNumber: String, callback: (Result<Unit>) -> Unit) {
         runOrFail(callback) { requireAuthController().submitPhoneNumber(phoneNumber) }
@@ -174,10 +256,19 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
         client = null
         authController = null
         sessionStorage = null
-        fileFetcher = null
+        // Log out / reconfigure invalidates every session at once — release them all rather than
+        // dropping the references and leaking their file handles and DC connections.
+        val orphaned = fetchers.values.toList()
+        fetchers.clear()
+        currentPlaybackFileId = null
+        if (orphaned.isNotEmpty()) {
+            scope.launch { orphaned.forEach { fetcher -> runCatching { fetcher.close() } } }
+        }
         lastAuthState = OxTdlibAuthState(kind = OxTdlibAuthStateKind.UNINITIALIZED)
+        lastConnectionHealth = OxTdlibConnectionHealth.UNINITIALIZED
         runOnMain {
             events?.onAuthStateChanged(lastAuthState) { }
+            events?.onConnectionHealthChanged(lastConnectionHealth) { }
         }
     }
 
@@ -190,6 +281,16 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
             Log.i("OXPLAY_TDLIB", "startPlaybackSession coroutine started")
             runCatching {
                 val oxClient = client ?: notConfigured()
+                // Revive a dead run loop before asking it for bytes. Without this the download
+                // fails deep inside gotd with "waitSession: connection dead", which surfaces as an
+                // unexplained playback stall rather than a recoverable connection problem. No-op on
+                // a healthy connection, so it costs nothing on the common path.
+                authController?.let { controller ->
+                    runCatching { oxClient.ensureConnected(controller.sink) }
+                        .onFailure { err ->
+                            Log.w("OXPLAY_TDLIB", "startPlaybackSession: reconnect attempt failed", err)
+                        }
+                }
                 val session = oxClient.startPlaybackSession(
                     source.providerBotId,
                     source.messageId,
@@ -197,7 +298,7 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
                     source.locator,
                 )
                 val fileId = playbackIdCounter.incrementAndGet()
-                fileFetcher = OxTelegramFileFetcher(session)
+                fetchers[fileId] = OxTelegramFileFetcher(session)
                 currentPlaybackFileId = fileId
                 Log.i("OXPLAY_TDLIB", "startPlaybackSession resolved fileId=$fileId size=${session.size()} mime=${session.mimeType()}")
                 when {
@@ -308,29 +409,43 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
      * that already fires exactly when ExoPlayer is released (including activity-finish/app-kill
      * paths), so no Dart round-trip is needed for that backend.
      *
-     * No-op if the just-ended playback wasn't Telegram-sourced (currentPlaybackFileId unset).
+     * [fileId] is the id the ENDING playback was opened with, parsed from the uri the player still
+     * holds — never [currentPlaybackFileId]. Reading the current id here instead is precisely the
+     * bug this signature exists to prevent: teardown of play N runs after play N+1 has already
+     * started, so "current" names the wrong session and closing it leaves the starting playback
+     * with a dead byte pipe.
+     *
+     * No-op if the just-ended playback wasn't Telegram-sourced (null [fileId]) or its session was
+     * already released.
      */
-    fun onTelegramPlaybackEnded() {
-        val fileId = currentPlaybackFileId ?: return
+    fun onTelegramPlaybackEnded(fileId: Int?) {
+        if (fileId == null) return
         closeAfterPlayback(fileId)
     }
 
     /**
-     * End the active download/session but keep the TDLib client alive (READY).
-     * Closing the whole client after every play forced the next play to reconfigure from
-     * UNINITIALIZED (~0.5–2s+), which dominated first-frame latency. Session auth stays on disk
-     * either way; keeping the live client just avoids that reconnect tax between plays.
+     * Release one finished playback session, keeping the MTProto client alive (see this object's
+     * doc for why that split matters).
+     *
+     * Closes rather than merely cancelling: [OxTelegramFileFetcher.cancelDownload] only aborts
+     * in-flight chunk fetches (it is the per-seek call), so dropping the reference after it left
+     * the DC connection and .part file handle open for the process's lifetime. The on-disk bytes
+     * are kept on purpose — replaying the title resumes from them.
      */
     private fun closeAfterPlayback(fileId: Int) {
-        if (currentPlaybackFileId != fileId) return
-        currentPlaybackFileId = null
-        val fetcher = fileFetcher
-        fileFetcher = null
-        if (fetcher != null) {
-            scope.launch { runCatching { fetcher.cancelDownload(fileId) } }
-        }
+        val fetcher = fetchers.remove(fileId)
+        if (currentPlaybackFileId == fileId) currentPlaybackFileId = null
         OxTelegramStreamBridge.unregisterSession(fileId)
-        Log.i("OXPLAY_TDLIB", "closeAfterPlayback fileId=$fileId — client kept alive")
+        if (fetcher == null) {
+            Log.i("OXPLAY_TDLIB", "closeAfterPlayback fileId=$fileId — already released, no-op")
+            return
+        }
+        scope.launch { runCatching { fetcher.close() } }
+        Log.i(
+            "OXPLAY_TDLIB",
+            "closeAfterPlayback fileId=$fileId — session closed, client kept alive " +
+                "(remaining=${fetchers.size} current=$currentPlaybackFileId)",
+        )
     }
 
     override fun fetchWebAppInitData(

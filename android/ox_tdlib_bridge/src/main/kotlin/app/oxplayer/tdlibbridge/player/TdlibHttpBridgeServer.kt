@@ -36,7 +36,7 @@ private const val CRLF = "\r\n"
  * next range on a seek, which is negligible overhead on loopback and avoids implementing
  * HTTP/1.1 keep-alive/pipelining for a server with exactly one real client.
  */
-class TdlibHttpBridgeServer(private val fileFetcher: () -> OxTelegramFileFetcher?) {
+class TdlibHttpBridgeServer(private val fileFetcher: (Int) -> OxTelegramFileFetcher?) {
     @Volatile private var serverSocket: ServerSocket? = null
     @Volatile private var port: Int = -1
     private val running = AtomicBoolean(false)
@@ -94,7 +94,10 @@ class TdlibHttpBridgeServer(private val fileFetcher: () -> OxTelegramFileFetcher
             }
 
             val fileId = path.removePrefix("/").substringBefore('?').toIntOrNull()
-            val fetcher = fileFetcher()
+            // Resolved by the id in the request path, not by "whichever session is current": a url
+            // whose session already ended must 404 rather than quietly stream the bytes of a
+            // different play that happens to be active now.
+            val fetcher = fileId?.let { fileFetcher(it) }
             val output = sock.getOutputStream()
             Log.i(TAG, "HTTP request method=$method path=$path range=$rangeHeader fileId=$fileId")
             if (fileId == null || fetcher == null) {

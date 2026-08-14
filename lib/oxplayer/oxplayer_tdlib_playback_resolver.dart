@@ -69,6 +69,20 @@ bool oxplayerIsGotdStreamCbUrl(String? url) {
 bool oxplayerIsTelegramDirectPlayUrl(String? url) =>
     oxplayerIsTdlibHttpBridgeUrl(url) || oxplayerIsGotdStreamCbUrl(url);
 
+/// True for any resolved playback url whose validity dies with the native playback session that
+/// minted it — all three transports, unlike [oxplayerIsTelegramDirectPlayUrl] which deliberately
+/// covers only the two mpv/mdk understands.
+///
+/// None of these are durable locators: the id in them is a per-session counter
+/// (TdlibBridgeObject.playbackIdCounter), and the bytes behind it come from a fileFetcher that is
+/// torn down when playback ends. Caching one and replaying it later hands ExoPlayer/mpv a url whose
+/// backing session no longer exists — the "No active TDLib session for playback" report from the
+/// TV. Use this for cache-admission and session-teardown decisions; use
+/// [oxplayerIsTelegramDirectPlayUrl] for the "can this backend play it directly" question, which
+/// is a different one (see lib_mpv.dart's stream_cb/HTTP-bridge tuning).
+bool oxplayerIsSessionBoundPlaybackUrl(String? url) =>
+    oxplayerIsTdlibFileUrl(url) || oxplayerIsTelegramDirectPlayUrl(url);
+
 /// One parsed `oxplayer-tg://{providerBotId}/{messageId}?loc={locator}` Path.
 class OxplayerTelegramDeliveryPath {
   const OxplayerTelegramDeliveryPath({

@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import mobile.AuthEventSink
 import mobile.Client
+import mobile.ConnectionSink
 import mobile.PlaybackSession
 import mobile.SessionStorage
 
@@ -22,6 +23,22 @@ class OxTelegramClient(
     val native: Client = Client(apiId, apiHash, storage)
 
     suspend fun configure(sink: AuthEventSink) = withContext(Dispatchers.IO) { native.configure(sink) }
+
+    /**
+     * Rebuilds the connection if its run loop died; no-op when healthy. See mobile.Client's doc for
+     * why "already configured" must never be assumed from the presence of a client object alone.
+     */
+    suspend fun ensureConnected(sink: AuthEventSink) =
+        withContext(Dispatchers.IO) { native.ensureConnected(sink) }
+
+    /** Registers the connection-health listener. Reconnection happens with or without one. */
+    fun setConnectionSink(sink: ConnectionSink?) = native.setConnectionSink(sink)
+
+    /**
+     * "uninitialized" / "connecting" / "ready" / "degraded" — an in-memory read on the Go side, so
+     * it stays off Dispatchers.IO and can answer a synchronous Pigeon call.
+     */
+    fun connectionHealth(): String = native.connectionHealth()
 
     suspend fun submitPhoneNumber(phone: String) = withContext(Dispatchers.IO) { native.submitPhoneNumber(phone) }
 

@@ -36,6 +36,21 @@ type Client struct {
 	// Auth is valid only between a successful Configure and the matching Close.
 	Auth *AuthController
 
+	// sink is kept from the last Configure so the self-healing reconnect (see watchRun) can rebuild
+	// the client without the host having to re-supply it.
+	sink AuthEventSink
+	// health is the last connection state reported to healthSink; guarded by mu.
+	health ConnectionHealth
+	// healthSink is optional — the host sets it via SetConnectionSink to drive UI. Connection
+	// recovery does NOT depend on it.
+	healthSink ConnectionSink
+	// closed is set by Close/LogOut so watchRun stops reconnecting instead of fighting a
+	// deliberate shutdown.
+	closed bool
+	// runGen increments per Configure so a watcher from a superseded run cannot reconnect on
+	// behalf of a newer one.
+	runGen int64
+
 	// pushWaiters/pushArrived deliver documents from live-pushed private messages to whichever
 	// resolve call is waiting for that SPECIFIC copy. The update dispatcher is registered from
 	// Configure onward (not just during a resolve call), but registerPushWaiter can only run
@@ -240,11 +255,147 @@ func isClosed(ch chan struct{}) bool {
 	}
 }
 
+// ConnectionHealth is the liveness of the MTProto socket, which is deliberately NOT the same
+// question as the auth state: a logged-in account whose run loop has died reports READY auth and
+// still cannot fetch a single byte. Reporting that as "logged out" is what sent TV users to a
+// login screen for a problem a reconnect fixes.
+type ConnectionHealth string
+
+const (
+	// HealthUninitialized — Configure has never succeeded.
+	HealthUninitialized ConnectionHealth = "uninitialized"
+	// HealthConnecting — a Run loop is starting (first connect or a reconnect in progress).
+	HealthConnecting ConnectionHealth = "connecting"
+	// HealthReady — the run loop is live and RPCs can be issued.
+	HealthReady ConnectionHealth = "ready"
+	// HealthDegraded — the run loop exited while credentials are still believed valid. Recoverable
+	// by rebuilding the client, which watchRun does automatically; never a reason to ask the user
+	// to log in again.
+	HealthDegraded ConnectionHealth = "degraded"
+)
+
+// ConnectionSink receives connection-health transitions. Optional and purely informational — the
+// reconnect loop runs whether or not one is set. Separate from AuthEventSink so hosts that only
+// care about login (and the Windows cshared build) need no change.
+type ConnectionSink interface {
+	OnConnectionHealthChanged(state string)
+}
+
+// reconnectBackoffs are the waits between self-healing reconnect attempts after the run loop dies.
+// Front-loaded because the common cause is a brief transport blip (wifi roam, TV waking from
+// sleep) that is fixed by the time the first retry lands; capped so a genuinely offline device
+// settles into one cheap attempt a minute rather than spinning.
+var reconnectBackoffs = []time.Duration{
+	time.Second,
+	2 * time.Second,
+	5 * time.Second,
+	15 * time.Second,
+	30 * time.Second,
+	60 * time.Second,
+}
+
+// SetConnectionSink registers (or clears, with nil) the health listener and immediately replays the
+// current state, so a host attaching after Configure does not sit on a stale default.
+func (c *Client) SetConnectionSink(sink ConnectionSink) {
+	c.mu.Lock()
+	c.healthSink = sink
+	current := c.health
+	if current == "" {
+		current = HealthUninitialized
+	}
+	c.mu.Unlock()
+	if sink != nil {
+		sink.OnConnectionHealthChanged(string(current))
+	}
+}
+
+// Health is the current connection state — the cheap synchronous read a playback gate uses before
+// deciding whether starting a download is worth attempting.
+func (c *Client) Health() ConnectionHealth {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.health == "" {
+		return HealthUninitialized
+	}
+	return c.health
+}
+
+// setHealth records the state and notifies the sink outside the lock (the host implementation
+// crosses a JNI boundary and must never run while holding c.mu).
+func (c *Client) setHealth(next ConnectionHealth) {
+	c.mu.Lock()
+	if c.health == next {
+		c.mu.Unlock()
+		return
+	}
+	c.health = next
+	sink := c.healthSink
+	c.mu.Unlock()
+	log.Printf("oxtelegram: connection health -> %s", next)
+	if sink != nil {
+		sink.OnConnectionHealthChanged(string(next))
+	}
+}
+
+// watchRun turns a dead run loop from a silent hang into a reported, self-healing event.
+//
+// gotd does not resurrect Run, and the *telegram.Client keeps answering as if healthy afterwards,
+// so without this every later UploadGetFile fails with "waitSession: connection dead" and the only
+// cure is killing the app. gen guards against a watcher outliving its own Configure: if a newer
+// Configure has already run, this watcher just exits.
+func (c *Client) watchRun(gen int64, runDone chan struct{}, runCtx context.Context) {
+	<-runDone
+
+	c.mu.Lock()
+	stale := c.runGen != gen
+	closed := c.closed
+	sink := c.sink
+	c.mu.Unlock()
+	// Deliberate teardown (Close/LogOut) or superseded by a newer Configure — nothing to heal.
+	if stale || closed || runCtx.Err() != nil {
+		return
+	}
+
+	log.Printf("oxtelegram: run loop exited unexpectedly — reconnecting")
+	c.setHealth(HealthDegraded)
+
+	for attempt := 0; ; attempt++ {
+		wait := reconnectBackoffs[len(reconnectBackoffs)-1]
+		if attempt < len(reconnectBackoffs) {
+			wait = reconnectBackoffs[attempt]
+		}
+		time.Sleep(wait)
+
+		c.mu.Lock()
+		stale = c.runGen != gen
+		closed = c.closed
+		c.mu.Unlock()
+		if stale || closed {
+			return
+		}
+
+		// Configure sees the closed runDone and rebuilds from the same on-disk session — no user
+		// interaction, because the credentials never became invalid.
+		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		err := c.Configure(ctx, sink)
+		cancel()
+		if err == nil {
+			log.Printf("oxtelegram: reconnected after %d attempt(s)", attempt+1)
+			return
+		}
+		log.Printf("oxtelegram: reconnect attempt %d failed: %v", attempt+1, err)
+	}
+}
+
 // Configure starts the underlying connection and blocks until it's ready to accept auth/API
 // calls, or ctx is cancelled, or 30s elapse. Idempotent — a second call while already configured
-// is a no-op. sink receives auth state push notifications for the lifetime of this Client.
+// AND healthy is a no-op; a second call after the run loop died rebuilds, which is what makes
+// recovery possible without restarting the process. sink receives auth state push notifications
+// for the lifetime of this Client.
 func (c *Client) Configure(ctx context.Context, sink AuthEventSink) error {
 	c.mu.Lock()
+	c.closed = false
+	c.sink = sink
 	if c.tg != nil {
 		if c.runDone != nil && !isClosed(c.runDone) {
 			c.mu.Unlock()
@@ -311,11 +462,18 @@ func (c *Client) Configure(ctx context.Context, sink AuthEventSink) error {
 	c.cancel = cancel
 	c.runDone = runDone
 	c.Auth = newAuthController(tgClient, c.apiID, c.apiHash, sink, dispatcher)
+	c.runGen++
+	gen := c.runGen
 	c.mu.Unlock()
+
+	c.setHealth(HealthConnecting)
+	// Started before the readiness wait so a run loop that dies during startup is still noticed.
+	go c.watchRun(gen, runDone, runCtx)
 
 	select {
 	case err := <-ready:
 		if err != nil {
+			c.setHealth(HealthDegraded)
 			return fmt.Errorf("client run failed before ready: %w", err)
 		}
 	case <-ctx.Done():
@@ -324,6 +482,7 @@ func (c *Client) Configure(ctx context.Context, sink AuthEventSink) error {
 		return fmt.Errorf("client did not become ready within 30s")
 	}
 
+	c.setHealth(HealthReady)
 	c.Auth.checkInitialStatus(ctx)
 	return nil
 }
@@ -379,7 +538,12 @@ func (c *Client) Close() error {
 	c.cancel = nil
 	c.runDone = nil
 	c.Auth = nil
+	// Marks this teardown deliberate so watchRun exits instead of treating it as a dropped
+	// connection and reconnecting against the caller's wishes.
+	c.closed = true
 	c.mu.Unlock()
+
+	c.setHealth(HealthUninitialized)
 
 	if cancel == nil {
 		return nil

@@ -5,6 +5,14 @@ import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
 /// In-memory cache of resolved TDLib playback URLs keyed by Telegram public link + bridge mode.
 ///
 /// Process-lifetime only. Short TTL so a purged public-pool message does not stick forever.
+///
+/// Session-bound urls are NEVER stored — see [put]. In practice that rules out every resolved
+/// Telegram transport, so this degrades to a singleflight (see [resolveOrStart]) plus a cache for
+/// any future non-session-bound resolution. That is deliberate and costs little: the expensive half
+/// of a resolve (finding which DM message holds the file, and copying it there if it is missing) is
+/// already remembered natively in go/oxtelegram's deliveryRefs for 10 minutes, so a second play of
+/// the same title re-runs startPlaybackSession against a warm client and a known message id rather
+/// than triggering a fresh server-side copy.
 abstract final class OxplayerTdlibSessionCache {
   static const Duration ttl = Duration(minutes: 15);
 
@@ -27,7 +35,14 @@ abstract final class OxplayerTdlibSessionCache {
     return entry.resolvedUrl;
   }
 
+  /// Stores [resolvedUrl] unless it dies with the playback session that minted it.
+  ///
+  /// The synthetic id in `tdlib-file://{id}` / `http://127.0.0.1:{port}/{id}` / `gotdstream://{id}`
+  /// is a per-session counter, not a locator: replaying a stored one after its fileFetcher was torn
+  /// down is exactly the dead-playback bug this guard exists to prevent. Silently skipping (rather
+  /// than throwing) keeps [resolveOrStart] a plain pass-through for those urls.
   static void put(String telegramUrl, String resolvedUrl, {required bool preferHttpBridge}) {
+    if (oxplayerIsSessionBoundPlaybackUrl(resolvedUrl)) return;
     final key = cacheKey(telegramUrl, preferHttpBridge: preferHttpBridge);
     _entries[key] = _Entry(resolvedUrl: resolvedUrl, storedAt: DateTime.now());
   }

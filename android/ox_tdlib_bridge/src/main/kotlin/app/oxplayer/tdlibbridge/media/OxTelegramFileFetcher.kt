@@ -67,4 +67,19 @@ class OxTelegramFileFetcher(private val session: PlaybackSession) {
             session.cancelCurrentRead()
         }
     }
+
+    /**
+     * Releases the underlying session's resources for good — migrated-DC connection and cache file
+     * handle (see PlaybackSession.Close in go/oxtelegram/mobile/bind.go). Unlike [cancelDownload],
+     * which only aborts in-flight chunk fetches and is called on every seek, this ends the session:
+     * call it exactly once, when the playback it belongs to is finished.
+     *
+     * The on-disk .part file deliberately survives, so replaying the same title resumes from what
+     * was already downloaded instead of refetching from byte zero.
+     */
+    suspend fun close() {
+        withContext(Dispatchers.IO) {
+            session.close()
+        }
+    }
 }
