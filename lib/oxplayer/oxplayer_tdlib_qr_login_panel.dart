@@ -10,6 +10,7 @@ import 'package:fladder/oxplayer/oxplayer_jellyfin_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_ox_login_kind_store.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_test_account_qr_hold.dart';
+import 'package:fladder/oxplayer/oxplayer_telegram_connecting_notice.dart';
 import 'package:fladder/oxplayer/oxplayer_test_account_sign_in.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
 import 'package:fladder/theme.dart';
@@ -402,10 +403,9 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
             textAlign: TextAlign.center,
           ),
         ] else if (_error == null)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 40),
-            child: CircularProgressIndicator(),
-          ),
+          // No QR yet means the MTProto connection is still coming up. This used to be a bare
+          // spinner, which on a slow network sat silent long enough to look hung.
+          const OxplayerTelegramConnectingNotice(),
         // Inline 2FA only when no hand-off callback (phone sheet / TV switch to LoginPanel).
         if (state.kind == OxTdlibAuthStateKind.waitingForPassword &&
             widget.onNeedTwoFactorPassword == null) ...[

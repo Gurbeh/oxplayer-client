@@ -476,14 +476,18 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
     final playbackModel = ref.read(playBackModel);
     if (playbackModel == null) return;
 
-    // mpv/mdk path: ExoPlayer's Activity teardown already releases its own session natively
-    // (VideoPlayerImplementation.clearSession), while this player runs inside the normal Flutter
-    // widget tree where nothing else would. tdlib-file:// is included anyway as defence in depth
-    // for the ExoPlayer path — it is safe to double-report because the native side keys the
-    // release on the fileId carried in this url, so a session that already ended is a no-op and a
-    // newer session started meanwhile is never touched. No-op for any non-Telegram url.
+    // mpv/mdk path only: ExoPlayer's own Activity teardown closes its session natively
+    // (VideoPlayerImplementation.clearSession) — this player runs inside the normal Flutter
+    // widget tree instead, so nothing else calls this. No-op for any non-Telegram url.
+    //
+    // tdlib-file:// must NOT be added here as "defence in depth", however tempting: this reads the
+    // CURRENT playbackModel, and openPlayer() calls stop() when the previous VideoPlayerActivity
+    // finishes — which on the next-episode path is after the new episode's model is already in
+    // place. Including it therefore reported the incoming session as ended and killed the playback
+    // that was starting. Measured on a TV: the release landed ~0.5s after the new session was
+    // minted, and the episode never opened.
     final sessionUrl = playbackModel.media?.url;
-    if (oxplayerIsSessionBoundPlaybackUrl(sessionUrl)) {
+    if (oxplayerIsTelegramDirectPlayUrl(sessionUrl)) {
       unawaited(OxplayerTdlibBridgeController.instance().stopPlaybackSession(sessionUrl!));
     }
 

@@ -21,6 +21,19 @@ import (
 
 const callTimeout = 30 * time.Second
 
+// authCallTimeout covers the login submissions, which can each trigger a data-centre migration:
+// Telegram answers with a redirect, and the client must stand up a whole new connection to the
+// target DC before it can retry. That is a second full handshake, not a round trip.
+//
+// Measured on an Android TV over a slow link, a bare connect took 16-18s, so under the shared 30s
+// budget a migration had ~12s left and three of four bot-token logins died with
+// "migrate to dc: context deadline exceeded" -- a login that works or not depending on the
+// network's mood. 90s leaves roughly 2x headroom over the worst observed connect+migrate.
+//
+// Callers must keep their own deadline above this one (see _kAuthRpcTimeout in
+// oxplayer_tdlib_bridge_controller.dart), or the extra budget here is unreachable.
+const authCallTimeout = 90 * time.Second
+
 // providerBotsSetupTimeout covers start+mute+archive across the whole sender list, each of which is
 // several sequential MTProto round trips. Generous because this runs off the playback path, at app
 // enter, and a partial run leaves some senders unprepared.
@@ -120,7 +133,7 @@ func (c *Client) EnsureConnected(sink AuthEventSink) error {
 }
 
 func (c *Client) SubmitPhoneNumber(phone string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), authCallTimeout)
 	defer cancel()
 	return c.inner.Auth.SubmitPhoneNumber(ctx, phone)
 }
@@ -128,13 +141,13 @@ func (c *Client) SubmitPhoneNumber(phone string) error {
 // SubmitBotToken logs in as a bot instead of a personal phone/QR account — see
 // oxtelegram.AuthController.SubmitBotToken.
 func (c *Client) SubmitBotToken(token string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), authCallTimeout)
 	defer cancel()
 	return c.inner.Auth.SubmitBotToken(ctx, token)
 }
 
 func (c *Client) SubmitCode(code string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), authCallTimeout)
 	defer cancel()
 	return c.inner.Auth.SubmitCode(ctx, code)
 }
@@ -142,7 +155,7 @@ func (c *Client) SubmitCode(code string) error {
 // SubmitTwoFactorPassword completes 2FA login — reached from either the phone or QR flow (see
 // oxtelegram.AuthController's doc on why this is one shared path, not two).
 func (c *Client) SubmitTwoFactorPassword(password string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), authCallTimeout)
 	defer cancel()
 	return c.inner.Auth.SubmitTwoFactorPassword(ctx, password)
 }

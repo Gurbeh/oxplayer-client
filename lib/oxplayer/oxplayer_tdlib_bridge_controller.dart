@@ -407,7 +407,11 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
     }
   }
 
-  static const _kAuthRpcTimeout = Duration(seconds: 45);
+  /// Must stay above mobile.authCallTimeout (90s in go/oxtelegram/mobile/bind.go) or the native
+  /// side's budget for a data-centre migration is unreachable — this deadline would fire first and
+  /// report a timeout while the login was still legitimately in flight. The 45s that used to be
+  /// here did exactly that on a slow TV link.
+  static const _kAuthRpcTimeout = Duration(seconds: 100);
 
   static bool _isPastPhoneStep(OxTdlibAuthStateKind kind) {
     switch (kind) {

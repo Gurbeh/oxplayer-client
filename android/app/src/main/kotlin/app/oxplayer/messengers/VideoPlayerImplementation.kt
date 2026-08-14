@@ -115,6 +115,19 @@ class VideoPlayerImplementation(
     private var pendingOpenUrl: String? = null
     private var pendingOpenPlay: Boolean = true
 
+    /**
+     * Telegram playback-session id this player actually opened, or null.
+     *
+     * Recorded at the moment [open] commits a url to ExoPlayer — deliberately NOT read back out of
+     * [playbackData] at teardown time. playbackData is replaced by sendPlayableModel as soon as the
+     * NEXT playback is prepared, which on the next-episode path happens before the previous
+     * player's teardown runs: reading it there identified the incoming session as the one that had
+     * ended and released it, leaving the starting playback with no byte pipe (observed as a
+     * next-episode that never opened). This field only ever names a session this player opened, so
+     * a late teardown cannot reach a newer one.
+     */
+    private var openedTelegramFileId: Int? = null
+
     fun saveBackgroundState() {
         val exo = player ?: return
         val pos = exo.currentPosition.coerceAtLeast(0L)
@@ -140,11 +153,11 @@ class VideoPlayerImplementation(
     }
 
     fun clearSession() {
-        // Read the url BEFORE clearing playbackData: it carries the fileId of the playback that is
-        // ending, which is what TdlibBridgeObject must release. Handing it the "current" session id
-        // instead would release whichever playback started most recently — and Dart resolves the
-        // next play's url before tearing this one down, so that is routinely the wrong one.
-        val endedFileId = telegramPlaybackFileId(playbackData.value?.url)
+        // Use the id this player opened with, not whatever url playbackData holds now — see
+        // [openedTelegramFileId]. Consuming it here also makes repeat teardowns (ExoPlayer dispose,
+        // then MainActivity, then Dart's stop) no-ops rather than three attempts to release.
+        val endedFileId = openedTelegramFileId
+        openedTelegramFileId = null
         playbackData.value = null
         savedPositionMs = 0L
         wasPlayingBeforeBackground = false
@@ -301,6 +314,10 @@ class VideoPlayerImplementation(
 
                 exo.stop()
                 exo.clearMediaItems()
+
+                // The commit point: from here this player owns that Telegram session, and its
+                // teardown — and only its teardown — may release it.
+                openedTelegramFileId = telegramPlaybackFileId(url)
 
                 exo.setMediaItem(mediaItem, startPosition)
                 exo.prepare()
