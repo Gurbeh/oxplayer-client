@@ -47,11 +47,11 @@ type byteRange struct {
 type DownloadSession struct {
 	client *Client
 	ref    *VideoFileRef
-	// channel/messageID identify ref's source message — kept only to re-resolve a fresh
-	// FileReference on FILE_REFERENCE_EXPIRED/INVALID (see refreshFileReference). Empty channel
-	// means refresh is unavailable (caller didn't provide it) and that error class is fatal.
-	channel   string
+	// messageID/locator identify ref's source message in the delivery DM — kept only to re-resolve
+	// a fresh FileReference on FILE_REFERENCE_EXPIRED/INVALID (see refreshFileReference). A zero
+	// messageID means refresh is unavailable and that error class is fatal.
 	messageID int64
+	locator   string
 
 	mu sync.Mutex
 	// ranges are sorted, non-overlapping, merged half-open intervals of bytes present on disk.
@@ -66,11 +66,11 @@ type DownloadSession struct {
 }
 
 // OpenDownload creates (or reopens) the local cache file for ref under cacheDir — the same file
-// TelegramFileDataSource/TdlibHttpBridgeServer read from as bytes land. channel/messageID are
-// ref's source message, kept only so refreshFileReference can re-resolve on
-// FILE_REFERENCE_EXPIRED/INVALID; pass "" if unavailable (that error class then becomes fatal
+// TelegramFileDataSource/TdlibHttpBridgeServer read from as bytes land. messageID/locator are ref's
+// source message in the delivery DM, kept only so refreshFileReference can re-resolve on
+// FILE_REFERENCE_EXPIRED/INVALID; pass 0/"" if unavailable (that error class then becomes fatal
 // instead of recovered).
-func (c *Client) OpenDownload(ref *VideoFileRef, channel string, messageID int64, cacheDir string) (*DownloadSession, error) {
+func (c *Client) OpenDownload(ref *VideoFileRef, messageID int64, locator, cacheDir string) (*DownloadSession, error) {
 	if c.API() == nil {
 		return nil, fmt.Errorf("client not configured")
 	}
@@ -79,7 +79,7 @@ func (c *Client) OpenDownload(ref *VideoFileRef, channel string, messageID int64
 	if err != nil {
 		return nil, fmt.Errorf("open cache file: %w", err)
 	}
-	return &DownloadSession{client: c, ref: ref, channel: channel, messageID: messageID, file: f}, nil
+	return &DownloadSession{client: c, ref: ref, messageID: messageID, locator: locator, file: f}, nil
 }
 
 func (d *DownloadSession) LocalPath() string { return d.file.Name() }
@@ -332,20 +332,25 @@ func (d *DownloadSession) location() *tg.InputDocumentFileLocation {
 	}
 }
 
-// refreshFileReference re-resolves channel/messageID and swaps in the fresh FileReference/
+// refreshFileReference re-reads the delivery message and swaps in the fresh FileReference/
 // AccessHash — the recovery path for FILE_REFERENCE_EXPIRED/INVALID, which is a normal, expected
-// MTProto condition (references rotate), not a fatal error. Requires channel to have been passed
-// to OpenDownload; otherwise this class of error stays fatal.
+// MTProto condition (references rotate), not a fatal error.
+//
+// Re-fetching a message by id is the standard way to get a fresh file_reference, and it works for
+// bot sessions as well as user ones. It needs the id in THIS session's own DM, which
+// StartPlaybackSession records — including on the cold path, where it only learns the id from the
+// live push. If it is still 0, nothing was ever read, so this fails fast rather than hanging on a
+// push wait that can never be answered; a full retry from PlaybackInfo recovers either way.
 func (d *DownloadSession) refreshFileReference(ctx context.Context) error {
 	d.mu.Lock()
-	channel, messageID := d.channel, d.messageID
+	messageID, locator, providerBotID := d.messageID, d.locator, d.ref.ProviderBotID
 	d.mu.Unlock()
-	if channel == "" {
-		return fmt.Errorf("no source channel/message recorded, cannot refresh file reference")
+	if messageID <= 0 || locator == "" {
+		return fmt.Errorf("no delivery message recorded, cannot refresh file reference")
 	}
-	fresh, err := d.client.ResolveVideoFile(ctx, channel, messageID)
+	fresh, err := d.client.ResolveVideoFile(ctx, providerBotID, messageID, locator)
 	if err != nil {
-		return fmt.Errorf("re-resolve %s/%d: %w", channel, messageID, err)
+		return fmt.Errorf("re-resolve %s/%d: %w", locator, messageID, err)
 	}
 	d.mu.Lock()
 	d.ref.FileReference = fresh.FileReference

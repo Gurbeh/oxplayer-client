@@ -70,10 +70,17 @@ abstract final class OxplayerTdlibSessionCache {
     _inFlight.clear();
   }
 
+  /// The locator alone, not the Path.
+  ///
+  /// A cold play carries `oxplayer-tg://0/0` — the backend has not committed to a sender yet — so
+  /// keying on bot+message id would canonicalise EVERY not-yet-remembered file to the same string
+  /// and hand one title's resolved url to another. The locator is unique per stored file, and it
+  /// stays the same string once the ids get filled in, so a warm entry survives the miss→hit
+  /// transition instead of being orphaned by it.
   static String? _canonicalTelegramUrl(String? url) {
-    if (!oxplayerIsTelegramProviderLink(url)) return null;
-    final uri = Uri.parse(url!.trim());
-    return 'https://t.me/${uri.pathSegments[0]}/${uri.pathSegments[1]}';
+    final parsed = url == null ? null : oxplayerParseTelegramDeliveryPath(url.trim());
+    if (parsed == null) return null;
+    return 'oxdelivery:${parsed.locator}';
   }
 }
 

@@ -7,12 +7,13 @@ import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/oxplayer/ox_series_next_up.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_delivery_reader_sync.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_info_polling.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_link_cache.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_media_source.dart';
+import 'package:fladder/oxplayer/oxplayer_provider_bots_bootstrap.dart';
 import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
-import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
 import 'package:fladder/providers/api_provider.dart';
@@ -23,9 +24,12 @@ import 'package:fladder/util/duration_extensions.dart';
 abstract final class OxplayerPlaybackPrefetch {
   /// In-flight keyed by itemId — any mediaSourceId for same item shares one flight.
   static final Map<String, Future<void>> _inFlightByItem = {};
+  /// Home slider: PlaybackInfo itself triggers copyMessage. One attempt per item per process
+  /// so a never-reported miss (oxm_dev_510) cannot recopy on every fetchViews.
+  static final Set<String> _homeOnceItems = {};
 
   /// Fire-and-forget when detail screen knows the likely play target.
-  static void scheduleForSeries(OxplayerRead read, SeriesModel? series) {
+  static void scheduleForSeries(OxplayerRead read, SeriesModel? series, {bool once = false}) {
     if (!OxplayerConfig.isEnabled || series == null) return;
     final episode = oxSeriesPlayableNextUp(series);
     if (episode == null) return;
@@ -34,6 +38,7 @@ abstract final class OxplayerPlaybackPrefetch {
       episode.id,
       startPosition: episode.userData.playBackPosition,
       mediaSourceId: episode.streamModel?.currentVersionStream?.id,
+      once: once,
     );
   }
 
@@ -54,8 +59,10 @@ abstract final class OxplayerPlaybackPrefetch {
     String itemId, {
     Duration? startPosition,
     String? mediaSourceId,
+    bool once = false,
   }) {
     if (!OxplayerConfig.isEnabled || itemId.isEmpty || kIsWeb) return;
+    if (once && !_homeOnceItems.add(itemId)) return;
     if (_inFlightByItem.containsKey(itemId)) return;
 
     _inFlightByItem[itemId] = _run(read, itemId, startPosition: startPosition, mediaSourceId: mediaSourceId)
@@ -93,19 +100,24 @@ abstract final class OxplayerPlaybackPrefetch {
     if (userId == null || userId.isEmpty) return;
 
     final sw = Stopwatch()..start();
-    // Overlap TDLib READY with PlaybackInfo (copyMessage) — next play must not serialize them.
-    final tdlibReady = () async {
-      try {
-        await OxplayerTdlibBridgeController.instance().ensureConfigured(
-          readyTimeout: const Duration(seconds: 30),
-        );
-      } catch (e) {
-        OxplayerStreamLog.event('tdlib_ready_prefetch', fields: {
-          'itemId': itemId,
-          'error': e.runtimeType.toString(),
-        });
-      }
-    }();
+    await oxplayerEnsureTdlibMatchesOxUser(read(userProvider)?.credentials.token);
+    if (oxplayerTdlibPlayInProgress()) {
+      OxplayerStreamLog.event('playback_prefetch', fields: {
+        'itemId': itemId,
+        'skipped': 'play_in_progress',
+      });
+      return;
+    }
+    // startBot MUST finish before PlaybackInfo: a miss copyMessage into an unstarted DM is
+    // Telegram 400 chat not found, and the client then spins 20s on oxplayer-tg://0/0.
+    final botsReady = await OxplayerProviderBotsBootstrap.ensureReady();
+    if (!botsReady) {
+      OxplayerStreamLog.event('playback_prefetch', fields: {
+        'itemId': itemId,
+        'skipped': 'provider_bots_not_ready',
+      });
+      return;
+    }
 
     try {
       final api = read(jellyApiProvider);
@@ -126,11 +138,8 @@ abstract final class OxplayerPlaybackPrefetch {
 
       final playbackInfoMs = sw.elapsedMilliseconds;
       if (response.isSuccessful && response.body != null) {
-        OxplayerPlaybackLinkCache.putFromResponse(response.body);
-        await tdlibReady;
         await _warmTdlibFromResponse(read, response.body!);
-      } else {
-        await tdlibReady;
+        OxplayerPlaybackLinkCache.putFromResponse(response.body);
       }
 
       OxplayerStreamLog.event('playback_prefetch', fields: {
@@ -141,7 +150,6 @@ abstract final class OxplayerPlaybackPrefetch {
         'totalMs': sw.elapsedMilliseconds,
       });
     } catch (e) {
-      await tdlibReady;
       OxplayerStreamLog.event('playback_prefetch', fields: {
         'itemId': itemId,
         'mediaSourceId': mediaSourceId,
@@ -151,14 +159,50 @@ abstract final class OxplayerPlaybackPrefetch {
     }
   }
 
-  /// Warm TDLib session so play tap hits session cache. Errors are logged; prefetch still succeeds.
+  /// Resolves the delivery and reports where it landed, so the eventual play is answered from the
+  /// backend's delivery table with no Telegram copy at all.
+  ///
+  /// Deliberately does NOT open a download session. Scrolling the dashboard warms several titles at
+  /// once, and starting a progressive download per warmed item would spend the user's data on bytes
+  /// for videos nobody pressed play on. Resolving is the whole point: it makes the backend remember
+  /// the message id. Errors are logged; the prefetch still counts as succeeded.
   static Future<void> _warmTdlibFromResponse(OxplayerRead read, PlaybackInfoResponse body) async {
     final source = oxplayerResolvePlaybackMediaSource(body);
     final path = source?.path?.trim();
-    if (!oxplayerIsTelegramProviderLink(path)) return;
+    if (path == null || !oxplayerIsTelegramProviderLink(path)) return;
+    final parsed = oxplayerParseTelegramDeliveryPath(path);
+    if (parsed == null) return;
+    if (oxplayerTdlibPlayInProgress() || oxplayerTdlibPlayIsResolving(parsed.locator)) {
+      OxplayerStreamLog.event('tdlib_warm', fields: {
+        'url': OxplayerStreamLog.describeUrl(path),
+        'skipped': 'play_resolving',
+      });
+      return;
+    }
+    final controller = OxplayerTdlibBridgeController.instance();
     final sw = Stopwatch()..start();
     try {
-      await oxplayerResolveStreamPlaybackUrl(read, path);
+      // Arm before resolving: on a miss the backend already sent the copy while PlaybackInfo was
+      // in flight, so the push can land before anything is waiting for it.
+      await controller.armDeliveryWaiter(parsed.locator);
+      // Prefer the live-push ref over a competing 0/0 warmDelivery — that shared waiter
+      // made play timeout while prefetch held the channel.
+      final landed = await waitForTdlibDeliveryRef(
+        controller,
+        parsed.locator,
+        timeout: const Duration(seconds: 8),
+      );
+      if (landed == null || landed.messageId <= 0) {
+        if (oxplayerTdlibPlayInProgress()) {
+          OxplayerStreamLog.event('tdlib_warm', fields: {
+            'url': OxplayerStreamLog.describeUrl(path),
+            'skipped': 'play_in_progress',
+          });
+          return;
+        }
+        await controller.warmDelivery(parsed.toSource());
+      }
+      await oxplayerReportTelegramDelivery(controller, locator: parsed.locator);
       OxplayerStreamLog.event('tdlib_warm', fields: {
         'url': OxplayerStreamLog.describeUrl(path),
         'tdlibWarmMs': sw.elapsedMilliseconds,

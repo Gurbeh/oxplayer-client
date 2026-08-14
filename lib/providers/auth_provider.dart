@@ -12,6 +12,7 @@ import 'package:fladder/models/credentials_model.dart';
 import 'package:fladder/models/login_screen_model.dart';
 import 'package:fladder/oxplayer/oxplayer_api_disk_cache.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_image_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_telegram_logout.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
@@ -146,13 +147,27 @@ class AuthNotifier extends StateNotifier<LoginScreenModel> {
 
   Future<Response<AccountModel>> _createAccountModel(Response<AuthenticationResult> response) async {
     CredentialsModel? credentials = state.serverLoginModel?.tempCredentials;
-    if (credentials == null) return Response(response.base, null);
+    if (credentials == null) {
+      final url = FladderConfig.baseUrl;
+      if (url == null || url.isEmpty) return Response(response.base, null);
+      credentials = CredentialsModel.createNewCredentials().copyWith(url: url);
+    }
     if (response.isSuccessful && (response.body?.accessToken?.isNotEmpty ?? false)) {
-      var serverResponse = await api.systemInfoPublicGet();
+      var serverName = credentials.serverName;
+      var serverId = response.body?.serverId ?? credentials.serverId;
+      try {
+        final serverResponse = await api.systemInfoPublicGet().timeout(const Duration(seconds: 12));
+        serverName = serverResponse.body?.serverName ?? serverName;
+        if (serverId.isEmpty) {
+          serverId = serverResponse.body?.id ?? serverId;
+        }
+      } catch (_) {
+        // Access token is already issued — do not block sign-in on public system info.
+      }
       credentials = credentials.copyWith(
         token: response.body?.accessToken ?? "",
-        serverId: response.body?.serverId ?? "",
-        serverName: serverResponse.body?.serverName ?? "",
+        serverId: serverId,
+        serverName: serverName,
       );
       var imageUrl = ref.read(imageUtilityProvider).getUserImageUrl(response.body?.user?.id ?? "");
       AccountModel newUser = AccountModel(
@@ -164,6 +179,7 @@ class AuthNotifier extends StateNotifier<LoginScreenModel> {
       );
       ref.read(sharedUtilityProvider).addAccount(newUser);
       ref.read(userProvider.notifier).userState = newUser;
+      OxplayerImageAuth.syncFromAccount(newUser);
       final currentAccounts = ref.read(authProvider.notifier).getSavedAccounts();
 
       state = state.copyWith(

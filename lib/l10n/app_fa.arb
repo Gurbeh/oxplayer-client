@@ -2116,6 +2116,8 @@
     "oxplayerDeveloperModeTitle": "حالت توسعه‌دهنده",
     "oxplayerDeveloperModeIntro": "ابزارهای تشخیص داخلی. فقط در صورت آشنایی استفاده کن.",
     "oxplayerDeveloperModeUnlocked": "حالت توسعه‌دهنده فعال شد",
+    "oxplayerAboutLoginSession": "ورود با سشن تلگرام",
+    "oxplayerAboutLoginBot": "ورود با بات تلگرام",
     "oxplayerDeveloperModeCheckSentry": "بررسی Sentry",
     "oxplayerDeveloperModeCheckStream": "بررسی استریم",
     "oxplayerDeveloperModeCheckCrashlytics": "بررسی Crashlytics",

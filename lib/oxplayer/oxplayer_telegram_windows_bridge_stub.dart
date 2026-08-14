@@ -16,6 +16,7 @@ class OxTelegramWindowsBridge {
   OxTdlibAuthState currentAuthState() => state;
 
   Future<void> submitPhoneNumber(String phone) async => throw UnsupportedError('windows-only');
+  Future<void> submitBotToken(String token) async => throw UnsupportedError('windows-only');
   Future<void> submitCode(String code) async => throw UnsupportedError('windows-only');
   Future<void> submitTwoFactorPassword(String password) async =>
       throw UnsupportedError('windows-only');
@@ -25,6 +26,15 @@ class OxTelegramWindowsBridge {
       throw UnsupportedError('windows-only');
   Future<void> stopPlaybackSession(String sessionUri) async =>
       throw UnsupportedError('windows-only');
+  Future<void> warmDelivery(OxTdlibPlaybackSource source) async =>
+      throw UnsupportedError('windows-only');
+  Future<void> ensureProviderBotsReady(List<OxTdlibProviderBot> bots) async =>
+      throw UnsupportedError('windows-only');
+  // The next three are silent no-ops rather than throws: callers treat "nothing armed / no id" as a
+  // normal outcome, and this file is only ever reached on a platform where the Windows host isn't
+  // the active bridge anyway.
+  void armDeliveryWaiter(String locator) {}
+  OxTdlibDeliveryRef? deliveryRefForLocator(String locator) => null;
   Future<String> fetchWebAppInitData(
     String botUsername,
     String? webAppShortName,

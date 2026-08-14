@@ -8,6 +8,7 @@ import 'package:fladder/models/view_model.dart';
 import 'package:fladder/models/views_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_home_detail_prefetch.dart';
+import 'package:fladder/oxplayer/oxplayer_provider_bots_bootstrap.dart';
 import 'package:fladder/oxplayer/oxplayer_home_feed.dart';
 import 'package:fladder/oxplayer/oxplayer_view_labels.dart';
 import 'package:fladder/oxplayer/providers/ox_favorites_dashboard.dart';
@@ -163,6 +164,9 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
       loading: false,
       loaded: true,
     );
+    // App enter: start+mute+archive every delivery sender. Prefetch/play await [ensureReady]
+    // so copyMessage cannot race ahead of startBot (Telegram 400 chat not found).
+    OxplayerProviderBotsBootstrap.schedule();
     OxplayerHomeDetailPrefetch.schedule(ref, dashboardViews: state.dashboardViews);
   }
 

@@ -46,7 +46,7 @@ abstract final class OxplayerEnv {
   static String? get effectiveMediaServerUrl => apiBaseUrl;
 
   static String? get botUsername {
-    final t = _pick(['OXPLAYER_BOT_USERNAME', 'BOT_USERNAME'], _cBotUsername)
+    final t = _pick(['OXPLAYER_BOT_USERNAME', 'BOT_USERNAME', 'TELEGRAM_MAIN_BOT_USERNAME'], _cBotUsername)
         .replaceFirst(RegExp(r'^@'), '');
     return t.isEmpty ? null : t;
   }
@@ -60,6 +60,14 @@ abstract final class OxplayerEnv {
   static String? get telegramBotDeleteAccountLink {
     final b = botUsername;
     return b == null ? null : 'https://telegram.me/$b?start=delete_account';
+  }
+
+  /// Deep link that opens the main bot with a pending login attempt pre-approved for Yes/No —
+  /// see apps/main-bot/internal/bot/login_attempt.go's handleStartLoginAttemptDeepLink
+  /// (?start=li_<32-hex-attemptId>).
+  static String? telegramBotLoginAttemptLink(String attemptId) {
+    final b = botUsername;
+    return b == null ? null : 'https://telegram.me/$b?start=li_$attemptId';
   }
 
   static String? get sentryDsn {

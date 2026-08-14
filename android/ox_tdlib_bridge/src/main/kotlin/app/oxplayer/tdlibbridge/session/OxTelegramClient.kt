@@ -25,6 +25,8 @@ class OxTelegramClient(
 
     suspend fun submitPhoneNumber(phone: String) = withContext(Dispatchers.IO) { native.submitPhoneNumber(phone) }
 
+    suspend fun submitBotToken(token: String) = withContext(Dispatchers.IO) { native.submitBotToken(token) }
+
     suspend fun submitCode(code: String) = withContext(Dispatchers.IO) { native.submitCode(code) }
 
     suspend fun submitTwoFactorPassword(password: String) =
@@ -34,8 +36,48 @@ class OxTelegramClient(
 
     suspend fun logOut() = withContext(Dispatchers.IO) { native.logOut() }
 
-    suspend fun startPlaybackSession(channelUsername: String, messageId: Long, cacheDir: String): PlaybackSession =
-        withContext(Dispatchers.IO) { native.startPlaybackSession(channelUsername, messageId, cacheDir) }
+    suspend fun startPlaybackSession(
+        providerBotId: Long,
+        messageId: Long,
+        cacheDir: String,
+        locator: String,
+    ): PlaybackSession =
+        withContext(Dispatchers.IO) {
+            native.startPlaybackSession(providerBotId, messageId, cacheDir, locator)
+        }
+
+    /**
+     * Resolves the delivery and records where it landed, without opening a download — the warm-up
+     * path. Still a real MTProto call, so it belongs on Dispatchers.IO.
+     */
+    suspend fun warmDelivery(providerBotId: Long, messageId: Long, locator: String) =
+        withContext(Dispatchers.IO) {
+            native.warmDelivery(providerBotId, messageId, locator)
+        }
+
+    /**
+     * Starts, mutes and archives every delivery sender. [botsJson] is
+     * `[{"id":123,"username":"SomeBot"}]` — gomobile cannot bind a slice of structs, so the list
+     * crosses the JNI boundary as JSON.
+     */
+    suspend fun ensureProviderBotsReady(botsJson: String) =
+        withContext(Dispatchers.IO) { native.ensureProviderBotsReady(botsJson) }
+
+    /**
+     * Registers interest in [locator] before the delivery is requested. Touches an in-memory map on
+     * the Go side — no MTProto round-trip, so it stays off Dispatchers.IO.
+     */
+    fun armDeliveryWaiter(locator: String) = native.armDeliveryWaiter(locator)
+
+    /**
+     * The DM message id this session read for [locator], or 0. Reads an in-memory map on the Go
+     * side — no MTProto round-trip, so it stays off Dispatchers.IO and can answer a synchronous
+     * Pigeon call.
+     */
+    fun deliveryMessageIDForLocator(locator: String): Long = native.deliveryMessageIDForLocator(locator)
+
+    /** The delivery bot whose DM held [locator], or 0. Same in-memory read as above. */
+    fun deliveryProviderBotIDForLocator(locator: String): Long = native.deliveryProviderBotIDForLocator(locator)
 
     suspend fun fetchWebAppInitData(
         botUsername: String,

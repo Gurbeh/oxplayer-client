@@ -34,6 +34,8 @@ class OxTelegramAuthController(private val client: OxTelegramClient) {
 
     suspend fun submitPhoneNumber(phone: String) = client.submitPhoneNumber(phone)
 
+    suspend fun submitBotToken(token: String) = client.submitBotToken(token)
+
     suspend fun submitCode(code: String) = client.submitCode(code)
 
     suspend fun submitTwoFactorPassword(password: String) = client.submitTwoFactorPassword(password)

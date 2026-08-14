@@ -10,10 +10,12 @@ import 'package:fladder/models/login_screen_model.dart';
 import 'package:fladder/oxplayer/oxplayer_account_switch.dart';
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_main_bot_login_panel.dart';
 import 'package:fladder/oxplayer/oxplayer_pending_route.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_login_panel.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_qr_login_panel.dart';
+import 'package:fladder/src/tdlib_bridge.g.dart';
 import 'package:fladder/oxplayer/oxplayer_test_account_qr_hold.dart';
 import 'package:fladder/oxplayer/oxplayer_test_account_sign_in.dart';
 import 'package:fladder/providers/arguments_provider.dart';
@@ -42,6 +44,8 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
   bool _editUsersMode = false;
   /// TV only: false = QR-first, true = phone panel after remote select.
   bool _tvUsePhone = false;
+  /// false = TDLib (personal Telegram account), true = @main-bot (no account access at all).
+  bool _useMainBot = false;
 
   @override
   void initState() {
@@ -280,39 +284,68 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
                                             ),
                                             const SizedBox(height: 8),
                                           ],
-                                          _isTv(context)
-                                              ? (_tvUsePhone
-                                                  ? OxplayerTdlibLoginPanel(
-                                                      onSuccess: _onLoginSuccess,
-                                                      showQrShortcut: false,
-                                                      onBackToQr: () async {
-                                                        final tdlib =
-                                                            OxplayerTdlibBridgeController.instance();
-                                                        await tdlib.resetForPhoneLogin();
-                                                        await tdlib.requestQrLogin();
-                                                        if (mounted) {
-                                                          setState(() => _tvUsePhone = false);
-                                                        }
-                                                      },
-                                                    )
-                                                  : OxplayerTdlibQrLoginPanel(
-                                                      onSuccess: _onLoginSuccess,
-                                                      onUsePhoneNumber: () async {
-                                                        await OxplayerTdlibBridgeController
-                                                            .instance()
-                                                            .resetForPhoneLogin();
-                                                        if (mounted) {
-                                                          setState(() => _tvUsePhone = true);
-                                                        }
-                                                      },
-                                                      onNeedTwoFactorPassword: () {
-                                                        // Keep TDLib waitingForPassword — do not reset.
-                                                        setState(() => _tvUsePhone = true);
-                                                      },
-                                                    ))
-                                              : OxplayerTdlibLoginPanel(
+                                          _useMainBot
+                                              ? OxplayerMainBotLoginPanel(
                                                   onSuccess: _onLoginSuccess,
-                                                ),
+                                                  onBack: () => setState(() => _useMainBot = false),
+                                                )
+                                              : _isTv(context)
+                                                  ? (_tvUsePhone
+                                                      ? OxplayerTdlibLoginPanel(
+                                                          onSuccess: _onLoginSuccess,
+                                                          showQrShortcut: false,
+                                                          onBackToQr: () async {
+                                                            final tdlib =
+                                                                OxplayerTdlibBridgeController.instance();
+                                                            await tdlib.resetForPhoneLogin();
+                                                            await tdlib.requestQrLogin();
+                                                            if (mounted) {
+                                                              setState(() => _tvUsePhone = false);
+                                                            }
+                                                          },
+                                                        )
+                                                      : OxplayerTdlibQrLoginPanel(
+                                                          onSuccess: _onLoginSuccess,
+                                                          onUsePhoneNumber: () async {
+                                                            await OxplayerTdlibBridgeController
+                                                                .instance()
+                                                                .resetForPhoneLogin();
+                                                            if (mounted) {
+                                                              setState(() => _tvUsePhone = true);
+                                                            }
+                                                          },
+                                                          onNeedTwoFactorPassword: () {
+                                                            // Keep TDLib waitingForPassword — do not reset.
+                                                            setState(() => _tvUsePhone = true);
+                                                          },
+                                                        ))
+                                                  : OxplayerTdlibLoginPanel(
+                                                      onSuccess: _onLoginSuccess,
+                                                    ),
+                                          if (!_useMainBot)
+                                            ListenableBuilder(
+                                              listenable: OxplayerTdlibBridgeController.instance(),
+                                              builder: (context, _) {
+                                                final kind = OxplayerTdlibBridgeController.instance().state.kind;
+                                                final onFirstSessionStep = kind ==
+                                                        OxTdlibAuthStateKind.waitingForPhoneNumber ||
+                                                    kind == OxTdlibAuthStateKind.waitingForQrConfirmation ||
+                                                    kind == OxTdlibAuthStateKind.uninitialized;
+                                                if (!onFirstSessionStep) {
+                                                  return const SizedBox.shrink();
+                                                }
+                                                return Padding(
+                                                  padding: const EdgeInsets.only(top: 14),
+                                                  child: TextButton(
+                                                    onPressed: () => setState(() => _useMainBot = true),
+                                                    child: Text(
+                                                      "Don't want to link your Telegram account? Sign in with @${OxplayerEnv.botUsername ?? 'main-bot'} instead",
+                                                      textAlign: TextAlign.center,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            ),
                                         ],
                                       ),
                               ),

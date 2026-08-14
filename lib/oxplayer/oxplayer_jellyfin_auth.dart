@@ -2,6 +2,7 @@ import 'package:chopper/chopper.dart';
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/account_model.dart';
 import 'package:fladder/oxplayer/oxplayer_login_attempt_api.dart';
+import 'package:fladder/oxplayer/oxplayer_ox_login_kind_store.dart';
 import 'package:fladder/oxplayer/oxplayer_session.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,8 +13,9 @@ import 'package:http/http.dart' as http;
 /// [OxplayerLoginAttemptPollResult] is the shared response wrapper — not a bot login-attempt poll.
 Future<Response<AccountModel>?> oxplayerAuthenticateFromLoginAttemptPoll(
   WidgetRef ref,
-  OxplayerLoginAttemptPollResult poll,
-) async {
+  OxplayerLoginAttemptPollResult poll, {
+  required OxplayerOxLoginKind loginKind,
+}) async {
   final body = poll.jellyfinBody;
   if (body == null) return null;
   final auth = AuthenticationResult.fromJson(body);
@@ -26,6 +28,7 @@ Future<Response<AccountModel>?> oxplayerAuthenticateFromLoginAttemptPoll(
   final account = accountResponse?.body;
   if (accountResponse != null && account != null) {
     await oxplayerPersistRefreshFromResponse(ref, account, accountResponse);
+    await OxplayerOxLoginKindStore.save(accountId: account.id, kind: loginKind);
   }
   return accountResponse;
 }

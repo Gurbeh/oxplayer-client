@@ -43,21 +43,55 @@ class OxTdlibAuthState {
   });
 }
 
-/// One playback session's Telegram-backed video source, resolved from the
-/// PlaybackInfo structured fields (TelegramChannelUsername / TelegramMessageId).
+/// One playback session's Telegram-backed video source, parsed from the PlaybackInfo Path
+/// `oxplayer-tg://{providerBotId}/{messageId}?loc={locator}`.
 class OxTdlibPlaybackSource {
-  final String channelUsername;
+  /// The delivery bot whose DM holds the video. 0 on a cold play: the backend round-robins across
+  /// senders and may fail over mid-request, so it does not commit to one until the copy lands —
+  /// the native side then learns the real sender from the update that carries [locator].
+  final int providerBotId;
+  /// The message id inside that DM, or 0 when the backend has none remembered yet and a fresh copy
+  /// is on its way (the native side then matches the live push by [locator] instead).
   final int messageId;
   /// True when the target player is mpv/mdk (no DataSource-style hook for a custom scheme) —
   /// returns a http://127.0.0.1:{port}/{fileId} url served by TdlibHttpBridgeServer instead of
   /// tdlib-file://{fileId}. False (default) keeps the existing ExoPlayer DataSource path.
   final bool preferHttpBridge;
+  /// The ?loc= query param off the PlaybackInfo Path: the caption on the copied message,
+  /// OXM_PREFIX_recordNo with no '#' (see apps/api's resolveTelegramDelivery). Unique per stored
+  /// file, and it does two jobs: it picks out the live-pushed document that answers THIS request
+  /// instead of whatever arrives next on the shared receive channel (confirmed a real bug without
+  /// it — concurrent dashboard-slider prefetches could hand one item's video to a different item's
+  /// player), and on the remembered path it verifies [messageId] still holds the expected file.
+  /// Always present now — both login modes read out of a DM.
+  final String locator;
 
   const OxTdlibPlaybackSource({
-    required this.channelUsername,
+    required this.providerBotId,
     required this.messageId,
+    required this.locator,
     this.preferHttpBridge = false,
   });
+}
+
+/// One delivery sender, as published by the backend's GET /telegram/provider-bots. The username is
+/// needed only for first contact (contacts.resolveUsername -> startBot); afterwards everything
+/// addresses the bot by [id]. Tokens never reach the client.
+class OxTdlibProviderBot {
+  final int id;
+  final String username;
+
+  const OxTdlibProviderBot({required this.id, required this.username});
+}
+
+/// Where a delivered video actually landed, as observed by THIS session. Both halves can only come
+/// from the receiving side: private-chat message ids are numbered per side, and the server
+/// round-robins across senders so it does not know which one won.
+class OxTdlibDeliveryRef {
+  final int messageId;
+  final int providerBotId;
+
+  const OxTdlibDeliveryRef({required this.messageId, required this.providerBotId});
 }
 
 @HostApi()
@@ -89,6 +123,12 @@ abstract class OxTdlibBridgeApi {
   @async
   void requestQrLogin();
 
+  /// Bot-token login: an alternative to phone/QR for users who don't want to give OXPlayer
+  /// access to their personal Telegram account. Logs in as a bot (gotd/td
+  /// auth.importBotAuthorization) instead — goes straight to ready, no code/2FA step.
+  @async
+  void submitBotToken(String token);
+
   /// Server-side session invalidation + local TDLib session wipe.
   @async
   void logOut();
@@ -101,6 +141,39 @@ abstract class OxTdlibBridgeApi {
   /// check currentAuthState() first and prompt login if not ready.
   @async
   String startPlaybackSession(OxTdlibPlaybackSource source);
+
+  /// Where the last successful resolve of [locator] landed, or null if this session has not read
+  /// one. Dart reports it to the backend (POST /me/telegram-delivery) so the NEXT play of the same
+  /// file is answered straight from the delivery table with no Telegram copy at all.
+  ///
+  /// It has to come from here rather than from the server: copyMessage hands the SENDING bot an id
+  /// from its own side of the private chat, and private-chat ids are numbered per side, so only
+  /// the receiving session ever sees the id that can be re-read later — and only it knows which
+  /// sender the backend's round-robin actually settled on.
+  /// Synchronous — reads an in-memory map, no MTProto round-trip.
+  OxTdlibDeliveryRef? deliveryRefForLocator(String locator);
+
+  /// Registers interest in [locator] BEFORE the PlaybackInfo call that triggers the copy, so a
+  /// delivery that lands while that HTTP request is still in flight is captured rather than raced
+  /// for. Idempotent, synchronous, no MTProto round-trip.
+  void armDeliveryWaiter(String locator);
+
+  /// Resolves [source] and remembers where it landed WITHOUT opening a download — the warm-up path.
+  /// Scrolling the dashboard warms a dozen titles at once, and starting a dozen progressive
+  /// downloads for videos nobody pressed play on would spend the user's data on bytes that get
+  /// thrown away. Resolving is enough: it makes the backend remember the message id, so the
+  /// eventual play needs no Telegram call at all.
+  @async
+  void warmDelivery(OxTdlibPlaybackSource source);
+
+  /// Starts, mutes and archives every delivery sender on this account, so delivery copies never
+  /// land in the user's visible inbox. Called on every app enter (not just after login) because a
+  /// sender can be added to the backend's list at any time.
+  ///
+  /// No-op for a bot-token login: a bot is not a user account, has no dialog list to archive, and
+  /// its B2B DM was already opened by main-bot's /connectbot.
+  @async
+  void ensureProviderBotsReady(List<OxTdlibProviderBot> bots);
 
   /// Stops the active playback session's download and closes the TDLib client (does not log
   /// out — the on-disk session persists, next play just reconnects). Callers on every backend

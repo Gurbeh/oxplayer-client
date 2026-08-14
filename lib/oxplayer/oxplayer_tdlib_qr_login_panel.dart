@@ -7,6 +7,7 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import 'package:fladder/oxplayer/oxplayer_jellyfin_auth.dart';
+import 'package:fladder/oxplayer/oxplayer_ox_login_kind_store.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_test_account_qr_hold.dart';
 import 'package:fladder/oxplayer/oxplayer_test_account_sign_in.dart';
@@ -273,13 +274,16 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
     });
     try {
       final result = await _controller.authenticateWithOxApi();
-      final response = await oxplayerAuthenticateFromLoginAttemptPoll(ref, result);
+      final response = await oxplayerAuthenticateFromLoginAttemptPoll(
+        ref,
+        result,
+        loginKind: OxplayerOxLoginKind.session,
+      );
       if (response?.body == null) {
         throw StateError('Sign-in did not complete');
       }
       await widget.onSuccess();
     } catch (e) {
-      _oxExchangeStarted = false;
       if (mounted) setState(() => _error = oxTdlibAuthUserMessage(e));
     } finally {
       if (mounted) setState(() => _exchangingWithOxApi = false);

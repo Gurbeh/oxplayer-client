@@ -16,6 +16,7 @@ import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_dashboard_empty_help.dart';
 import 'package:fladder/oxplayer/oxplayer_dashboard_skeleton.dart';
 import 'package:fladder/oxplayer/oxplayer_dashboard_watchlist.dart';
+import 'package:fladder/oxplayer/oxplayer_home_detail_prefetch.dart';
 import 'package:fladder/oxplayer/oxplayer_home_refresh.dart';
 import 'package:fladder/oxplayer/oxplayer_tv_ui_limits.dart';
 import 'package:fladder/providers/arguments_provider.dart';
@@ -125,7 +126,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       HomeCarouselSettings.combined => [...allResume, ...dashboardData.nextUp],
       HomeCarouselSettings.cont => allResume,
     };
-    final homeBannerPosters = OxplayerTvUiLimits.capHomeSliderForTv(ref, homeCarouselItems);
+    final homeBannerPosters = OxplayerTvUiLimits.shouldCapHomeSlider(ref)
+        ? OxplayerTvUiLimits.capHomeSliderItems(homeCarouselItems)
+        : OxplayerConfig.isEnabled
+            ? OxplayerHomeDetailPrefetch.capSliderItems(homeCarouselItems)
+            : homeCarouselItems;
 
     final viewSize = AdaptiveLayout.viewSizeOf(context);
 

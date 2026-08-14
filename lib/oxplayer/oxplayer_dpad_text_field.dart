@@ -193,6 +193,14 @@ class OxplayerDpadTextFieldState extends State<OxplayerDpadTextField> {
     final theme = Theme.of(context);
     final fill = theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35);
     final enabled = widget.enabled;
+    final radius = BorderRadius.circular(12);
+    // Phone: InputDecorator focusedBorder + label notch. TV: wrapper ring only while
+    // waiting for Select (TextField itself not focused yet).
+    final showDpadRing =
+        _isDpad && enabled && _externalOrOwned.hasFocus && !_tvTextFocus.hasFocus;
+    final labelColor = (_hasFocus && enabled)
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant;
 
     final textField = TextField(
       controller: widget.controller,
@@ -230,17 +238,20 @@ class OxplayerDpadTextFieldState extends State<OxplayerDpadTextField> {
         hintText: widget.hint,
         filled: true,
         fillColor: fill,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+        floatingLabelStyle: TextStyle(color: labelColor, fontWeight: FontWeight.w600),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        border: OutlineInputBorder(borderRadius: radius),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderRadius: radius,
+          borderSide: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.45)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderRadius: radius,
+          borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
         ),
         disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: radius,
           borderSide: BorderSide.none,
         ),
       ),
@@ -248,11 +259,12 @@ class OxplayerDpadTextFieldState extends State<OxplayerDpadTextField> {
 
     final ring = AnimatedContainer(
       duration: const Duration(milliseconds: 150),
+      clipBehavior: Clip.none,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: radius,
         border: Border.all(
-          width: _hasFocus && enabled ? 3 : 2,
-          color: _hasFocus && enabled ? theme.colorScheme.primary : Colors.transparent,
+          width: showDpadRing ? 3 : (_isDpad ? 2 : 0),
+          color: showDpadRing ? theme.colorScheme.primary : Colors.transparent,
         ),
       ),
       child: _isDpad

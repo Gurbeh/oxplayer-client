@@ -19,6 +19,7 @@ import "C"
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -31,6 +32,11 @@ import (
 
 const callTimeout = 30 * time.Second
 
+// providerBotsSetupTimeout covers start+mute+archive across the whole sender list, each of which is
+// several sequential MTProto round trips. Generous because this runs off the playback path, at app
+// enter, and a partial run leaves some senders unprepared.
+const providerBotsSetupTimeout = 90 * time.Second
+
 var (
 	mu             sync.Mutex
 	client         *oxtelegram.Client
@@ -40,8 +46,9 @@ var (
 	playbackSource *oxtelegram.DownloadByteSource
 	playbackFileID int
 	playbackIDSeq  int
-	playbackChan   string
+	playbackBotID  int64
 	playbackMsgID  int64
+	playbackLoc    string
 	cacheDir       string
 	authKind       = "uninitialized"
 	authQR         string
@@ -195,6 +202,16 @@ func ox_submit_phone(phone *C.char) C.int {
 	})
 }
 
+//export ox_submit_bot_token
+func ox_submit_bot_token(token *C.char) C.int {
+	v := C.GoString(token)
+	return withAuth(func(a *oxtelegram.AuthController) error {
+		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+		defer cancel()
+		return a.SubmitBotToken(ctx, v)
+	})
+}
+
 //export ox_submit_code
 func ox_submit_code(code *C.char) C.int {
 	v := C.GoString(code)
@@ -235,8 +252,9 @@ func closePlaybackLocked() {
 	}
 	playbackSource = nil
 	playbackFileID = 0
-	playbackChan = ""
+	playbackBotID = 0
 	playbackMsgID = 0
+	playbackLoc = ""
 }
 
 //export ox_logout
@@ -266,14 +284,23 @@ func ox_logout() C.int {
 	return 0
 }
 
+// providerBotID/messageID come from the PlaybackInfo Path (oxplayer-tg://{botId}/{msgId}); both are
+// 0 when the backend has nothing remembered and a fresh copy is in flight, in which case locator —
+// the ?loc= query param — is what identifies the incoming copy. See
+// oxtelegram.Client.ResolveVideoFile.
+//
 //export ox_start_playback
-func ox_start_playback(channel *C.char, messageID C.int64_t) *C.char {
-	ch := C.GoString(channel)
+func ox_start_playback(providerBotID C.int64_t, messageID C.int64_t, locatorC *C.char) *C.char {
+	botID := int64(providerBotID)
 	mid := int64(messageID)
+	locator := C.GoString(locatorC)
 
 	mu.Lock()
-	// Subtitle/audio swap → Fladder shouldReload re-resolves t.me → must NOT tear down the
+	// Subtitle/audio swap → Fladder shouldReload re-resolves the Path → must NOT tear down the
 	// live session (mpv's stream_cb instance is still reading it). Reuse same session+URL.
+	//
+	// Matched on locator, not on bot+message id: those are 0/0 on a cold play, so keying on them
+	// would make two resolves of the same in-flight delivery look identical and collide.
 	//
 	// The returned string is discarded by the Dart caller (see
 	// oxplayer_telegram_windows_bridge.dart: it only checks the pointer for null, then frees it
@@ -282,8 +309,7 @@ func ox_start_playback(channel *C.char, messageID C.int64_t) *C.char {
 	// URLFor() lazily binds a real TCP listener via EnsureStarted(), and stream_cb has fully
 	// replaced that transport, so calling it here would open an idle socket every playback for
 	// no reason.
-	if playback != nil && playbackFileID != 0 &&
-		playbackChan == ch && playbackMsgID == mid {
+	if playback != nil && playbackFileID != 0 && locator != "" && playbackLoc == locator {
 		id := playbackFileID
 		mu.Unlock()
 		setErr(nil)
@@ -299,12 +325,20 @@ func ox_start_playback(channel *C.char, messageID C.int64_t) *C.char {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
 	defer cancel()
-	ref, err := c.ResolveVideoFile(ctx, ch, mid)
+	ref, err := c.ResolveVideoFile(ctx, botID, mid, locator)
 	if err != nil {
 		setErr(err)
 		return nil
 	}
-	dl, err := c.OpenDownload(ref, ch, mid, dir)
+	// See mobile/bind.go's StartPlaybackSession: a cold resolve only learns its DM message id from
+	// the live push, and that id is what refreshFileReference re-resolves against.
+	if mid <= 0 {
+		if learned := c.DeliveryRefForLocator(locator); learned.MessageID > 0 {
+			mid = learned.MessageID
+			botID = learned.ProviderBotID
+		}
+	}
+	dl, err := c.OpenDownload(ref, mid, locator, dir)
 	if err != nil {
 		setErr(err)
 		return nil
@@ -318,8 +352,9 @@ func ox_start_playback(channel *C.char, messageID C.int64_t) *C.char {
 	playback = dl
 	playbackSource = src
 	playbackFileID = id
-	playbackChan = ch
+	playbackBotID = botID
 	playbackMsgID = mid
+	playbackLoc = locator
 	b.Register(id, src)
 	mu.Unlock()
 
@@ -344,6 +379,107 @@ func ox_stream_uri_for_current_playback() *C.char {
 	}
 	setErr(nil)
 	return C.CString(fmt.Sprintf("%s%d", streamProtocol, id))
+}
+
+// ox_delivery_message_id_for_locator returns the DM message id this session read for locator, or 0.
+// Pairs with ox_delivery_provider_bot_id_for_locator: the Dart caller reports both to the backend
+// (POST /me/telegram-delivery) so the next play of the same file needs no Telegram copy at all.
+// Only the receiving side can know either — private-chat ids are numbered per side, and the server
+// round-robins across senders so it does not know which one won.
+//
+//export ox_delivery_message_id_for_locator
+func ox_delivery_message_id_for_locator(locatorC *C.char) C.int64_t {
+	mu.Lock()
+	c := client
+	mu.Unlock()
+	if c == nil {
+		return 0
+	}
+	return C.int64_t(c.DeliveryRefForLocator(C.GoString(locatorC)).MessageID)
+}
+
+// ox_delivery_provider_bot_id_for_locator returns the delivery bot whose DM held locator, or 0.
+//
+//export ox_delivery_provider_bot_id_for_locator
+func ox_delivery_provider_bot_id_for_locator(locatorC *C.char) C.int64_t {
+	mu.Lock()
+	c := client
+	mu.Unlock()
+	if c == nil {
+		return 0
+	}
+	return C.int64_t(c.DeliveryRefForLocator(C.GoString(locatorC)).ProviderBotID)
+}
+
+// ox_arm_delivery_waiter registers interest in locator before the delivery request is sent, so a
+// copy that arrives while PlaybackInfo is still in flight is captured rather than raced for.
+//
+//export ox_arm_delivery_waiter
+func ox_arm_delivery_waiter(locatorC *C.char) {
+	mu.Lock()
+	c := client
+	mu.Unlock()
+	if c == nil {
+		return
+	}
+	c.ArmDeliveryWaiter(C.GoString(locatorC))
+}
+
+// ox_warm_delivery resolves the delivery message and records its id WITHOUT opening a download —
+// the warm-up path. Scrolling the dashboard warms a dozen titles at once, and starting a dozen
+// progressive downloads for videos nobody pressed play on would spend the user's data on bytes that
+// get thrown away. Resolving is enough: it makes the backend remember the id.
+//
+// Returns 0 on success, 1 on failure — the same convention as withAuth and every other status
+// export here (ox_last_error carries the detail).
+//
+//export ox_warm_delivery
+func ox_warm_delivery(providerBotID C.int64_t, messageID C.int64_t, locatorC *C.char) C.int {
+	mu.Lock()
+	c := client
+	mu.Unlock()
+	if c == nil {
+		setErr(fmt.Errorf("oxtelegram not configured"))
+		return 1
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+	defer cancel()
+	if _, err := c.ResolveVideoFile(ctx, int64(providerBotID), int64(messageID), C.GoString(locatorC)); err != nil {
+		setErr(err)
+		return 1
+	}
+	setErr(nil)
+	return 0
+}
+
+// ox_ensure_provider_bots_ready starts, mutes and archives every delivery sender on this account so
+// delivery copies never land in the user's visible inbox. botsJSON is the array returned by the
+// backend's GET /telegram/provider-bots: [{"id":123,"username":"SomeBot"}].
+//
+// Returns 0 on success, 1 on failure — same convention as the other status exports.
+//
+//export ox_ensure_provider_bots_ready
+func ox_ensure_provider_bots_ready(botsJSON *C.char) C.int {
+	mu.Lock()
+	c := client
+	mu.Unlock()
+	if c == nil {
+		setErr(fmt.Errorf("oxtelegram not configured"))
+		return 1
+	}
+	var bots []oxtelegram.ProviderBot
+	if err := json.Unmarshal([]byte(C.GoString(botsJSON)), &bots); err != nil {
+		setErr(fmt.Errorf("parse provider bots: %w", err))
+		return 1
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), providerBotsSetupTimeout)
+	defer cancel()
+	if err := c.EnsureProviderBotsReady(ctx, bots); err != nil {
+		setErr(err)
+		return 1
+	}
+	setErr(nil)
+	return 0
 }
 
 //export ox_stop_playback

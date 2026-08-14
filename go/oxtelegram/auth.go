@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -61,6 +62,18 @@ type AuthController struct {
 	// loggedIn is signaled by UpdateLoginToken (QR accepted on phone). Created once;
 	// RequestQrLogin always reads this same channel.
 	loggedIn qrlogin.LoggedIn
+	// botMode is set once SubmitBotToken succeeds. ResolveVideoFile reads it (via IsBotMode) to
+	// decide whether it's safe to resolve a public channel directly (session accounts) or must
+	// instead wait for the server's live-forwarded push (bot accounts — see Client.pushedDocs).
+	botMode bool
+}
+
+// IsBotMode reports whether this session logged in via SubmitBotToken rather than
+// phone/QR — see ResolveVideoFile.
+func (a *AuthController) IsBotMode() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.botMode
 }
 
 func newAuthController(
@@ -105,10 +118,39 @@ func (a *AuthController) checkInitialStatus(ctx context.Context) {
 		return
 	}
 	if status.Authorized {
+		if self, err := a.tg.Self(ctx); err == nil && self != nil {
+			a.mu.Lock()
+			a.botMode = self.Bot
+			a.mu.Unlock()
+			if self.Bot {
+				log.Printf("oxtelegram: restored BOT session id=%d @%s — getHistory/search are invalid; 0/0 play needs live push into this bot", self.ID, self.Username)
+			} else {
+				log.Printf("oxtelegram: restored USER session id=%d", self.ID)
+			}
+		}
 		a.emit(AuthReady, "", "", "")
 		return
 	}
 	a.emit(AuthWaitingForPhoneNumber, "", "", "")
+}
+
+// SubmitBotToken logs in as a bot (auth.importBotAuthorization) instead of a personal
+// phone/QR account — the alternate login mode for users who don't want to give OXPlayer TDLib
+// access to their real Telegram account. Confirmed working (no file-size cap, no FLOOD_WAIT
+// across a full sequential+seek read of a 2.1GB file) against oxplayer-be's apps/bot2bot-poc
+// spike before this was wired in. Goes straight from uninitialized/waitingForPhoneNumber to
+// ready — there is no code/2FA step for bot login.
+func (a *AuthController) SubmitBotToken(ctx context.Context, token string) error {
+	_, err := a.tg.Auth().Bot(ctx, token)
+	if err != nil {
+		a.emit(AuthFailed, "", "", err.Error())
+		return err
+	}
+	a.mu.Lock()
+	a.botMode = true
+	a.mu.Unlock()
+	a.emit(AuthReady, "", "", "")
+	return nil
 }
 
 // SubmitPhoneNumber starts the phone/code flow (step 1 of 2-3).

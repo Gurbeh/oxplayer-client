@@ -3,6 +3,8 @@ import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_delivery_reader_sync.dart';
+import 'package:fladder/oxplayer/oxplayer_provider_bots_bootstrap.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 
 /// Clears the on-device Telegram (gotd) session when the user signs out of OX.
@@ -13,6 +15,8 @@ import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 /// calls [OxplayerTdlibBridgeController.prepareForLoginScreen] afterward.
 Future<void> oxplayerLogoutTelegramSession() async {
   if (!OxplayerConfig.isEnabled) return;
+  OxplayerProviderBotsBootstrap.reset();
+  oxplayerClearPlaybackCacheOnAccountSwitch();
   try {
     await OxplayerTdlibBridgeController.instance().clearSessionAfterOxLogout();
   } catch (e, st) {

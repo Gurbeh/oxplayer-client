@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 
@@ -122,6 +123,15 @@ class OxTelegramWindowsBridge {
     }
   }
 
+  Future<void> submitBotToken(String token) async {
+    final p = token.toNativeUtf8();
+    try {
+      _native.throwIfFailed(_native.submitBotToken(p));
+    } finally {
+      malloc.free(p);
+    }
+  }
+
   Future<void> submitCode(String code) async {
     final p = code.toNativeUtf8();
     try {
@@ -155,9 +165,9 @@ class OxTelegramWindowsBridge {
     // entirely (see go/oxtelegram/cshared/stream_cb.go). ox_start_playback still runs the real
     // resolve/download/registration; only the URL handed to mpv changes from an HTTP loopback
     // URL to a gotdstream:// one, via ox_stream_uri_for_current_playback.
-    final ch = source.channelUsername.toNativeUtf8();
+    final loc = source.locator.toNativeUtf8();
     try {
-      final urlPtr = _native.startPlayback(ch, source.messageId);
+      final urlPtr = _native.startPlayback(source.providerBotId, source.messageId, loc);
       if (urlPtr == nullptr) {
         final msg = _native.readCString(_native.lastError());
         throw OxTelegramNativeException(msg.isEmpty ? 'startPlayback failed' : msg);
@@ -173,7 +183,55 @@ class OxTelegramWindowsBridge {
       }
       return streamUri;
     } finally {
-      malloc.free(ch);
+      malloc.free(loc);
+    }
+  }
+
+  /// Resolves the delivery and records where it landed, without opening a download — warm-up.
+  Future<void> warmDelivery(OxTdlibPlaybackSource source) async {
+    final loc = source.locator.toNativeUtf8();
+    try {
+      _native.throwIfFailed(_native.warmDelivery(source.providerBotId, source.messageId, loc));
+    } finally {
+      malloc.free(loc);
+    }
+  }
+
+  /// Registers interest in [locator] before PlaybackInfo triggers the copy.
+  void armDeliveryWaiter(String locator) {
+    final p = locator.toNativeUtf8();
+    try {
+      _native.armDeliveryWaiter(p);
+    } finally {
+      malloc.free(p);
+    }
+  }
+
+  /// Starts, mutes and archives every delivery sender so copies stay out of the user's inbox.
+  Future<void> ensureProviderBotsReady(List<OxTdlibProviderBot> bots) async {
+    final payload = jsonEncode([
+      for (final bot in bots) {'id': bot.id, 'username': bot.username},
+    ]).toNativeUtf8();
+    try {
+      _native.throwIfFailed(_native.ensureProviderBotsReady(payload));
+    } finally {
+      malloc.free(payload);
+    }
+  }
+
+  /// Where this session read [locator], or null if it has read nothing. See
+  /// OxplayerTelegramDeliveryApi for what Dart does with it.
+  OxTdlibDeliveryRef? deliveryRefForLocator(String locator) {
+    final p = locator.toNativeUtf8();
+    try {
+      final messageId = _native.deliveryMessageIdForLocator(p);
+      if (messageId <= 0) return null;
+      return OxTdlibDeliveryRef(
+        messageId: messageId,
+        providerBotId: _native.deliveryProviderBotIdForLocator(p),
+      );
+    } finally {
+      malloc.free(p);
     }
   }
 

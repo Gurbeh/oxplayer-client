@@ -5,7 +5,9 @@ import OxTdlibAuthState
 import OxTdlibAuthStateKind
 import OxTdlibBridgeApi
 import OxTdlibBridgeEvents
+import OxTdlibDeliveryRef
 import OxTdlibPlaybackSource
+import OxTdlibProviderBot
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
@@ -21,6 +23,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -41,11 +44,15 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 object TdlibBridgeObject : OxTdlibBridgeApi {
 
-    /** TEMPORARILY true for the joint device-testing pass (2026-08-10) validating the JNI
-     *  round-trip on a real device for the first time — see OxTelegramStreamBridge's doc. Flip
-     *  back to false if this test session finds a real bug, or leave true once confirmed working
-     *  and consider removing the HTTP bridge fallback entirely (as already done on Windows). */
-    private const val OX_TELEGRAM_STREAM_CB_ENABLED = true
+    /** Flipped back to false (2026-08-13): on-device testing reproduced a full app freeze/ANR
+     *  (mpv's demuxer thread stuck inside ox_stream_open_fn's JNI round-trip, ~44s of total
+     *  silence — no Flutter log output at all, not even unrelated screens — ending in Android
+     *  killing the process) on the second/third real playback in a session, right after a large
+     *  dashboard-prefetch burst. Root cause not yet isolated (native crash trace rolls out of the
+     *  logcat ring buffer before it can be captured), but it reliably reproduced with this flag on
+     *  and did not reproduce on the proven HTTP bridge path — see jni_bridge.go's doc for the
+     *  round-trip this bypasses. Re-enable only after that hang is root-caused and fixed. */
+    private const val OX_TELEGRAM_STREAM_CB_ENABLED = false
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -138,6 +145,10 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
         runOrFail(callback) { requireAuthController().submitCode(code) }
     }
 
+    override fun submitBotToken(token: String, callback: (Result<Unit>) -> Unit) {
+        runOrFail(callback) { requireAuthController().submitBotToken(token) }
+    }
+
     override fun submitTwoFactorPassword(password: String, callback: (Result<Unit>) -> Unit) {
         runOrFail(callback) { requireAuthController().submitTwoFactorPassword(password) }
     }
@@ -174,15 +185,16 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
         source: OxTdlibPlaybackSource,
         callback: (Result<String>) -> Unit,
     ) {
-        Log.i("OXPLAY_TDLIB", "startPlaybackSession received channel=${source.channelUsername} messageId=${source.messageId}, dispatching")
+        Log.i("OXPLAY_TDLIB", "startPlaybackSession received providerBotId=${source.providerBotId} messageId=${source.messageId} locator=${source.locator}, dispatching")
         scope.launch {
             Log.i("OXPLAY_TDLIB", "startPlaybackSession coroutine started")
             runCatching {
                 val oxClient = client ?: notConfigured()
                 val session = oxClient.startPlaybackSession(
-                    source.channelUsername,
+                    source.providerBotId,
                     source.messageId,
                     appContext.cacheDir.absolutePath,
+                    source.locator,
                 )
                 val fileId = playbackIdCounter.incrementAndGet()
                 fileFetcher = OxTelegramFileFetcher(session)
@@ -204,6 +216,74 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
             }.fold(
                 onSuccess = { uri -> replyOnMain(callback, Result.success(uri)) },
                 onFailure = { error -> replyOnMain(callback, Result.failure(error)) },
+            )
+        }
+    }
+
+    /**
+     * Where this session actually read [locator], or null if it has read nothing. Dart reports it
+     * to the backend so the next play of the same file skips the copy entirely — see the Pigeon
+     * declaration for why only the receiving session can know either number.
+     */
+    override fun deliveryRefForLocator(locator: String): OxTdlibDeliveryRef? {
+        val oxClient = client ?: return null
+        val messageId = oxClient.deliveryMessageIDForLocator(locator)
+        if (messageId <= 0L) return null
+        return OxTdlibDeliveryRef(
+            messageId = messageId,
+            providerBotId = oxClient.deliveryProviderBotIDForLocator(locator),
+        )
+    }
+
+    /**
+     * Registers interest in [locator] before the PlaybackInfo call that triggers the copy, so a
+     * delivery landing mid-request is captured rather than raced for. Cheap and idempotent.
+     */
+    override fun armDeliveryWaiter(locator: String) {
+        client?.armDeliveryWaiter(locator)
+    }
+
+    /**
+     * Resolves [source] and remembers where it landed, without opening a download — see the Pigeon
+     * declaration for why warm-up must not start a byte transfer.
+     */
+    override fun warmDelivery(source: OxTdlibPlaybackSource, callback: (Result<Unit>) -> Unit) {
+        scope.launch {
+            runCatching {
+                val oxClient = client ?: notConfigured()
+                oxClient.warmDelivery(source.providerBotId, source.messageId, source.locator)
+            }.fold(
+                onSuccess = { replyOnMain(callback, Result.success(Unit)) },
+                onFailure = { error -> replyOnMain(callback, Result.failure(error)) },
+            )
+        }
+    }
+
+    /**
+     * Starts, mutes and archives every delivery sender so copies never reach the user's inbox.
+     *
+     * The list crosses into Go as JSON: gomobile cannot bind a slice of structs, and one call keeps
+     * the whole set atomic from Dart's point of view.
+     */
+    override fun ensureProviderBotsReady(
+        bots: List<OxTdlibProviderBot>,
+        callback: (Result<Unit>) -> Unit,
+    ) {
+        scope.launch {
+            runCatching {
+                val oxClient = client ?: notConfigured()
+                val json = bots.joinToString(prefix = "[", postfix = "]") { bot ->
+                    """{"id":${bot.id},"username":${JSONObject.quote(bot.username)}}"""
+                }
+                oxClient.ensureProviderBotsReady(json)
+            }.fold(
+                onSuccess = { replyOnMain(callback, Result.success(Unit)) },
+                onFailure = { error ->
+                    // Non-fatal for the app: playback still works, delivery copies just show up in
+                    // the user's inbox instead of Archive. Surface it so Dart can log and move on.
+                    Log.w("OXPLAY_TDLIB", "ensureProviderBotsReady failed", error)
+                    replyOnMain(callback, Result.failure(error))
+                },
             )
         }
     }

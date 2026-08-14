@@ -1,5 +1,6 @@
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_media_source.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
 
 /// In-memory PlaybackInfo cache keyed by Jellyfin MediaSource id (`ms_{variantId}`).
 ///
@@ -19,6 +20,10 @@ abstract final class OxplayerPlaybackLinkCache {
       _byMediaSourceId.remove(key);
       return null;
     }
+    if (!_responseHasCommittedPlayableUrl(entry.response, mediaSourceId: key)) {
+      _byMediaSourceId.remove(key);
+      return null;
+    }
     return entry.response;
   }
 
@@ -34,6 +39,7 @@ abstract final class OxplayerPlaybackLinkCache {
       final id = source.id?.trim() ?? '';
       if (id.isEmpty) continue;
       if (!oxplayerMediaSourceHasPlayableUrl(source)) continue;
+      if (!_sourceIsCommittedPlayable(source)) continue;
       _byMediaSourceId[id] = _Entry(response: response, storedAt: now);
     }
   }
@@ -48,6 +54,19 @@ abstract final class OxplayerPlaybackLinkCache {
   static void clearAll() => _byMediaSourceId.clear();
 
   static int get debugEntryCount => _byMediaSourceId.length;
+}
+
+bool _sourceIsCommittedPlayable(MediaSourceInfo source) {
+  final path = source.path?.trim() ?? '';
+  if (!oxplayerIsTelegramProviderLink(path)) return true;
+  final parsed = oxplayerParseTelegramDeliveryPath(path);
+  return parsed != null && parsed.isCommitted;
+}
+
+bool _responseHasCommittedPlayableUrl(PlaybackInfoResponse response, {required String mediaSourceId}) {
+  final source = oxplayerResolvePlaybackMediaSource(response, requestedMediaSourceId: mediaSourceId);
+  if (source == null) return false;
+  return _sourceIsCommittedPlayable(source);
 }
 
 class _Entry {

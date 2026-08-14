@@ -7,6 +7,7 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/oxplayer/oxplayer_dpad_text_field.dart';
 import 'package:fladder/oxplayer/oxplayer_jellyfin_auth.dart';
+import 'package:fladder/oxplayer/oxplayer_ox_login_kind_store.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_qr_login_panel.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
@@ -247,13 +248,18 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
     });
     try {
       final result = await _controller.authenticateWithOxApi();
-      final response = await oxplayerAuthenticateFromLoginAttemptPoll(ref, result);
+      final response = await oxplayerAuthenticateFromLoginAttemptPoll(
+        ref,
+        result,
+        loginKind: OxplayerOxLoginKind.session,
+      );
       if (response?.body == null) {
         throw StateError('Sign-in did not complete');
       }
       await widget.onSuccess();
     } catch (e) {
-      _oxExchangeStarted = false;
+      // Keep _oxExchangeStarted so the ready UI can show the error + Try again
+      // instead of an infinite spinner (ready + !_oxExchangeStarted).
       if (mounted) setState(() => _error = oxTdlibAuthUserMessage(e));
     } finally {
       if (mounted) setState(() => _exchangingWithOxApi = false);

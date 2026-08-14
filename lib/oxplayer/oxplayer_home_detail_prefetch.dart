@@ -2,26 +2,37 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:fladder/models/home_model.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/series_model.dart';
+import 'package:fladder/models/settings/home_settings_model.dart';
 import 'package:fladder/models/view_model.dart';
 import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
 import 'package:fladder/oxplayer/ox_series_details_loader.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_prefetch.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
+import 'package:fladder/providers/settings/home_settings_provider.dart';
 
 /// After Home paints: warm detail SWR + PlaybackInfo (public copy) for likely play targets.
 ///
 /// Cheap path: `GET /Items/{id}` (Play for movies / episode MediaSources).
 /// Series catalog only for slider targets (Seasons+Episodes is heavier).
 abstract final class OxplayerHomeDetailPrefetch {
+  /// Home banner slider + PlaybackInfo copy warmup. More than this floods Telegram copy.
+  static const sliderTake = 5;
   static const shelfTake = 5;
   static const concurrency = 3;
   static const _startDelay = Duration(milliseconds: 500);
+
+  static List<ItemBaseModel> capSliderItems(List<ItemBaseModel> items) {
+    if (items.length <= sliderTake) return items;
+    return items.take(sliderTake).toList(growable: false);
+  }
 
   static int _generation = 0;
 
@@ -73,11 +84,13 @@ abstract final class OxplayerHomeDetailPrefetch {
     }
 
     // Kick PlaybackInfo / public copyMessage while user still browses home.
-    if (target.playbackItemId != null && target.playbackItemId!.isNotEmpty) {
+    if (target.playbackItemId != null && target.playbackItemId!.isNotEmpty &&
+        !oxplayerTdlibPlayInProgress()) {
       OxplayerPlaybackPrefetch.scheduleForItem(
         ref.read,
         target.playbackItemId!,
         mediaSourceId: target.mediaSourceId,
+        once: true,
       );
     }
 
@@ -121,8 +134,9 @@ abstract final class OxplayerHomeDetailPrefetch {
             playbackItemId = e.id;
             mediaSourceId = e.streamModel?.currentVersionStream?.id;
           case SeriesModel s:
-            // Series rail: PlaybackInfo waits until detail knows next-up episode.
-            OxplayerPlaybackPrefetch.scheduleForSeries(ref.read, s);
+            if (!oxplayerTdlibPlayInProgress()) {
+              OxplayerPlaybackPrefetch.scheduleForSeries(ref.read, s, once: true);
+            }
           default:
             break;
         }
@@ -135,9 +149,10 @@ abstract final class OxplayerHomeDetailPrefetch {
       ));
     }
 
-    // Slider / rails — highest tap chance → warm public copy early.
-    for (final item in [...dashboard.nextUp, ...dashboard.resumeVideo]) {
-      add(item, wantSeriesCatalog: true, warmPlayback: true);
+    // Slider: detail SWR + series catalog only. PlaybackInfo here copyMessage's NextUp
+    // into the DM on every app start (oxm_dev_510) even when the user never opens that title.
+    for (final item in _sliderItems(ref, dashboard)) {
+      add(item, wantSeriesCatalog: true, warmPlayback: false);
     }
 
     // First posters of each home shelf — detail SWR only (no mass copyMessage).
@@ -148,6 +163,16 @@ abstract final class OxplayerHomeDetailPrefetch {
     }
 
     return out;
+  }
+
+  static List<ItemBaseModel> _sliderItems(Ref ref, HomeModel dashboard) {
+    final settings = ref.read(homeSettingsProvider).carouselSettings;
+    final raw = switch (settings) {
+      HomeCarouselSettings.nextUp => dashboard.nextUp,
+      HomeCarouselSettings.combined => [...dashboard.resumeVideo, ...dashboard.nextUp],
+      HomeCarouselSettings.cont => dashboard.resumeVideo,
+    };
+    return capSliderItems(raw);
   }
 }
 

@@ -15,6 +15,7 @@ import 'package:fladder/oxplayer/oxplayer_telegram_windows_bridge_stub.dart'
 import 'package:fladder/src/tdlib_bridge.g.dart';
 
 const _kOxTdlibDeviceIdPrefsKey = 'oxplayer_td_device_id';
+const _kOxBotTokenPrefsKey = 'oxplayer_bot_token';
 const _kTdlibAuthLogTag = 'ox-tdlib-auth';
 
 class OxplayerTdlibBridgeException implements Exception {
@@ -97,10 +98,24 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
   OxTelegramWindowsBridge? _windows;
   OxTdlibAuthState _state = OxTdlibAuthState(kind: OxTdlibAuthStateKind.uninitialized);
   bool _configured = false;
+  /// Login-screen prepare/reset must not silently [submitBotToken] from cache.
+  /// That would land TDLib on [OxTdlibAuthStateKind.ready] and the phone/QR UI
+  /// would never appear (checkmark only).
+  bool _suppressBotSessionRestore = false;
 
   bool get _useWindows => _windows != null;
 
   OxTdlibAuthState get state => _state;
+
+  /// True when native TDLib is logged in with a personal bot token (not a user phone/QR session).
+  bool get nativeSessionIsBot => _activeBotToken != null && _activeBotToken!.isNotEmpty;
+
+  Future<bool> hasCachedBotToken() async {
+    if (nativeSessionIsBot) return true;
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString(_kOxBotTokenPrefsKey);
+    return cached != null && cached.isNotEmpty;
+  }
 
   /// True once TDLib finished setTdlibParameters and is ready for phone/QR/code/password.
   bool get isReadyForAuthInput => _isInteractiveAuthKind(_state.kind);
@@ -143,11 +158,37 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
     notifyListeners();
   }
 
-  /// Idempotent — safe to call from every login panel's initState.
-  /// Waits until TDLib accepts phone/QR input (past setTdlibParameters).
+  /// Serializes concurrent ensureConfigured callers onto one in-flight attempt instead of each
+  /// kicking off its own native configure/restore — confirmed a real bug: several
+  /// dashboard-slider items prefetching at once each raced their own bot-token restore
+  /// (ensureBotSessionFromCacheIfNeeded → submitBotToken) against the others, and the native
+  /// side losing that race would reset to uninitialized, which the next prefetch's
+  /// ensureConfigured then saw and "fixed" by reconfiguring — repeating forever, and starving
+  /// the real play action of a state that ever settled.
+  Future<void>? _ensureConfiguredInFlight;
+
+  /// Idempotent — safe to call from every login panel's initState, and from every prefetch/play
+  /// attempt (see _ensureConfiguredInFlight — concurrent callers share one attempt).
+  /// Waits until TDLib accepts phone/QR input (past setTdlibParameters) — for bot-mode sessions,
+  /// also tries to restore a previously-connected bot from local cache if the native state isn't
+  /// already ready (see ensureBotSessionFromCacheIfNeeded), so both prefetch and the real play
+  /// action see the same, fully-restored state without either needing to know about the other.
   Future<void> ensureConfigured({
     Duration readyTimeout = const Duration(seconds: 45),
-  }) async {
+  }) {
+    final inFlight = _ensureConfiguredInFlight;
+    if (inFlight != null) return inFlight;
+    final future = _ensureConfiguredLocked(readyTimeout);
+    _ensureConfiguredInFlight = future;
+    future.whenComplete(() {
+      if (identical(_ensureConfiguredInFlight, future)) {
+        _ensureConfiguredInFlight = null;
+      }
+    });
+    return future;
+  }
+
+  Future<void> _ensureConfiguredLocked(Duration readyTimeout) async {
     if (_configured) {
       // Don't trust the cached flag alone — re-verify against native's actual current state.
       // Observed in practice: _configured stays true (this singleton survives Dart hot restarts)
@@ -155,14 +196,38 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
       // configure() again and drive it forward — waitUntilReadyForAuthInput then polls a dead
       // state for the full timeout instead of failing fast or self-healing.
       final polled = _useWindows ? _windows!.currentAuthState() : await _api.currentAuthState();
-      if (polled.kind != OxTdlibAuthStateKind.uninitialized) {
+      if (polled.kind != OxTdlibAuthStateKind.uninitialized &&
+          polled.kind != OxTdlibAuthStateKind.failed) {
         _state = polled;
         _log('ensureConfigured: already configured kind=${_state.kind.name}');
         await waitUntilReadyForAuthInput(timeout: readyTimeout);
+        await _restoreBotSessionIfNeededLocked();
         return;
       }
-      _log('ensureConfigured: cached configured=true but native reports uninitialized — reconfiguring');
+      // `failed` is treated exactly like `uninitialized`, not like a configured state. It is what
+      // native lands in when a cold-start RPC fails, and it used to be cached the same way `ready`
+      // was: every later play logged "already configured kind=failed" and never retried, so the
+      // app stayed dead until it was force-killed (seen on Xiaomi). Re-submitting a cached bot
+      // token onto that client does not help either — the client itself is the thing that is
+      // broken, so the fix is a real reconfigure. Same failure shape, and same remedy, as the dead
+      // run loop handled in go/oxtelegram/client.go's Configure.
+      _log('ensureConfigured: cached configured=true but native reports ${polled.kind.name} — reconfiguring');
       _configured = false;
+      if (polled.kind == OxTdlibAuthStateKind.failed) {
+        // Tear the corpse down first: configure() on the native side is idempotent on "already
+        // have a client", so without this it would return the same dead client straight back.
+        try {
+          if (_useWindows) {
+            await _windows!.logOut();
+          } else {
+            await _api.logOut();
+          }
+        } catch (e) {
+          // Expected to fail sometimes — we are tearing down something already broken. The
+          // configure() below is what actually has to work.
+          _log('ensureConfigured: teardown before failed-state reconfigure threw: $e');
+        }
+      }
     }
     final apiId = OxplayerEnv.telegramApiId;
     final apiHash = OxplayerEnv.telegramApiHash;
@@ -183,6 +248,21 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
     _log('ensureConfigured: currentAuthState=${_state.kind.name}');
     notifyListeners();
     await waitUntilReadyForAuthInput(timeout: readyTimeout);
+    await _restoreBotSessionIfNeededLocked();
+  }
+
+  /// Only ever called from inside _ensureConfiguredLocked (hence "Locked" — under the same
+  /// single-flight guard as the rest of ensureConfigured, not a separate entry point). A no-op
+  /// unless state is waitingForPhoneNumber (fresh/unauthenticated) and a bot token is cached —
+  /// see submitBotToken's caching and ensureBotSessionFromCacheIfNeeded's fuller doc comment.
+  Future<void> _restoreBotSessionIfNeededLocked() async {
+    if (_suppressBotSessionRestore) {
+      _log('restoreBotSession: skipped (login-screen auth)');
+      return;
+    }
+    if (_state.kind != OxTdlibAuthStateKind.ready) {
+      await ensureBotSessionFromCacheIfNeeded();
+    }
   }
 
   /// Blocks until past WaitTdlibParameters (phone/QR/code/password/ready/failed).
@@ -222,44 +302,54 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
   /// phone field is usable immediately.
   Future<void> prepareForLoginScreen({bool phoneFirst = true}) async {
     _log('prepareForLoginScreen phoneFirst=$phoneFirst');
+    _suppressBotSessionRestore = true;
     try {
-      await ensureConfigured();
-    } on OxplayerTdlibBridgeException catch (e) {
-      if (!e.message.contains('stuck at')) rethrow;
-      // Native client often still alive after hot restart with stale UNINITIALIZED cache —
-      // force wipe + recreate once.
-      _log('prepareForLoginScreen: stuck — forcing logOut + recreate');
-      _configured = false;
       try {
-        if (_useWindows) {
-          await _windows!.logOut();
-        } else {
-          await _api.logOut();
+        await ensureConfigured();
+      } on OxplayerTdlibBridgeException catch (e) {
+        if (!e.message.contains('stuck at')) rethrow;
+        // Native client often still alive after hot restart with stale UNINITIALIZED cache —
+        // force wipe + recreate once.
+        _log('prepareForLoginScreen: stuck — forcing logOut + recreate');
+        _configured = false;
+        try {
+          if (_useWindows) {
+            await _windows!.logOut();
+          } else {
+            await _api.logOut();
+          }
+        } catch (logoutErr) {
+          _log('prepareForLoginScreen: logOut during recover: $logoutErr');
         }
-      } catch (logoutErr) {
-        _log('prepareForLoginScreen: logOut during recover: $logoutErr');
+        await ensureConfigured();
       }
-      await ensureConfigured();
+      // OX logout does not always clear Telegram — AuthReady blocks QR/phone restart.
+      if (_state.kind == OxTdlibAuthStateKind.ready) {
+        _log('prepareForLoginScreen: Telegram still ready — reset for re-auth');
+        await resetForPhoneLogin();
+      }
+      if (phoneFirst && _state.kind == OxTdlibAuthStateKind.waitingForQrConfirmation) {
+        await resetForPhoneLogin();
+      }
+      if (_state.kind == OxTdlibAuthStateKind.failed) {
+        throw OxplayerTdlibBridgeException(
+          _state.errorMessage ?? 'Telegram auth failed to start',
+        );
+      }
+      if (!_isInteractiveAuthKind(_state.kind)) {
+        throw OxplayerTdlibBridgeException(
+          'Telegram client did not finish initializing (stuck at ${_state.kind.name}). Try again.',
+        );
+      }
+      if (_state.kind == OxTdlibAuthStateKind.ready) {
+        throw OxplayerTdlibBridgeException(
+          'Telegram session was still signed in after reset. Tap Retry.',
+        );
+      }
+      _log('prepareForLoginScreen done kind=${_state.kind.name}');
+    } finally {
+      _suppressBotSessionRestore = false;
     }
-    // OX logout does not always clear Telegram — AuthReady blocks QR/phone restart.
-    if (_state.kind == OxTdlibAuthStateKind.ready) {
-      _log('prepareForLoginScreen: Telegram still ready — reset for re-auth');
-      await resetForPhoneLogin();
-    }
-    if (phoneFirst && _state.kind == OxTdlibAuthStateKind.waitingForQrConfirmation) {
-      await resetForPhoneLogin();
-    }
-    if (_state.kind == OxTdlibAuthStateKind.failed) {
-      throw OxplayerTdlibBridgeException(
-        _state.errorMessage ?? 'Telegram auth failed to start',
-      );
-    }
-    if (!_isInteractiveAuthKind(_state.kind)) {
-      throw OxplayerTdlibBridgeException(
-        'Telegram client did not finish initializing (stuck at ${_state.kind.name}). Try again.',
-      );
-    }
-    _log('prepareForLoginScreen done kind=${_state.kind.name}');
   }
 
   static const _kAuthRpcTimeout = Duration(seconds: 45);
@@ -318,6 +408,143 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
       timeoutMessage:
           'Could not reach Telegram (timed out). Check internet / VPN and try again.',
     );
+  }
+
+  /// Bot-token login: an alternative to phone/QR for users who don't want to give OXPlayer
+  /// access to their personal Telegram account. Goes straight to `ready` — no code/2FA step.
+  /// Everything downstream (state, startPlaybackSession, stopPlaybackSession, logOut) is
+  /// unchanged by which of the two paths got here — callers never need to know or branch on it.
+  /// Native (auth.go SubmitBotToken/checkInitialStatus) has no state restriction on when this can
+  /// be called — a transient RPC failure at cold start (checkInitialStatus's Auth().Status call,
+  /// or a previous SubmitBotToken attempt) lands in `failed`, and calling this again from there is
+  /// exactly how ensureBotSessionFromCacheIfNeeded recovers (see its widened guard below).
+  Future<void> submitBotToken(String token) async {
+    final trimmed = token.trim();
+    _log('submitBotToken len=${trimmed.length} kind=${_state.kind.name}');
+    if (trimmed.isEmpty) {
+      throw OxplayerTdlibBridgeException('Enter your bot token');
+    }
+    if (_state.kind != OxTdlibAuthStateKind.waitingForPhoneNumber) {
+      throw OxplayerTdlibBridgeException(
+        'Telegram is not ready for bot-token login yet (state=${_state.kind.name})',
+      );
+    }
+    await _awaitAuthRpc(
+      _useWindows ? _windows!.submitBotToken(trimmed) : _api.submitBotToken(trimmed),
+      until: (kind) => kind == OxTdlibAuthStateKind.ready,
+      timeoutMessage:
+          'Could not reach Telegram (timed out). Check internet / VPN and try again.',
+    );
+    _activeBotToken = trimmed;
+    // Cached so a later app start (or a fresh install's first playback attempt) can silently
+    // re-apply it via ensureBotSessionFromCacheIfNeeded, without needing the OX session/access
+    // token threaded all the way down here again.
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kOxBotTokenPrefsKey, trimmed);
+  }
+
+  String? _activeBotToken;
+  Future<void>? _ensureBotTokenInFlight;
+  String? _ensureBotTokenTarget;
+
+  /// Logs native TDLib in as [token] (personal bot). Tears down a leftover user/QR session first —
+  /// [submitBotToken] only accepts `waitingForPhoneNumber`, so a previous client-session login
+  /// otherwise stays `ready` while the API copies into `@userbot`. Play then waits 20s on the
+  /// wrong account.
+  Future<void> ensureBotTokenSession(String token) {
+    final trimmed = token.trim();
+    if (trimmed.isEmpty) {
+      return Future.error(OxplayerTdlibBridgeException('Enter your bot token'));
+    }
+    if (_state.kind == OxTdlibAuthStateKind.ready && _activeBotToken == trimmed) {
+      return Future.value();
+    }
+    if (_ensureBotTokenInFlight != null && _ensureBotTokenTarget == trimmed) {
+      return _ensureBotTokenInFlight!;
+    }
+    final future = _ensureBotTokenSessionLocked(trimmed);
+    _ensureBotTokenInFlight = future;
+    _ensureBotTokenTarget = trimmed;
+    future.whenComplete(() {
+      if (identical(_ensureBotTokenInFlight, future)) {
+        _ensureBotTokenInFlight = null;
+        _ensureBotTokenTarget = null;
+      }
+    });
+    return future;
+  }
+
+  Future<void> _ensureBotTokenSessionLocked(String trimmed) async {
+    if (_state.kind == OxTdlibAuthStateKind.ready && _activeBotToken == trimmed) {
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kOxBotTokenPrefsKey, trimmed);
+    _log('ensureBotTokenSession: switching to personal bot from kind=${_state.kind.name}');
+
+    Future<void> tearDownNativeSession() async {
+      try {
+        await logOut();
+      } catch (e) {
+        _log('ensureBotTokenSession: logOut: $e');
+      }
+      _configured = false;
+      _activeBotToken = null;
+    }
+
+    if (_state.kind != OxTdlibAuthStateKind.waitingForPhoneNumber) {
+      await tearDownNativeSession();
+      await ensureConfigured();
+    }
+    if (_state.kind == OxTdlibAuthStateKind.ready && _activeBotToken == trimmed) {
+      return;
+    }
+    if (_state.kind != OxTdlibAuthStateKind.waitingForPhoneNumber) {
+      await tearDownNativeSession();
+      await ensureConfigured();
+    }
+    if (_state.kind == OxTdlibAuthStateKind.ready && _activeBotToken == trimmed) {
+      return;
+    }
+    if (_state.kind != OxTdlibAuthStateKind.waitingForPhoneNumber) {
+      throw OxplayerTdlibBridgeException(
+        'Telegram is not ready for bot-token login yet (state=${_state.kind.name})',
+      );
+    }
+    await submitBotToken(trimmed);
+  }
+
+  /// Lazily re-applies a previously-connected bot token when this device's native session isn't
+  /// authenticated yet — the gap that caused a real bug: a returning bot-mode user whose native
+  /// bridge was configured on a fresh login (see OxplayerMainBotLoginPanel) but never again on
+  /// subsequent app starts, so playback hit AUTH_KEY_UNREGISTERED via the session-mode resolve
+  /// path instead of ever reaching bot-mode at all. No-op if already ready, or nothing cached
+  /// (i.e. this really is a session-mode/TDLib user, or a bot-mode user who hasn't connected a
+  /// bot yet at all — callers distinguish those via the thrown exception, not this method).
+  ///
+  /// Retries from `failed` too, not just `waitingForPhoneNumber`: confirmed on-device that a
+  /// transient cold-start RPC hiccup (checkInitialStatus's Auth().Status call in auth.go) lands
+  /// native in `failed`, and once there this method used to return immediately every time —
+  /// _ensureConfiguredLocked treats non-uninitialized state as "already configured" and skips
+  /// reconfigure, so the app got permanently stuck reporting "bot isn't connected" despite a
+  /// perfectly valid cached token, on every single playback attempt, with no retry path at all.
+  Future<void> ensureBotSessionFromCacheIfNeeded() async {
+    if (_state.kind == OxTdlibAuthStateKind.ready) return;
+    if (_state.kind != OxTdlibAuthStateKind.waitingForPhoneNumber &&
+        _state.kind != OxTdlibAuthStateKind.failed) {
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString(_kOxBotTokenPrefsKey);
+    if (cached == null || cached.isEmpty) return;
+    _log('ensureBotSessionFromCacheIfNeeded: re-applying cached bot token');
+    try {
+      await submitBotToken(cached);
+    } catch (e) {
+      // Token was revoked/bot deleted since it was cached — surface nothing here, let the
+      // caller's own ready-check after this call produce the real "reconnect your bot" error.
+      _log('ensureBotSessionFromCacheIfNeeded: cached token no longer works: $e');
+    }
   }
 
   Future<void> submitCode(String code) async {
@@ -391,6 +618,7 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
       _log('clearSessionAfterOxLogout logOut error (continuing): $e');
     }
     _configured = false;
+    _activeBotToken = null;
     _state = OxTdlibAuthState(kind: OxTdlibAuthStateKind.uninitialized);
     notifyListeners();
   }
@@ -398,24 +626,148 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
   /// Abort QR (or any mid-auth) and recreate client so phone login works again.
   Future<void> resetForPhoneLogin() async {
     _log('resetForPhoneLogin from kind=${_state.kind.name}');
+    final previousSuppress = _suppressBotSessionRestore;
+    _suppressBotSessionRestore = true;
     try {
-      await logOut();
-    } catch (e) {
-      _log('resetForPhoneLogin logOut error (continuing): $e');
+      try {
+        await logOut();
+      } catch (e) {
+        _log('resetForPhoneLogin logOut error (continuing): $e');
+      }
+      _configured = false;
+      _activeBotToken = null;
+      _state = OxTdlibAuthState(kind: OxTdlibAuthStateKind.uninitialized);
+      notifyListeners();
+      await ensureConfigured();
+    } finally {
+      _suppressBotSessionRestore = previousSuppress;
     }
-    _configured = false;
-    _state = OxTdlibAuthState(kind: OxTdlibAuthStateKind.uninitialized);
-    notifyListeners();
-    await ensureConfigured();
   }
 
   /// Resolves a PlaybackInfo Telegram source and starts progressive download.
+  ///
+  /// Throws [OxplayerTdlibBridgeException] with a clear, user-facing message — not a raw native
+  /// PlatformException/AUTH_KEY_UNREGISTERED stack trace — when the native session isn't
+  /// authenticated at all. That used to be silently attempted anyway (a real bug: a bot-mode
+  /// user's native bridge only ever got configured right after a fresh login, never again on
+  /// later app starts, so returning users hit the native call with kind still
+  /// waitingForPhoneNumber and got an opaque AUTH_KEY_UNREGISTERED crash instead of a clear
+  /// "reconnect your bot" message).
   Future<String> startPlaybackSession(OxTdlibPlaybackSource source) async {
+    // ensureConfigured already tries the cached-bot-token restore (see
+    // _restoreBotSessionIfNeededLocked) — under the same single-flight guard every other
+    // concurrent caller (prefetch included) shares, so this doesn't race a separate attempt.
     await ensureConfigured(readyTimeout: const Duration(seconds: 180));
+    if (_state.kind != OxTdlibAuthStateKind.ready) {
+      throw OxplayerTdlibBridgeException(
+        "Your personal bot isn't connected. In Telegram, send /connectbot to "
+        "@${OxplayerEnv.botUsername ?? 'main-bot'} to reconnect it, then try again.",
+      );
+    }
     if (_useWindows) {
       return _windows!.startPlaybackSession(source);
     }
     return _api.startPlaybackSession(source);
+  }
+
+  /// Where the native session actually read [locator], or null. Reported to the backend so the
+  /// next play of the same file skips the copy — see OxplayerTelegramDeliveryApi. Never throws: a
+  /// failure here only costs one redundant copy.
+  Future<OxTdlibDeliveryRef?> deliveryRefForLocator(String locator) async {
+    try {
+      if (_useWindows) {
+        return _windows!.deliveryRefForLocator(locator);
+      }
+      return await _api.deliveryRefForLocator(locator);
+    } catch (e) {
+      _log('deliveryRefForLocator failed: $e');
+      return null;
+    }
+  }
+
+  /// Registers interest in [locator] BEFORE the PlaybackInfo call that triggers the copy, so a
+  /// delivery landing while that request is still in flight is captured rather than raced for.
+  /// Never throws — the native buffer already tolerates an unarmed early arrival, this only
+  /// narrows the window.
+  Future<void> armDeliveryWaiter(String locator) async {
+    if (locator.isEmpty) return;
+    try {
+      if (_useWindows) {
+        _windows!.armDeliveryWaiter(locator);
+      } else {
+        await _api.armDeliveryWaiter(locator);
+      }
+    } catch (e) {
+      _log('armDeliveryWaiter failed: $e');
+    }
+  }
+
+  /// Resolves [source] and records where it landed WITHOUT opening a download — the warm-up path.
+  /// Requires a ready session, like [startPlaybackSession], but deliberately starts no byte
+  /// transfer: warming a dashboard row must not spend the user's data on a dozen videos nobody
+  /// pressed play on.
+  Future<void> warmDelivery(OxTdlibPlaybackSource source) async {
+    await ensureConfigured(readyTimeout: const Duration(seconds: 60));
+    if (_state.kind != OxTdlibAuthStateKind.ready) return;
+    if (_useWindows) {
+      await _windows!.warmDelivery(source);
+      return;
+    }
+    await _api.warmDelivery(source);
+  }
+
+  /// Blocks until the session is [OxTdlibAuthStateKind.ready] (user logged in, not merely past
+  /// setTdlibParameters). Distinct from [waitUntilReadyForAuthInput], which returns at
+  /// waitingForPhoneNumber — too early to startBot.
+  Future<bool> waitUntilSessionReady({
+    Duration timeout = const Duration(seconds: 60),
+  }) async {
+    if (_state.kind == OxTdlibAuthStateKind.ready) return true;
+    final done = Completer<void>();
+    void onState() {
+      if (_state.kind == OxTdlibAuthStateKind.ready && !done.isCompleted) {
+        done.complete();
+      }
+    }
+    addListener(onState);
+    try {
+      await done.future.timeout(timeout);
+    } on TimeoutException {
+      _log('waitUntilSessionReady timed out kind=${_state.kind.name}');
+    } finally {
+      removeListener(onState);
+    }
+    return _state.kind == OxTdlibAuthStateKind.ready;
+  }
+
+  /// Starts, mutes and archives every delivery sender on this account so delivery copies never
+  /// land in the user's visible inbox. Called on every app enter — a sender can be added to the
+  /// backend's list at any time, and a user who never re-logs in would otherwise never start it.
+  ///
+  /// Returns false when the session is not ready (caller must retry, not mark the job done).
+  /// Never throws: a failed startBot on one sender must not take playback down.
+  Future<bool> ensureProviderBotsReady(List<OxTdlibProviderBot> bots) async {
+    if (bots.isEmpty) return true;
+    try {
+      await ensureConfigured(readyTimeout: const Duration(seconds: 60));
+      if (_state.kind != OxTdlibAuthStateKind.ready) {
+        final ready = await waitUntilSessionReady();
+        if (!ready) {
+          _log('ensureProviderBotsReady skipped — auth kind=${_state.kind.name}');
+          return false;
+        }
+      }
+      if (_useWindows) {
+        await _windows!.ensureProviderBotsReady(bots);
+      } else {
+        await _api.ensureProviderBotsReady(bots);
+      }
+      _log('ensureProviderBotsReady ok for ${bots.length} bot(s)');
+      return true;
+    } catch (e) {
+      _log('ensureProviderBotsReady failed: $e');
+      return false;
+    }
   }
 
   Future<void> stopPlaybackSession(String sessionUri) async {
@@ -456,7 +808,7 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
   /// login-attempt poll flow — both call writeJellyfinAuthenticationResult server-side).
   Future<OxplayerLoginAttemptPollResult> authenticateWithOxApi({String? deviceName}) async {
     final initData = await fetchWebAppInitData();
-    final identity = await _resolveDeviceIdentity();
+    final identity = await resolveDeviceIdentity();
     final client = OxplayerTelegramWebAppAuthApi();
     return client.exchangeInitData(
       initData: initData,
@@ -465,7 +817,7 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
     );
   }
 
-  static Future<String> _resolveDeviceIdentity() async {
+  static Future<String> resolveDeviceIdentity() async {
     final prefs = await SharedPreferences.getInstance();
     var storedId = prefs.getString(_kOxTdlibDeviceIdPrefsKey)?.trim() ?? '';
     if (storedId.isEmpty) {

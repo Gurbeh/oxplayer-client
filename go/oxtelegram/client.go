@@ -10,6 +10,7 @@ package oxtelegram
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -34,10 +35,209 @@ type Client struct {
 
 	// Auth is valid only between a successful Configure and the matching Close.
 	Auth *AuthController
+
+	// pushWaiters/pushArrived deliver documents from live-pushed private messages to whichever
+	// resolve call is waiting for that SPECIFIC copy. The update dispatcher is registered from
+	// Configure onward (not just during a resolve call), but registerPushWaiter can only run
+	// *after* this client has the locator — which only exists after the PlaybackInfo HTTP round
+	// trip that triggered the server-side copy already completed. So the push can legitimately
+	// arrive before anyone is waiting for it; pushArrived is the buffer for exactly that ordering,
+	// keyed by the same locator, checked first by registerPushWaiter before it falls back to
+	// actually waiting.
+	//
+	// Keyed by the copied message's caption — the locator, OXM_PREFIX_recordNo (see apps/api's
+	// resolveTelegramDelivery) — NOT a single shared channel/buffer. Confirmed a real bug on real
+	// devices: prefetching several dashboard items copies several different videos into the same
+	// DM in close succession, and a single shared channel handed whichever document arrived
+	// next to whichever resolve call happened to be waiting, playing the wrong title. The locator
+	// lets each concurrent resolve call wait only for its own answer, and since it is unique per
+	// stored file, two concurrent copies that DO collide on it are the same bytes anyway.
+	//
+	// This waiting path is now only the cold case. A message whose id is known can be re-read
+	// directly (messages.getMessages works for bots too; only enumeration — getHistory/search —
+	// returns BOT_METHOD_INVALID), so once the server has been told the id, resolves go straight to
+	// resolveVideoFileByDMMessageID and no copy happens at all.
+	pushMu      sync.Mutex
+	pushWaiters map[string]chan *pushedMessage
+	pushArrived map[string]pushArrival
+
+	// deliveryRefs remembers locator -> (message id, sending bot id) for messages this session has
+	// actually read, so the Dart layer can report both to the backend (DeliveryRefForLocator).
+	// Only the RECEIVER knows the message id: private-chat ids are numbered per side, so the id the
+	// sending bot got back from copyMessage is a different one entirely. And only the receiver
+	// knows WHICH sender won, because the server round-robins and may fail over mid-request.
+	dmMu         sync.Mutex
+	deliveryRefs map[string]deliveryRefEntry
+
+	// providerPeers are InputPeerUser values from EnsureProviderBotsReady (access_hash included).
+	// GetHistory against these DMs finds copies that live-push missed — SearchGlobal skips Archive.
+	providerPeersMu sync.Mutex
+	providerPeers   map[int64]*tg.InputPeerUser
+}
+
+// pushedMessage is one live-pushed document, the id it landed on in THIS session's DM, and the bot
+// that sent it.
+type pushedMessage struct {
+	doc           *tg.Document
+	messageID     int64
+	providerBotID int64
+}
+
+type pushArrival struct {
+	msg *pushedMessage
+	at  time.Time
+}
+
+// DeliveryRef is the pair the backend needs to answer the next play of this file without copying
+// anything: which message, in whose DM.
+type DeliveryRef struct {
+	MessageID     int64
+	ProviderBotID int64
+}
+
+type deliveryRefEntry struct {
+	ref DeliveryRef
+	at  time.Time
+}
+
+// pushArrivedTTL bounds how long an unclaimed early-arrived push is kept — generous relative to
+// botModeResolveTimeout so a slow-to-register waiter still finds it, but not unbounded (a
+// cancelled/never-issued resolve for the same locator would otherwise leak this entry forever).
+const pushArrivedTTL = 60 * time.Second
+
+// deliveryRefTTL bounds how long a locator -> delivery ref entry is kept for reporting. Only needs
+// to outlive the gap between a successful resolve and the Dart layer's report call, which is one
+// method call away; kept generous anyway since each entry is three words.
+const deliveryRefTTL = 10 * time.Minute
+
+// registerPushWaiter returns a channel that receives the pushed message for locator, checking
+// first whether it already arrived (see pushArrived's doc comment) before falling back to
+// actually waiting. Callers must eventually call unregisterPushWaiter (defer it).
+func (c *Client) registerPushWaiter(locator string) chan *pushedMessage {
+	ch := make(chan *pushedMessage, 1)
+	c.pushMu.Lock()
+	defer c.pushMu.Unlock()
+	c.pruneStalePushesLocked()
+	if c.pushWaiters == nil {
+		c.pushWaiters = make(map[string]chan *pushedMessage)
+	}
+	if existing, ok := c.pushWaiters[locator]; ok {
+		// Already armed (ArmDeliveryWaiter ran before the resolve). Reuse that channel rather than
+		// replacing it, or the arm would be silently discarded and an early push would be dropped.
+		return existing
+	}
+	if arrival, ok := c.pushArrived[locator]; ok {
+		delete(c.pushArrived, locator)
+		ch <- arrival.msg
+		// Must keep this channel in the map. ArmDeliveryWaiter ignores the return
+		// value — dropping it here discarded the early push, then warm/play both
+		// waited 20s on an empty waiter (oxm_dev_459: copy sent, never recorded).
+		c.pushWaiters[locator] = ch
+		return ch
+	}
+	c.pushWaiters[locator] = ch
+	return ch
+}
+
+// ArmDeliveryWaiter registers interest in locator BEFORE the delivery request goes out, so a copy
+// that lands while the PlaybackInfo HTTP call is still in flight is captured rather than raced for.
+//
+// pushArrived already buffers an early push, so this is a latency guard rather than a correctness
+// one — but the buffer has a TTL and is pruned, and arming first removes the window entirely.
+// Idempotent: arming twice for the same locator keeps the first channel.
+func (c *Client) ArmDeliveryWaiter(locator string) {
+	if locator == "" {
+		return
+	}
+	c.registerPushWaiter(locator)
+}
+
+func (c *Client) unregisterPushWaiter(locator string) {
+	c.pushMu.Lock()
+	delete(c.pushWaiters, locator)
+	// Keep pushArrived: a second resolve (play after prefetch timeout) still needs it.
+	c.pushMu.Unlock()
+}
+
+// deliverPushedDoc routes an incoming pushed document to whichever resolve call registered for
+// its locator, or buffers it in pushArrived if none has registered yet.
+func (c *Client) deliverPushedDoc(locator string, doc *tg.Document, messageID, providerBotID int64) {
+	// Remember even if no waiter is armed yet. Play polls DeliveryRefForLocator and
+	// can getMessages instead of sharing the 0/0 channel with prefetch warmDelivery.
+	c.rememberDeliveryRef(locator, messageID, providerBotID)
+	c.pushMu.Lock()
+	defer c.pushMu.Unlock()
+	c.pruneStalePushesLocked()
+	msg := &pushedMessage{doc: doc, messageID: messageID, providerBotID: providerBotID}
+	if ch, ok := c.pushWaiters[locator]; ok {
+		delete(c.pushWaiters, locator)
+		select {
+		case ch <- msg:
+		default:
+		}
+		return
+	}
+	c.pushArrived[locator] = pushArrival{msg: msg, at: time.Now()}
+}
+
+// pruneStalePushesLocked drops early-arrived pushes nobody ever claimed (a cancelled prefetch,
+// or a resolve that gave up after its own timeout). Callers must hold pushMu.
+func (c *Client) pruneStalePushesLocked() {
+	if len(c.pushArrived) == 0 {
+		return
+	}
+	cutoff := time.Now().Add(-pushArrivedTTL)
+	for locator, arrival := range c.pushArrived {
+		if arrival.at.Before(cutoff) {
+			delete(c.pushArrived, locator)
+		}
+	}
+}
+
+// rememberDeliveryRef records that locator was read at messageID inside providerBotID's DM.
+func (c *Client) rememberDeliveryRef(locator string, messageID, providerBotID int64) {
+	if locator == "" || messageID <= 0 {
+		return
+	}
+	c.dmMu.Lock()
+	defer c.dmMu.Unlock()
+	if c.deliveryRefs == nil {
+		c.deliveryRefs = make(map[string]deliveryRefEntry)
+	}
+	cutoff := time.Now().Add(-deliveryRefTTL)
+	for k, e := range c.deliveryRefs {
+		if e.at.Before(cutoff) {
+			delete(c.deliveryRefs, k)
+		}
+	}
+	c.deliveryRefs[locator] = deliveryRefEntry{
+		ref: DeliveryRef{MessageID: messageID, ProviderBotID: providerBotID},
+		at:  time.Now(),
+	}
+}
+
+// DeliveryRefForLocator returns the message id and sending bot this session read for locator, both
+// zero if it has read none. The Dart layer calls this after a successful resolve and reports the
+// pair to the backend (POST /me/telegram-delivery), which is what lets the NEXT play skip the copy.
+func (c *Client) DeliveryRefForLocator(locator string) DeliveryRef {
+	c.dmMu.Lock()
+	defer c.dmMu.Unlock()
+	return c.deliveryRefs[locator].ref
 }
 
 func NewClient(apiID int, apiHash string, storage SessionStorage) *Client {
 	return &Client{apiID: apiID, apiHash: apiHash, storage: storage}
+}
+
+// isClosed reports whether ch has been closed, without blocking. Used to tell a live gotd run
+// loop from one that already exited — see Configure.
+func isClosed(ch chan struct{}) bool {
+	select {
+	case <-ch:
+		return true
+	default:
+		return false
+	}
 }
 
 // Configure starts the underlying connection and blocks until it's ready to accept auth/API
@@ -46,11 +246,38 @@ func NewClient(apiID int, apiHash string, storage SessionStorage) *Client {
 func (c *Client) Configure(ctx context.Context, sink AuthEventSink) error {
 	c.mu.Lock()
 	if c.tg != nil {
-		c.mu.Unlock()
-		return nil
+		if c.runDone != nil && !isClosed(c.runDone) {
+			c.mu.Unlock()
+			return nil
+		}
+		// The run loop exited. gotd does not resurrect it, and c.tg keeps answering as if
+		// healthy, so every later UploadGetFile fails with "waitSession: connection dead"
+		// while ensureConfigured still reports "already configured" — a hang with no error
+		// path, only recoverable by killing the app. Drop the corpse and rebuild below.
+		if c.cancel != nil {
+			c.cancel()
+		}
+		c.tg = nil
+		c.cancel = nil
+		c.runDone = nil
+		c.Auth = nil
 	}
 
 	dispatcher := tg.NewUpdateDispatcher()
+	c.pushMu.Lock()
+	c.pushWaiters = make(map[string]chan *pushedMessage)
+	c.pushArrived = make(map[string]pushArrival)
+	c.pushMu.Unlock()
+	dispatcher.OnNewMessage(func(_ context.Context, _ tg.Entities, u *tg.UpdateNewMessage) error {
+		doc, locator, messageID, senderID := documentFromMessage(u.Message)
+		if doc != nil {
+			if locator != "" {
+				log.Printf("oxtelegram: push %s msg=%d from=%d", locator, messageID, senderID)
+			}
+			c.deliverPushedDoc(locator, doc, messageID, senderID)
+		}
+		return nil
+	})
 	tgClient := telegram.NewClient(c.apiID, c.apiHash, telegram.Options{
 		SessionStorage: &sessionStorageAdapter{backing: c.storage},
 		// Required for QR: UpdateLoginToken must reach qrlogin.OnLoginToken. Default
@@ -110,6 +337,22 @@ func (c *Client) API() *tg.Client {
 		return nil
 	}
 	return c.tg.API()
+}
+
+// selfUserID is the logged-in Telegram user id, or 0 if Configure has not finished. Used to log
+// whether startBot ran on the same account PlaybackInfo copies into.
+func (c *Client) selfUserID(ctx context.Context) int64 {
+	c.mu.Lock()
+	tgClient := c.tg
+	c.mu.Unlock()
+	if tgClient == nil {
+		return 0
+	}
+	self, err := tgClient.Self(ctx)
+	if err != nil || self == nil {
+		return 0
+	}
+	return self.ID
 }
 
 // mediaOnlyDC opens a pooled connection to dcID for file downloads — used when a chunk fetch on

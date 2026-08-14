@@ -21,15 +21,31 @@ final class OxTelegramNative {
         currentAuthError =
             lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>('ox_current_auth_error'),
         submitPhone = lib.lookupFunction<Int32 Function(Pointer<Utf8>), int Function(Pointer<Utf8>)>('ox_submit_phone'),
+        submitBotToken =
+            lib.lookupFunction<Int32 Function(Pointer<Utf8>), int Function(Pointer<Utf8>)>('ox_submit_bot_token'),
         submitCode = lib.lookupFunction<Int32 Function(Pointer<Utf8>), int Function(Pointer<Utf8>)>('ox_submit_code'),
         submitPassword =
             lib.lookupFunction<Int32 Function(Pointer<Utf8>), int Function(Pointer<Utf8>)>('ox_submit_password'),
         requestQr = lib.lookupFunction<Int32 Function(), int Function()>('ox_request_qr'),
         logout = lib.lookupFunction<Int32 Function(), int Function()>('ox_logout'),
-        startPlayback = lib.lookupFunction<Pointer<Utf8> Function(Pointer<Utf8>, Int64),
-            Pointer<Utf8> Function(Pointer<Utf8>, int)>('ox_start_playback'),
+        startPlayback = lib.lookupFunction<Pointer<Utf8> Function(Int64, Int64, Pointer<Utf8>),
+            Pointer<Utf8> Function(int, int, Pointer<Utf8>)>('ox_start_playback'),
         stopPlayback =
             lib.lookupFunction<Int32 Function(Pointer<Utf8>), int Function(Pointer<Utf8>)>('ox_stop_playback'),
+        deliveryMessageIdForLocator = lib.lookupFunction<Int64 Function(Pointer<Utf8>), int Function(Pointer<Utf8>)>(
+          'ox_delivery_message_id_for_locator',
+        ),
+        deliveryProviderBotIdForLocator =
+            lib.lookupFunction<Int64 Function(Pointer<Utf8>), int Function(Pointer<Utf8>)>(
+          'ox_delivery_provider_bot_id_for_locator',
+        ),
+        armDeliveryWaiter =
+            lib.lookupFunction<Void Function(Pointer<Utf8>), void Function(Pointer<Utf8>)>('ox_arm_delivery_waiter'),
+        warmDelivery = lib.lookupFunction<Int32 Function(Int64, Int64, Pointer<Utf8>),
+            int Function(int, int, Pointer<Utf8>)>('ox_warm_delivery'),
+        ensureProviderBotsReady = lib.lookupFunction<Int32 Function(Pointer<Utf8>), int Function(Pointer<Utf8>)>(
+          'ox_ensure_provider_bots_ready',
+        ),
         streamUriForCurrentPlayback = lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
           'ox_stream_uri_for_current_playback',
         ),
@@ -55,12 +71,35 @@ final class OxTelegramNative {
   final Pointer<Utf8> Function() currentAuthHint;
   final Pointer<Utf8> Function() currentAuthError;
   final int Function(Pointer<Utf8>) submitPhone;
+  final int Function(Pointer<Utf8>) submitBotToken;
   final int Function(Pointer<Utf8>) submitCode;
   final int Function(Pointer<Utf8>) submitPassword;
   final int Function() requestQr;
   final int Function() logout;
-  final Pointer<Utf8> Function(Pointer<Utf8>, int) startPlayback;
+  /// (providerBotId, messageId, locator) — both ids are 0 on a cold play, where the locator alone
+  /// identifies the delivery still in flight.
+  final Pointer<Utf8> Function(int, int, Pointer<Utf8>) startPlayback;
   final int Function(Pointer<Utf8>) stopPlayback;
+
+  /// The DM message id the current session read for a locator, or 0. Reported to the backend
+  /// together with [deliveryProviderBotIdForLocator] so the next play of that file needs no
+  /// Telegram copy — see OxplayerTelegramDeliveryApi.
+  final int Function(Pointer<Utf8>) deliveryMessageIdForLocator;
+
+  /// The delivery bot whose DM held that message, or 0.
+  final int Function(Pointer<Utf8>) deliveryProviderBotIdForLocator;
+
+  /// Registers interest in a locator before PlaybackInfo triggers the copy, so a delivery that
+  /// lands mid-request is captured rather than raced for.
+  final void Function(Pointer<Utf8>) armDeliveryWaiter;
+
+  /// Resolves a delivery and remembers where it landed, without opening a download — warm-up.
+  /// Returns 0 on success, like every other status export here.
+  final int Function(int, int, Pointer<Utf8>) warmDelivery;
+
+  /// Starts, mutes and archives every delivery sender. Takes the backend's
+  /// `[{"id":..,"username":".."}]` JSON. Returns 0 on success.
+  final int Function(Pointer<Utf8>) ensureProviderBotsReady;
   final Pointer<Utf8> Function() streamUriForCurrentPlayback;
 
   /// Address of the native ox_stream_open_fn — pass this directly as mpv_stream_cb_add_ro's

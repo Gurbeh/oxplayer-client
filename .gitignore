@@ -103,5 +103,8 @@ android/.kotlin/*
 **/graphify-out/**
 **/.graphify/**
 
-# Claude Code - local runtime state (never commit)
-.claude/scheduled_tasks.lock
+# Local Go probe leftovers (never commit)
+go/oxtelegram/botprobe.exe
+go/oxtelegram/botprobe.session
+go/oxtelegram/cshared/cshared.exe
+go/oxtelegram/*.session

@@ -34,8 +34,9 @@ import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
 import 'package:fladder/oxplayer/oxplayer_force_repair_interceptor.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_link_cache.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_media_source.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_prefetch.dart';
+import 'package:fladder/oxplayer/oxplayer_provider_bots_bootstrap.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_subtitle.dart';
+import 'package:fladder/oxplayer/oxplayer_delivery_reader_sync.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
@@ -420,6 +421,10 @@ class PlaybackModelHelper {
 
       final requestedMediaSourceId = newStreamModel?.currentVersionStream?.id;
 
+      if (OxplayerEnv.isEnabled) {
+        await oxplayerEnsureTdlibMatchesOxUser(ref.read(userProvider)?.credentials.token);
+      }
+
       Future<PlaybackInfoResponse?> fetchPlaybackInfo({required bool forceRepair}) async {
         if (forceRepair) {
           OxplayerPlaybackLinkCache.invalidate(requestedMediaSourceId);
@@ -450,20 +455,19 @@ class PlaybackModelHelper {
 
       PlaybackInfoResponse? playbackInfo;
       if (OxplayerEnv.isEnabled) {
+        await OxplayerProviderBotsBootstrap.ensureReady();
         if (requestedMediaSourceId != null) {
           playbackInfo = OxplayerPlaybackLinkCache.get(requestedMediaSourceId);
         }
-        if (playbackInfo == null) {
-          await OxplayerPlaybackPrefetch.waitInFlightForItem(
-            item.id,
-            mediaSourceId: requestedMediaSourceId,
-          );
-          if (requestedMediaSourceId != null) {
-            playbackInfo = OxplayerPlaybackLinkCache.get(requestedMediaSourceId);
-          }
-        }
+        // Do not wait for dashboard prefetch. That path only warms TDLib; play was
+        // stalling after prefetch returned (no startPlaybackSession / playback_url).
         if (playbackInfo != null) {
           OxplayerStreamLog.event('playback_link_cache_hit', fields: {
+            'itemId': item.id,
+            'mediaSourceId': requestedMediaSourceId,
+          });
+        } else {
+          OxplayerStreamLog.event('playback_link_cache_miss', fields: {
             'itemId': item.id,
             'mediaSourceId': requestedMediaSourceId,
           });
@@ -471,6 +475,7 @@ class PlaybackModelHelper {
       }
       playbackInfo ??= await fetchPlaybackInfo(forceRepair: false);
       if (playbackInfo == null) {
+        OxplayerStreamLog.event('playback_info_null', fields: {'itemId': item.id});
         return null;
       }
 
@@ -484,6 +489,12 @@ class PlaybackModelHelper {
       }
 
       var mediaPath = isValidVideoUrl(mediaSource.path ?? "");
+      OxplayerStreamLog.event('playback_media_path', fields: {
+        'itemId': item.id,
+        'path': OxplayerStreamLog.describeUrl(mediaPath),
+        'supportsDirectPlay': mediaSource.supportsDirectPlay,
+        'supportsDirectStream': mediaSource.supportsDirectStream,
+      });
       String? resolvedMediaPath;
       if (mediaPath != null && OxplayerEnv.isEnabled) {
         try {
@@ -496,10 +507,13 @@ class PlaybackModelHelper {
             rethrow;
           }
           debugPrint(
-            '$oxplayTdlibLogTag: file missing ($e) for itemId=${item.id} — force-repair retry',
+            '$oxplayTdlibLogTag: resolve failed ($e) for itemId=${item.id} — refetch retry',
           );
           OxplayerTdlibSessionCache.invalidateTelegramUrl(mediaPath);
-          final repairedInfo = await fetchPlaybackInfo(forceRepair: true);
+          OxplayerPlaybackLinkCache.invalidate(requestedMediaSourceId);
+          final repairedInfo = await fetchPlaybackInfo(
+            forceRepair: oxplayerIsTdlibFileMissingError(e),
+          );
           final repairedSource = repairedInfo == null
               ? null
               : oxplayerResolvePlaybackMediaSource(repairedInfo, requestedMediaSourceId: requestedMediaSourceId);
@@ -529,9 +543,9 @@ class PlaybackModelHelper {
         defaultSubStreamIndex: subStreamIndex,
       );
 
-      final mediaSegments = await api.mediaSegmentsGet(id: item.id);
-
-      final trickPlayResp = await api.getTrickPlay(item: item, ref: ref);
+      final isTelegram = oxplayerIsTelegramProviderLink(mediaPath);
+      final mediaSegments = isTelegram ? null : await api.mediaSegmentsGet(id: item.id);
+      final trickPlayResp = isTelegram ? null : await api.getTrickPlay(item: item, ref: ref);
 
       final trickPlay = trickPlayResp?.body;
       final chapters = item.overview.chapters ?? [];

@@ -1,6 +1,7 @@
 import 'package:http/http.dart' as http;
 
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_session.dart';
 
 /// HTTP for pre-login auth endpoints (/auth/*).
 abstract final class OxplayerAuthHttp {
@@ -16,5 +17,7 @@ abstract final class OxplayerAuthHttp {
     return Uri.parse('$base$path').replace(queryParameters: query);
   }
 
-  static Future<http.Response> send(Future<http.Response> Function() request) => request();
+  static Future<http.Response> send(Future<http.Response> Function() request) {
+    return request().timeout(kOxSessionRestoreTimeout);
+  }
 }

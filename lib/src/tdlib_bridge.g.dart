@@ -109,17 +109,23 @@ class OxTdlibAuthState {
 ;
 }
 
-/// One playback session's Telegram-backed video source, resolved from the
-/// PlaybackInfo structured fields (TelegramChannelUsername / TelegramMessageId).
+/// One playback session's Telegram-backed video source, parsed from the PlaybackInfo Path
+/// `oxplayer-tg://{providerBotId}/{messageId}?loc={locator}`.
 class OxTdlibPlaybackSource {
   OxTdlibPlaybackSource({
-    required this.channelUsername,
+    required this.providerBotId,
     required this.messageId,
     required this.preferHttpBridge,
+    required this.locator,
   });
 
-  String channelUsername;
+  /// The delivery bot whose DM holds the video. 0 on a cold play: the backend round-robins across
+  /// senders and may fail over mid-request, so it does not commit to one until the copy lands —
+  /// the native side then learns the real sender from the update that carries [locator].
+  int providerBotId;
 
+  /// The message id inside that DM, or 0 when the backend has none remembered yet and a fresh copy
+  /// is on its way (the native side then matches the live push by [locator] instead).
   int messageId;
 
   /// True when the target player is mpv/mdk (no DataSource-style hook for a custom scheme) —
@@ -127,11 +133,21 @@ class OxTdlibPlaybackSource {
   /// tdlib-file://{fileId}. False (default) keeps the existing ExoPlayer DataSource path.
   bool preferHttpBridge;
 
+  /// The ?loc= query param off the PlaybackInfo Path: the caption on the copied message,
+  /// OXM_PREFIX_recordNo with no '#' (see apps/api's resolveTelegramDelivery). Unique per stored
+  /// file, and it does two jobs: it picks out the live-pushed document that answers THIS request
+  /// instead of whatever arrives next on the shared receive channel (confirmed a real bug without
+  /// it — concurrent dashboard-slider prefetches could hand one item's video to a different item's
+  /// player), and on the remembered path it verifies [messageId] still holds the expected file.
+  /// Always present now — both login modes read out of a DM.
+  String locator;
+
   List<Object?> _toList() {
     return <Object?>[
-      channelUsername,
+      providerBotId,
       messageId,
       preferHttpBridge,
+      locator,
     ];
   }
 
@@ -141,9 +157,10 @@ class OxTdlibPlaybackSource {
   static OxTdlibPlaybackSource decode(Object result) {
     result as List<Object?>;
     return OxTdlibPlaybackSource(
-      channelUsername: result[0]! as String,
+      providerBotId: result[0]! as int,
       messageId: result[1]! as int,
       preferHttpBridge: result[2]! as bool,
+      locator: result[3]! as String,
     );
   }
 
@@ -151,6 +168,104 @@ class OxTdlibPlaybackSource {
   // ignore: avoid_equals_and_hash_code_on_mutable_classes
   bool operator ==(Object other) {
     if (other is! OxTdlibPlaybackSource || other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(encode(), other.encode());
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => Object.hashAll(_toList())
+;
+}
+
+/// One delivery sender, as published by the backend's GET /telegram/provider-bots. The username is
+/// needed only for first contact (contacts.resolveUsername -> startBot); afterwards everything
+/// addresses the bot by [id]. Tokens never reach the client.
+class OxTdlibProviderBot {
+  OxTdlibProviderBot({
+    required this.id,
+    required this.username,
+  });
+
+  int id;
+
+  String username;
+
+  List<Object?> _toList() {
+    return <Object?>[
+      id,
+      username,
+    ];
+  }
+
+  Object encode() {
+    return _toList();  }
+
+  static OxTdlibProviderBot decode(Object result) {
+    result as List<Object?>;
+    return OxTdlibProviderBot(
+      id: result[0]! as int,
+      username: result[1]! as String,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! OxTdlibProviderBot || other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(encode(), other.encode());
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => Object.hashAll(_toList())
+;
+}
+
+/// Where a delivered video actually landed, as observed by THIS session. Both halves can only come
+/// from the receiving side: private-chat message ids are numbered per side, and the server
+/// round-robins across senders so it does not know which one won.
+class OxTdlibDeliveryRef {
+  OxTdlibDeliveryRef({
+    required this.messageId,
+    required this.providerBotId,
+  });
+
+  int messageId;
+
+  int providerBotId;
+
+  List<Object?> _toList() {
+    return <Object?>[
+      messageId,
+      providerBotId,
+    ];
+  }
+
+  Object encode() {
+    return _toList();  }
+
+  static OxTdlibDeliveryRef decode(Object result) {
+    result as List<Object?>;
+    return OxTdlibDeliveryRef(
+      messageId: result[0]! as int,
+      providerBotId: result[1]! as int,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! OxTdlibDeliveryRef || other.runtimeType != runtimeType) {
       return false;
     }
     if (identical(this, other)) {
@@ -182,6 +297,12 @@ class _PigeonCodec extends StandardMessageCodec {
     }    else if (value is OxTdlibPlaybackSource) {
       buffer.putUint8(131);
       writeValue(buffer, value.encode());
+    }    else if (value is OxTdlibProviderBot) {
+      buffer.putUint8(132);
+      writeValue(buffer, value.encode());
+    }    else if (value is OxTdlibDeliveryRef) {
+      buffer.putUint8(133);
+      writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
     }
@@ -197,6 +318,10 @@ class _PigeonCodec extends StandardMessageCodec {
         return OxTdlibAuthState.decode(readValue(buffer)!);
       case 131: 
         return OxTdlibPlaybackSource.decode(readValue(buffer)!);
+      case 132: 
+        return OxTdlibProviderBot.decode(readValue(buffer)!);
+      case 133: 
+        return OxTdlibDeliveryRef.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
     }
@@ -369,6 +494,32 @@ class OxTdlibBridgeApi {
     }
   }
 
+  /// Bot-token login: an alternative to phone/QR for users who don't want to give OXPlayer
+  /// access to their personal Telegram account. Logs in as a bot (gotd/td
+  /// auth.importBotAuthorization) instead — goes straight to ready, no code/2FA step.
+  Future<void> submitBotToken(String token) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.submitBotToken$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[token]);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
+
   /// Server-side session invalidation + local TDLib session wipe.
   Future<void> logOut() async {
     final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.logOut$pigeonVar_messageChannelSuffix';
@@ -424,6 +575,121 @@ class OxTdlibBridgeApi {
       );
     } else {
       return (pigeonVar_replyList[0] as String?)!;
+    }
+  }
+
+  /// Where the last successful resolve of [locator] landed, or null if this session has not read
+  /// one. Dart reports it to the backend (POST /me/telegram-delivery) so the NEXT play of the same
+  /// file is answered straight from the delivery table with no Telegram copy at all.
+  ///
+  /// It has to come from here rather than from the server: copyMessage hands the SENDING bot an id
+  /// from its own side of the private chat, and private-chat ids are numbered per side, so only
+  /// the receiving session ever sees the id that can be re-read later — and only it knows which
+  /// sender the backend's round-robin actually settled on.
+  /// Synchronous — reads an in-memory map, no MTProto round-trip.
+  Future<OxTdlibDeliveryRef?> deliveryRefForLocator(String locator) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.deliveryRefForLocator$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[locator]);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return (pigeonVar_replyList[0] as OxTdlibDeliveryRef?);
+    }
+  }
+
+  /// Registers interest in [locator] BEFORE the PlaybackInfo call that triggers the copy, so a
+  /// delivery that lands while that HTTP request is still in flight is captured rather than raced
+  /// for. Idempotent, synchronous, no MTProto round-trip.
+  Future<void> armDeliveryWaiter(String locator) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.armDeliveryWaiter$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[locator]);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
+
+  /// Resolves [source] and remembers where it landed WITHOUT opening a download — the warm-up path.
+  /// Scrolling the dashboard warms a dozen titles at once, and starting a dozen progressive
+  /// downloads for videos nobody pressed play on would spend the user's data on bytes that get
+  /// thrown away. Resolving is enough: it makes the backend remember the message id, so the
+  /// eventual play needs no Telegram call at all.
+  Future<void> warmDelivery(OxTdlibPlaybackSource source) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.warmDelivery$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[source]);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
+
+  /// Starts, mutes and archives every delivery sender on this account, so delivery copies never
+  /// land in the user's visible inbox. Called on every app enter (not just after login) because a
+  /// sender can be added to the backend's list at any time.
+  ///
+  /// No-op for a bot-token login: a bot is not a user account, has no dialog list to archive, and
+  /// its B2B DM was already opened by main-bot's /connectbot.
+  Future<void> ensureProviderBotsReady(List<OxTdlibProviderBot> bots) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.ensureProviderBotsReady$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[bots]);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
     }
   }
 

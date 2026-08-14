@@ -48,7 +48,20 @@ class FladderSnack {
       return;
     }
 
-    final overlay = Overlay.of(effectiveContext);
+    // Overlay.of() throws (not returns null) when effectiveContext has no Overlay ancestor —
+    // `mounted` above only guarantees the Element is still in the tree, not that an Overlay sits
+    // above it. Concretely hit via the app-level fallback _storedContext (a Navigator's own
+    // context, captured once by NotificationManagerInitializer): Overlay is a Navigator
+    // *descendant*, not an ancestor, so Overlay.of(navigatorContext) can legitimately have
+    // nothing to find. An uncaught throw here was silently swallowing whatever async flow called
+    // show() — e.g. a "your bot isn't connected, run /connectbot" playback error never reached
+    // the user and the screen was left stuck loading, with nothing in the logs pointing at this
+    // being the cause until traced through here.
+    final overlay = Overlay.maybeOf(effectiveContext);
+    if (overlay == null) {
+      debugPrint('FladderNotificationManager: no Overlay ancestor for the current context — dropping "$message"');
+      return;
+    }
     final instance = FladderSnack();
     final id = instance._nextId++;
 

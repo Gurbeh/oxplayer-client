@@ -16,14 +16,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 private const val TAG = "OXPLAY_TDLIB"
 private const val READ_CHUNK_BYTES = 64 * 1024
-/** Prefetch enough for mkv after seek — match open-ended chunk so first Range is ready to stream. */
+/** Prefetch enough for mkv after seek so the first Range body can start immediately. */
 private const val READ_AHEAD_BYTES = 2L * 1024 * 1024
-/**
- * Cap open-ended `Range: bytes=N-` responses. Serving to EOF (~600MB+) races with concurrent cue
- * fetches (mpv opens start + near-EOF together for MKV): finishing one stream called
- * cancelDownload and killed the other → seek hang / jump-to-end / Connection reset.
- */
-private const val OPEN_RANGE_CHUNK_BYTES = 2L * 1024 * 1024
 private const val CRLF = "\r\n"
 
 /**
@@ -47,7 +41,7 @@ class TdlibHttpBridgeServer(private val fileFetcher: () -> OxTelegramFileFetcher
     @Volatile private var port: Int = -1
     private val running = AtomicBoolean(false)
     private val scope = CoroutineScope(Dispatchers.IO)
-    /** Active HTTP bodies for the current playback session — only cancelDownload when last leaves. */
+    /** Concurrent HTTP bodies (MKV cue + cluster). Download stays running until playback session ends. */
     private val activeStreams = AtomicInteger(0)
 
     /** Starts the accept loop if not already running; returns the bound port. Idempotent. */
@@ -138,9 +132,24 @@ class TdlibHttpBridgeServer(private val fileFetcher: () -> OxTelegramFileFetcher
         val start = parseRangeStart(rangeHeader)
         // Prefetch enough for mkv/ffmpeg after seek (same READ_AHEAD as TelegramFileDataSource).
         val probeStartedAt = System.currentTimeMillis()
-        fetcher.requestDownload(fileId, offset = start, priority = 32)
         val probeWant = READ_AHEAD_BYTES
-        val probe = fetcher.awaitBytesAvailable(fileId, start, minBytesAvailable = probeWant)
+        // Must not throw past here without writing a response: this runs BEFORE any status line
+        // is sent, so an escaping exception closes the socket with zero bytes written and the
+        // player sees no status code at all — it just retries forever and the UI sits on an
+        // endless spinner. A dead MTProto session ("waitSession: connection dead") reproduces
+        // exactly that, so surface it as a real 503 instead.
+        val probe = try {
+            fetcher.requestDownload(fileId, offset = start, priority = 32)
+            fetcher.awaitBytesAvailable(fileId, start, minBytesAvailable = probeWant)
+        } catch (e: Exception) {
+            Log.w(
+                TAG,
+                "HTTP probe FAILED fileId=$fileId start=$start " +
+                    "tookMs=${System.currentTimeMillis() - probeStartedAt} — ${e.message}",
+            )
+            writeStatusOnly(output, 503, "Service Unavailable")
+            return
+        }
         Log.i(
             TAG,
             "HTTP probe fileId=$fileId start=$start want=$probeWant " +
@@ -153,12 +162,10 @@ class TdlibHttpBridgeServer(private val fileFetcher: () -> OxTelegramFileFetcher
         }
         val lastByte = size - 1
         val explicitEnd = parseRangeEnd(rangeHeader, lastByte)
-        // Open-ended (or no Range): serve a bounded chunk so concurrent cue/seek ranges are not
-        // cancelled when this connection finishes or resets mid-file.
-        val end = when {
-            explicitEnd != null -> explicitEnd
-            else -> minOf(lastByte, start + OPEN_RANGE_CHUNK_BYTES - 1)
-        }
+        // Open-ended `Range: bytes=N-` (and no Range) must run to EOF. ffmpeg's http protocol
+        // treats a short 206 as "Stream ends prematurely at X, should be <filesize>" and
+        // reconnects every chunk — 2MB caps caused I/O-error reconnect storms on session play.
+        val end = explicitEnd ?: lastByte
         val contentLength = end - start + 1
         val isPartial = rangeHeader != null || end < lastByte
 
@@ -194,8 +201,9 @@ class TdlibHttpBridgeServer(private val fileFetcher: () -> OxTelegramFileFetcher
             )
         } finally {
             if (activeStreams.decrementAndGet() <= 0) {
-                // Last concurrent range left — safe to cancel in-flight chunk for this session.
-                runCatching { fetcher.cancelDownload(fileId) }
+                // Leave in-flight bytes; closeAfterPlayback cancels. Cancelling here raced the
+                // next Range (ffmpeg reconnect / cue→cluster) and reset the gotd window.
+                Log.d(TAG, "last HTTP stream closed fileId=$fileId (download left running)")
             }
         }
     }

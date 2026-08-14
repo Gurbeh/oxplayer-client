@@ -5,7 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/oxplayer/oxplayer_developer_mode_store.dart';
+import 'package:fladder/oxplayer/oxplayer_ox_login_kind_store.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_version_tap_unlock.dart';
+import 'package:fladder/providers/user_provider.dart';
+import 'package:fladder/src/tdlib_bridge.g.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/settings/settings_scaffold.dart';
 import 'package:fladder/screens/shared/fladder_icon.dart';
@@ -27,11 +31,30 @@ class OxplayerAboutSettingsPage extends ConsumerStatefulWidget {
 
 class _OxplayerAboutSettingsPageState extends ConsumerState<OxplayerAboutSettingsPage> {
   bool _developerModeUnlocked = false;
+  OxplayerOxLoginKind? _loginKind;
 
   @override
   void initState() {
     super.initState();
     _loadDeveloperMode();
+    _loadLoginKind();
+  }
+
+  Future<void> _loadLoginKind() async {
+    final accountId = ref.read(userProvider)?.id;
+    final controller = OxplayerTdlibBridgeController.instance();
+    final hasBotToken = await controller.hasCachedBotToken();
+    if (!mounted) return;
+    final kind = await OxplayerOxLoginKindStore.resolve(
+      accountId: accountId,
+      tdlibUserSessionReady:
+          controller.state.kind == OxTdlibAuthStateKind.ready && !controller.nativeSessionIsBot,
+      hasBotToken: hasBotToken,
+      nativeWaitingForUserAuth: controller.state.kind == OxTdlibAuthStateKind.waitingForPhoneNumber ||
+          controller.state.kind == OxTdlibAuthStateKind.failed,
+    );
+    if (!mounted) return;
+    setState(() => _loginKind = kind);
   }
 
   Future<void> _loadDeveloperMode() async {
@@ -66,6 +89,19 @@ class _OxplayerAboutSettingsPageState extends ConsumerState<OxplayerAboutSetting
               child: Text(context.localized.aboutVersion(applicationInfo.versionAndPlatform)),
             ),
             Text(context.localized.aboutBuild(applicationInfo.buildNumber)),
+            if (_loginKind != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  switch (_loginKind!) {
+                    OxplayerOxLoginKind.session => context.localized.oxplayerAboutLoginSession,
+                    OxplayerOxLoginKind.bot => context.localized.oxplayerAboutLoginBot,
+                  },
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+              ),
             const SizedBox(height: 16),
             const Text('Created by Gurbeh'),
           ],
