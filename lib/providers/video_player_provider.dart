@@ -78,6 +78,16 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
       return;
     }
 
+    // Reaching here tears the player down and rebuilds it — and on the native backend that also
+    // finishes VideoPlayerActivity (NativePlayer.dispose -> disposeActivity), so it must stay rare.
+    //
+    // It used to run on EVERY play: MediaControlsWrapper.backend had no case for NativePlayer and
+    // returned null, so matchesSettings could never be true there. The normal play path masked it
+    // by calling openPlayer() afterwards, which launched a fresh Activity; the next-episode path
+    // (PlaybackModelHelper.loadNewVideo) has no such call, so it was left waiting for an ExoPlayer
+    // that never bound and the episode simply never started. See _activeBackend in
+    // media_control_wrapper.dart. If this event ever starts firing per-play again, that comparison
+    // is the first thing to check.
     OxplayerStreamLog.event('video_player_reinit', fields: {
       'hasPlayer': state.hasPlayer,
       'stack': StackTrace.current.toString().split('\n').take(8).join(' <- '),
@@ -211,6 +221,13 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
         'startMs': effectiveStartPosition.inMilliseconds,
         'streamUrl': OxplayerStreamLog.describeUrl(media.url),
         'streamHost': OxplayerStreamLog.describeHost(media.url),
+        // The queue drives the player's next/previous buttons (PlayableData.nextVideo /
+        // previousVideo). A model that arrives here with queueLen=0 renders a player with no way
+        // to reach the rest of the series, so it is worth seeing per load.
+        'queueLen': model.playbackQueue.queue.length,
+        'queueAnchor': model.playbackQueue.mainQueueCurrentId,
+        'hasNext': model.nextVideo != null,
+        'hasPrevious': model.previousVideo != null,
       });
       ref.read(playBackModel.notifier).update((state) => newPlaybackModel);
       await state.loadVideo(model, effectiveStartPosition, true);

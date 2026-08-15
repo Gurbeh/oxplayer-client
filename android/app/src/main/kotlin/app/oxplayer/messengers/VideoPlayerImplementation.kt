@@ -152,6 +152,25 @@ class VideoPlayerImplementation(
         publishPlaybackState(exo)
     }
 
+    /**
+     * Ends the current playback session: drops [playbackData] and releases any Telegram byte pipe.
+     *
+     * Three callers, all legitimate: Dart's Pigeon `stop()`, MainActivity's activity-result hook,
+     * and ExoPlayer's onDispose when the Activity is finishing. The recurring hazard is not any one
+     * of them but their *timing* — a teardown belonging to the outgoing item arriving after the
+     * incoming one is already in place, at which point this wipes the new playback instead of the
+     * old one. It has happened twice, and both times the symptom pointed somewhere else entirely:
+     *
+     *  - a stale url read here released the incoming Telegram session (fixed by [openedTelegramFileId])
+     *  - audio_service's onNotificationDeleted called stop() ~1.5s into the next episode, which
+     *    nulled playbackData and left the native player with no title and prev/next drawn at
+     *    CustomButton's disabled alpha of 0.15 — indistinguishable from missing buttons
+     *    (fixed in MediaControlsWrapper.onNotificationDeleted)
+     *
+     * So when playback data disappears mid-session, suspect a late teardown before suspecting the
+     * UI. Logging `playbackData.value?.currentItem?.id` here names the victim immediately: if it is
+     * the item that just STARTED rather than the one that ended, that is the bug.
+     */
     fun clearSession() {
         // Use the id this player opened with, not whatever url playbackData holds now — see
         // [openedTelegramFileId]. Consuming it here also makes repeat teardowns (ExoPlayer dispose,
@@ -205,6 +224,12 @@ class VideoPlayerImplementation(
                     "host=${Uri.parse(playableData.url).host} " +
                     "url=${redactStreamUrl(playableData.url)}",
             )
+            // This is the only writer of a whole [playbackData], and everything the native UI shows
+            // — title, chapters, segments, and the prev/next buttons via nextVideo/previousVideo —
+            // hangs off it. When that UI has looked wrong, the value written here was always
+            // correct and something cleared it afterwards; logging nextVideo/previousVideo on the
+            // line above is what proved that, and is worth re-adding for a day if it recurs.
+            // See [clearSession].
             playbackData.value = playableData
             callback(Result.success(true))
             return

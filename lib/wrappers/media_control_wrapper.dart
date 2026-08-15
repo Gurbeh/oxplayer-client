@@ -52,9 +52,29 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
 
   bool get hasPlayer => _player != null;
 
+  /// The backend actually in use, including [NativePlayer].
+  ///
+  /// [backend] predates that player and reports null for it, which made [matchesSettings]
+  /// permanently false on the native backend: every loadPlaybackItem then tore the player down and
+  /// rebuilt it, and since NativePlayer.dispose() finishes the VideoPlayerActivity, every play
+  /// destroyed and recreated the Activity + ExoPlayer. The normal play path hid this by calling
+  /// openPlayer() afterwards; the queue path (next episode) does not, so it was left waiting for an
+  /// ExoPlayer that never bound. Confirmed on an Android TV: reinit logged playerSame=true,
+  /// playerRuntimeType=NativePlayer, backend=null, wantedPlayer=nativePlayer.
+  ///
+  /// Kept separate from the public [backend] rather than fixing that getter in place, because its
+  /// null is load-bearing elsewhere — videoProfileProvider falls back to PlayerOptions.platformDefaults
+  /// on null, so widening it would silently change the device profile sent to Jellyfin.
+  PlayerOptions? get _activeBackend => switch (_player) {
+        LibMPV _ => PlayerOptions.libMPV,
+        LibMDK _ => PlayerOptions.libMDK,
+        NativePlayer _ => PlayerOptions.nativePlayer,
+        _ => null,
+      };
+
   bool matchesSettings(VideoPlayerSettingsModel settings) {
     if (!hasPlayer || _activePlayerSettings == null) return false;
-    return _activePlayerSettings!.playerSame(settings) && backend == settings.wantedPlayer;
+    return _activePlayerSettings!.playerSame(settings) && _activeBackend == settings.wantedPlayer;
   }
 
   PlayerOptions? get backend => switch (_player) {
@@ -469,6 +489,29 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
 
     smtc?.enableSmtc();
     smtc?.setPlaybackStatus(playing ? PlaybackStatus.playing : PlaybackStatus.paused);
+  }
+
+  /// audio_service calls this when Android reports the media notification gone, and its default
+  /// implementation is [stop] — correct for the case it documents, the user swiping the
+  /// notification away.
+  ///
+  /// It also fires when the notification merely disappears, which happens on every episode change:
+  /// [OxPlaybackModelHelper.loadNewVideo] pauses first, and with `androidStopForegroundOnPause` the
+  /// pause removes the foreground notification. The callback then lands ~1.5s later, by which time
+  /// the NEXT episode is already loaded, and [stop] operates on it. Measured on a TV, two of these
+  /// arrived per transition and the first one cleared the episode that had just started — which
+  /// wiped the native playbackData (no title, and prev/next drawn at CustomButton's disabled alpha
+  /// of 0.15, i.e. invisible), reported a spurious "stopped at 0s" to Jellyfin for an episode
+  /// seconds old, and nulled playBackModel so nothing reported that episode's progress afterwards.
+  ///
+  /// A video session is never torn down from here: it has explicit exits (Back, the close button,
+  /// Activity finish) that all call [stop] with the right item. Audio keeps the documented
+  /// behaviour, where the notification is a real control surface the user can reach.
+  @override
+  Future<void> onNotificationDeleted() async {
+    final model = ref.read(playBackModel);
+    if (model != null && model.item.type != FladderItemType.audio) return;
+    return super.onNotificationDeleted();
   }
 
   @override

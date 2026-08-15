@@ -432,6 +432,12 @@ fun PlaybackButtons(
 
     val isTVMode by VideoPlayerObject.implementation.isTVMode.collectAsState(false)
 
+    // These buttons render straight from playbackData and hold no state of their own: every time
+    // they have gone dead, the cause was something clearing playbackData underneath them rather
+    // than anything in this composable. Note a disabled CustomButton draws at alpha 0.15, which
+    // over video reads as "the button isn't there at all" — so a report of missing buttons is not
+    // evidence that this block failed to render. Instrument VideoPlayerImplementation.clearSession
+    // before touching the UI; see MediaControlsWrapper.onNotificationDeleted for the last case.
     Row(
         modifier = Modifier
             .padding(horizontal = 4.dp, vertical = 6.dp)
