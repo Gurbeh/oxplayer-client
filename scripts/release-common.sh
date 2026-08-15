@@ -135,7 +135,9 @@ release_confirm() {
 release_show_help() {
   local script_name="$1"
   cat <<EOF
-Usage: ${script_name} [options] <summary>
+Usage: ${script_name} [options] [summary]
+
+Summary is prompted if omitted.
 
 Options:
   --dry-run      Show plan only; no file edits
@@ -198,6 +200,27 @@ release_parse_args() {
     esac
   done
 
+  if [[ -z "${RELEASE_SUMMARY}" ]]; then
+    release_prompt_summary
+  fi
+}
+
+release_trim() {
+  local s="$1"
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+  printf '%s' "${s}"
+}
+
+release_prompt_summary() {
+  if [[ -r /dev/tty ]]; then
+    printf 'Release summary (one-line description): ' >/dev/tty
+    IFS= read -r RELEASE_SUMMARY </dev/tty || true
+  elif [[ -t 0 ]]; then
+    printf 'Release summary (one-line description): '
+    IFS= read -r RELEASE_SUMMARY || true
+  fi
+  RELEASE_SUMMARY="$(release_trim "${RELEASE_SUMMARY:-}")"
   if [[ -z "${RELEASE_SUMMARY}" ]]; then
     echo "error: release summary required (one-line description)" >&2
     release_show_help "$0"

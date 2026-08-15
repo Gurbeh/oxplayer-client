@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Bump pubspec.yaml + Play changelog, commit, tag vM.m.p, push main + tag.
-# Usage: bash scripts/release-client.sh [options] "One-line release summary"
+# Usage: bash scripts/release-client.sh [options] ["One-line release summary"]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,9 +9,10 @@ source "${SCRIPT_DIR}/release-common.sh"
 
 release_show_help() {
   cat <<'EOF'
-Usage: release-client.sh [options] <summary>
+Usage: release-client.sh [options] [summary]
 
 Semver bump (patch) in pubspec.yaml + fastlane changelog.
+Summary is prompted if omitted.
 Tag: vM.m.p → triggers Build OXPlayer (signed AAB + GitHub draft release).
 
 Options:
@@ -33,6 +34,7 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 fi
 
 release_parse_args "$@"
+cd "${SCRIPT_DIR}/.."
 ROOT="$(release_root)"
 cd "${ROOT}"
 
