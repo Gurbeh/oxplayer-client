@@ -422,18 +422,7 @@ class PlaybackModelHelper {
       final requestedMediaSourceId = newStreamModel?.currentVersionStream?.id;
 
       if (OxplayerEnv.isEnabled) {
-        final readerSync =
-            await oxplayerEnsureTdlibMatchesOxUser(ref.read(userProvider)?.credentials.token);
-        // A confirmed mismatch means the native session is reading a different inbox than the one
-        // the API is about to copy this file into, so there is nothing to wait for. Failing here
-        // with a real reason beats the 20s stall then 424 that continuing produced. `unknown` is
-        // deliberately allowed through — see OxplayerReaderSyncResult.
-        if (readerSync == OxplayerReaderSyncResult.mismatched) {
-          throw Exception(
-            'Telegram account mismatch: this device is signed into a different Telegram '
-            'session than the one your videos are delivered to. Reconnect via /connectbot.',
-          );
-        }
+        await oxplayerEnsureTdlibMatchesOxUser(ref.read(userProvider)?.credentials.token);
       }
 
       Future<PlaybackInfoResponse?> fetchPlaybackInfo({required bool forceRepair}) async {
@@ -514,7 +503,23 @@ class PlaybackModelHelper {
           // The public Telegram pool purges daily; a link can go dead between hydrate and this
           // play attempt. Force-repair sends a brand new copyMessage and retry once, silently,
           // rather than surfacing an error — see oxplayerIsTdlibFileMissingError.
-          if (!oxplayerIsTelegramProviderLink(mediaPath) || !oxplayerIsTdlibFileMissingError(e)) {
+          //
+          // oxplayerIsTelegramDeliveryWaitTimeoutError covers a different dead end that needs the
+          // same fix: the server marks a delivery "sent" the moment Telegram accepts the copy and
+          // will not re-copy while that sender stays healthy, but the only way the client can ever
+          // learn the resulting message id is a live push at the moment of copy — there is no
+          // fallback scan for it (bot-mode readers can't enumerate DM history at all;
+          // findLocatorInRecentMessages is a no-op for them, see resolve.go). Miss that one push —
+          // background/lock-screen delay, cold start, anything — and every future play of the same
+          // file waits the full 20s for a push the server will never send again, forever, with no
+          // self-heal. force-repair is the only thing that unsticks it: it deletes the stale
+          // pending row server-side and sends a fresh copyMessage, producing a NEW push this
+          // attempt is actively listening for. Confirmed against production logs (oxp_18941):
+          // "delivery copy already sent — awaiting report" on every attempt, sender healthy,
+          // provider_bot_id unchanged, message_id never gets past 0.
+          final isDeliveryTimeout = oxplayerIsTelegramDeliveryWaitTimeoutError(e);
+          if (!oxplayerIsTelegramProviderLink(mediaPath) ||
+              !(oxplayerIsTdlibFileMissingError(e) || isDeliveryTimeout)) {
             rethrow;
           }
           debugPrint(
@@ -522,9 +527,7 @@ class PlaybackModelHelper {
           );
           OxplayerTdlibSessionCache.invalidateTelegramUrl(mediaPath);
           OxplayerPlaybackLinkCache.invalidate(requestedMediaSourceId);
-          final repairedInfo = await fetchPlaybackInfo(
-            forceRepair: oxplayerIsTdlibFileMissingError(e),
-          );
+          final repairedInfo = await fetchPlaybackInfo(forceRepair: true);
           final repairedSource = repairedInfo == null
               ? null
               : oxplayerResolvePlaybackMediaSource(repairedInfo, requestedMediaSourceId: requestedMediaSourceId);
