@@ -11,10 +11,19 @@ import (
 )
 
 // deliveryWaitTimeout bounds how long a cold resolve waits for the server's copy to arrive as a
-// live push. Generous relative to observed near-instant delivery, to absorb normal network/API
-// latency on top of it. Only the cold path pays this: once the backend knows which message id the
-// file landed on, resolves read it directly and never wait.
-const deliveryWaitTimeout = 20 * time.Second
+// live push. Only the cold path pays this: once the backend knows which message id the file
+// landed on, resolves read it directly and never wait.
+//
+// This used to be 20s, sized back when a miss here was unrecoverable (bot-mode readers can't
+// scan DM history — see findLocatorInRecentMessages — so a lost push meant every future play of
+// that file paid the full wait forever). Now that the client force-repairs on this exact timeout
+// (see oxplayerIsTelegramDeliveryWaitTimeoutError in oxplayer_tdlib_playback_resolver.dart), that
+// 20s is no longer a safety margin — it is dead time paid before recovery even starts. Measured
+// on a real stuck delivery: the timeout fired at 20.02s, and the FRESH copy triggered by
+// force-repair had its push land 0.66s later. 8s keeps well over an order of magnitude of margin
+// above that observed round trip (plus the 1.5s per-sender copy throttle, see
+// tgapi.DefaultCopyInterval) while cutting the worst case from ~22s to ~10s.
+const deliveryWaitTimeout = 8 * time.Second
 
 // VideoFileRef is the gomobile-safe (all primitive fields — see plan's "100% flat" export-surface
 // requirement) description of a resolved video/document file. DocumentID/AccessHash are Telegram

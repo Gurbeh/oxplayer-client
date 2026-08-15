@@ -61,6 +61,29 @@ release_require_gh_auth() {
   gh auth setup-git &>/dev/null || true
 }
 
+release_commit_pending_changes() {
+  if [[ -z "$(git status --porcelain)" ]]; then
+    return 0
+  fi
+
+  echo "=== uncommitted changes ==="
+  git status --short
+
+  if [[ "${RELEASE_DRY_RUN}" == "1" ]]; then
+    echo "[dry-run] Would commit pending changes before version bump"
+    return 0
+  fi
+
+  if [[ "${RELEASE_YES:-0}" != "1" ]]; then
+    echo "error: working tree not clean — commit/stash first, or pass -y to auto-commit into release" >&2
+    exit 1
+  fi
+
+  echo "Auto-committing pending changes (-y)…"
+  git add -A
+  git commit -m "${RELEASE_SUMMARY}" -m "Auto-committed before release version bump."
+}
+
 release_preflight() {
   local root branch behind
 
@@ -146,7 +169,8 @@ Options:
   --skip-verify  Default: skip local verify-all / pre-push (CI is the gate)
   --verify       Run scripts/verify-all.sh locally before bump/push
 
-Requires: gh auth login, clean main, up to date with origin/main
+Requires: gh auth login, main branch, up to date with origin/main
+With -y, uncommitted changes are auto-committed before the version bump.
 EOF
 }
 

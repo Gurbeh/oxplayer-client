@@ -228,7 +228,7 @@ Future<String> _oxplayerResolveTdlibPlaybackUrlInner(
 Future<OxTdlibDeliveryRef?> waitForTdlibDeliveryRef(
   OxplayerTdlibBridgeController controller,
   String locator, {
-  Duration timeout = const Duration(seconds: 20),
+  Duration timeout = const Duration(seconds: 8),
 }) async {
   final deadline = DateTime.now().add(timeout);
   while (DateTime.now().isBefore(deadline)) {

@@ -39,6 +39,7 @@ ROOT="$(release_root)"
 cd "${ROOT}"
 
 release_require_gh_auth
+release_commit_pending_changes
 release_preflight
 release_client_require_web_dispatch_token
 release_run_verify
