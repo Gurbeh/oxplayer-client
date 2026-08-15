@@ -550,6 +550,7 @@ class _DesktopControlsState extends ConsumerState<DesktopControls> {
     return Consumer(
       builder: (context, ref, child) {
         final previousVideo = ref.watch(playBackModel.select((value) => value?.previousVideo));
+        final buffering = ref.watch(mediaPlaybackProvider.select((value) => value.buffering));
         return Tooltip(
           message: previousVideo?.detailedName(context.localized) ?? "",
           textAlign: TextAlign.center,
@@ -559,7 +560,7 @@ class _DesktopControlsState extends ConsumerState<DesktopControls> {
           ),
           textStyle: Theme.of(context).textTheme.labelLarge,
           child: IconButton(
-            onPressed: loadPreviousVideo(ref, video: previousVideo),
+            onPressed: loadPreviousVideo(ref, video: previousVideo, buffering: buffering),
             iconSize: 30,
             icon: const Icon(
               IconsaxPlusLinear.backward,
@@ -570,16 +571,25 @@ class _DesktopControlsState extends ConsumerState<DesktopControls> {
     );
   }
 
-  Function()? loadPreviousVideo(WidgetRef ref, {ItemBaseModel? video}) {
+  /// [video] and [buffering] must both be passed by widgets that render a button from the result:
+  /// both gate whether it is enabled, so both have to be *watched* by the building Consumer.
+  /// Reading `buffering` here instead used to leave the button dead for the whole episode — a load
+  /// sets buffering=true and updates playBackModel, so the Consumer rebuilt at the one moment the
+  /// value was true, and nothing rebuilt it again (the enclosing controls only watch `playing`).
+  /// The defaults exist for the keyboard shortcut path, which calls this outside of a build.
+  Function()? loadPreviousVideo(WidgetRef ref, {ItemBaseModel? video, bool? buffering}) {
     final previousVideo = video ?? ref.read(playBackModel.select((value) => value?.previousVideo));
-    final buffering = ref.read(mediaPlaybackProvider.select((value) => value.buffering));
-    return previousVideo != null && !buffering ? () => ref.read(playbackModelHelper).loadNewVideo(previousVideo) : null;
+    final bool isBuffering = buffering ?? ref.read(mediaPlaybackProvider.select((value) => value.buffering));
+    return previousVideo != null && !isBuffering
+        ? () => ref.read(playbackModelHelper).loadNewVideo(previousVideo)
+        : null;
   }
 
   Widget get nextVideoButton {
     return Consumer(
       builder: (context, ref, child) {
         final nextVideo = ref.watch(playBackModel.select((value) => value?.nextVideo));
+        final buffering = ref.watch(mediaPlaybackProvider.select((value) => value.buffering));
         return Tooltip(
           message: nextVideo?.detailedName(context.localized) ?? "",
           textAlign: TextAlign.center,
@@ -589,7 +599,7 @@ class _DesktopControlsState extends ConsumerState<DesktopControls> {
           ),
           textStyle: Theme.of(context).textTheme.labelLarge,
           child: IconButton(
-            onPressed: loadNextVideo(ref, video: nextVideo),
+            onPressed: loadNextVideo(ref, video: nextVideo, buffering: buffering),
             iconSize: 30,
             icon: const Icon(
               IconsaxPlusLinear.forward,
@@ -600,10 +610,11 @@ class _DesktopControlsState extends ConsumerState<DesktopControls> {
     );
   }
 
-  Function()? loadNextVideo(WidgetRef ref, {ItemBaseModel? video}) {
+  /// See [loadPreviousVideo] for why [buffering] must be watched and passed in, not read here.
+  Function()? loadNextVideo(WidgetRef ref, {ItemBaseModel? video, bool? buffering}) {
     final nextVideo = video ?? ref.read(playBackModel.select((value) => value?.nextVideo));
-    final buffering = ref.read(mediaPlaybackProvider.select((value) => value.buffering));
-    return nextVideo != null && !buffering ? () => ref.read(playbackModelHelper).loadNewVideo(nextVideo) : null;
+    final bool isBuffering = buffering ?? ref.read(mediaPlaybackProvider.select((value) => value.buffering));
+    return nextVideo != null && !isBuffering ? () => ref.read(playbackModelHelper).loadNewVideo(nextVideo) : null;
   }
 
   Widget seekBackwardButton(WidgetRef ref) {
