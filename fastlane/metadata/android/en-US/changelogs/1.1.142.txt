@@ -1,0 +1,1 @@
+Fix Telegram reader-sync mismatch surfacing as a silent playback failure
