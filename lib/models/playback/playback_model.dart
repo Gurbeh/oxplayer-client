@@ -422,7 +422,15 @@ class PlaybackModelHelper {
       final requestedMediaSourceId = newStreamModel?.currentVersionStream?.id;
 
       if (OxplayerEnv.isEnabled) {
-        await oxplayerEnsureTdlibMatchesOxUser(ref.read(userProvider)?.credentials.token);
+        final readerSync = await oxplayerEnsureTdlibMatchesOxUser(ref.read(userProvider)?.credentials.token);
+        // The native Telegram session is reading the wrong account (e.g. a leftover bot-mode
+        // login after the personal bot was disconnected) — any copy the server makes now lands
+        // somewhere this session can never see. Bail out instead of hanging on a delivery that
+        // will never arrive; see oxplayerEnsureTdlibMatchesOxUser's doc comment.
+        if (readerSync == OxplayerReaderSyncResult.mismatched) {
+          OxplayerStreamLog.event('playback_reader_mismatch', fields: {'itemId': item.id});
+          return null;
+        }
       }
 
       Future<PlaybackInfoResponse?> fetchPlaybackInfo({required bool forceRepair}) async {

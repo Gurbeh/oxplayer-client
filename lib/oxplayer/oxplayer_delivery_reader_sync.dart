@@ -45,8 +45,23 @@ Future<OxplayerReaderSyncResult> oxplayerEnsureTdlibMatchesOxUser(String? access
     return OxplayerReaderSyncResult.unknown;
   }
   // No personal bot for this OX user: deliveries land in their own DM, which the user session
-  // already reads.
-  if (userBot == null) return OxplayerReaderSyncResult.aligned;
+  // already reads — UNLESS this device's native session is still logged in as a leftover
+  // personal bot from before the account's bot token was disconnected. A bot session can never
+  // read a DM that isn't its own (BOT_METHOD_INVALID on history, and it is a different Telegram
+  // account entirely), and there is no cached credential to silently switch back with — a real
+  // user login needs phone/code/2FA, unlike submitBotToken's static secret. So this is a hard
+  // mismatch, not a default-aligned case.
+  if (userBot == null) {
+    final controller = OxplayerTdlibBridgeController.instance();
+    if (controller.nativeSessionIsBot) {
+      _oxplayTdlibLog(
+        'delivery reader MISMATCH: native session is still bot-mode but this OX account has no '
+        'personal bot anymore — re-login required',
+      );
+      return OxplayerReaderSyncResult.mismatched;
+    }
+    return OxplayerReaderSyncResult.aligned;
+  }
 
   try {
     final controller = OxplayerTdlibBridgeController.instance();
