@@ -1,0 +1,1 @@
+rebind oxtelegram.aar for IsBotMode
