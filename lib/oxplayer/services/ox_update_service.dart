@@ -16,6 +16,7 @@ import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/services/ox_github_update_service.dart';
+import 'package:fladder/oxplayer/widgets/ox_dialog_focus_trap.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 
@@ -576,43 +577,34 @@ class _OxOptionalUpdateDialog extends StatefulWidget {
 }
 
 class _OxOptionalUpdateDialogState extends State<_OxOptionalUpdateDialog> {
-  final FocusScopeNode _focusScope =
-      FocusScopeNode(debugLabel: 'OxOptionalUpdateDialog');
   final FocusNode _primaryActionFocus =
       FocusNode(debugLabel: 'OxUpdatePrimaryAction');
 
   @override
-  void initState() {
-    super.initState();
-    _focusScope.addListener(_reclaimFocusIfNeeded);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _requestInitialFocus();
-      // Home TV rows can steal focus on the same frame they mount.
-      WidgetsBinding.instance
-          .addPostFrameCallback((_) => _requestInitialFocus());
-    });
+  void dispose() {
+    _primaryActionFocus.dispose();
+    super.dispose();
   }
 
-  void _reclaimFocusIfNeeded() {
-    if (!mounted || _focusScope.focusedChild != null) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _requestInitialFocus());
-  }
-
-  void _requestInitialFocus() {
-    if (!mounted) return;
-    if (_primaryActionFocus.canRequestFocus) {
-      _focusScope.requestFocus(_primaryActionFocus);
+  Future<void> _onUpdate() async {
+    final prompt = widget.prompt;
+    if (prompt.canUseFlexibleUpdate) {
+      // Downloads in the background via Play's own UI — don't block the dialog on it.
+      if (mounted) Navigator.of(context).pop();
+      unawaited(OxUpdateService.startFlexibleUpdate());
     } else {
-      _focusScope.requestFocus();
+      await OxUpdateService.openPlayStoreListing();
+      if (mounted) Navigator.of(context).pop();
     }
   }
 
-  @override
-  void dispose() {
-    _focusScope.removeListener(_reclaimFocusIfNeeded);
-    _primaryActionFocus.dispose();
-    _focusScope.dispose();
-    super.dispose();
+  Future<void> _onSkip() async {
+    final prompt = widget.prompt;
+    await OxUpdateService.skipVersion(
+      sharedPreferences: prompt.sharedPreferences,
+      skipKey: prompt.skipKey,
+    );
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -620,52 +612,69 @@ class _OxOptionalUpdateDialogState extends State<_OxOptionalUpdateDialog> {
     final theme = Theme.of(context);
     final prompt = widget.prompt;
     final isDpad = AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad;
+    final body = Text(
+      prompt.targetVersion == 'latest'
+          ? 'A new version is available on Google Play. You are on ${prompt.currentVersion}.'
+          : 'Version ${prompt.targetVersion} is available. You are on ${prompt.currentVersion}.',
+    );
 
-    return FocusScope(
-      node: _focusScope,
-      autofocus: true,
-      child: AlertDialog(
-        title: const Text('Update available'),
-        content: Text(
-          prompt.targetVersion == 'latest'
-              ? 'A new version is available on Google Play. You are on ${prompt.currentVersion}.'
-              : 'Version ${prompt.targetVersion} is available. You are on ${prompt.currentVersion}.',
-        ),
-        actionsAlignment: MainAxisAlignment.start,
-        actions: [
-          TextButton(
+    final updateButton = isDpad
+        ? FilledButton(
             focusNode: _primaryActionFocus,
-            autofocus: isDpad,
-            onPressed: () async {
-              if (prompt.canUseFlexibleUpdate) {
-                // Downloads in the background via Play's own UI — don't block the dialog on it.
-                if (context.mounted) Navigator.of(context).pop();
-                unawaited(OxUpdateService.startFlexibleUpdate());
-              } else {
-                await OxUpdateService.openPlayStoreListing();
-                if (context.mounted) Navigator.of(context).pop();
-              }
-            },
+            autofocus: true,
+            onPressed: _onUpdate,
             child: const Text('Update'),
-          ),
-          TextButton(
+          )
+        : TextButton(
+            focusNode: _primaryActionFocus,
+            onPressed: _onUpdate,
+            child: const Text('Update'),
+          );
+    final laterButton = isDpad
+        ? OutlinedButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Remind Me Later'),
-          ),
-          TextButton(
-            onPressed: () async {
-              await OxUpdateService.skipVersion(
-                sharedPreferences: prompt.sharedPreferences,
-                skipKey: prompt.skipKey,
-              );
-              if (context.mounted) Navigator.of(context).pop();
-            },
+          )
+        : TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Remind Me Later'),
+          );
+    final skipButton = isDpad
+        ? OutlinedButton(
+            onPressed: _onSkip,
+            child: const Text('Skip This Version'),
+          )
+        : TextButton(
+            onPressed: _onSkip,
             child: Text(
               'Skip This Version',
               style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
             ),
-          ),
-        ],
+          );
+
+    return OxDialogFocusTrap(
+      primaryFocus: _primaryActionFocus,
+      child: AlertDialog(
+        title: const Text('Update available'),
+        content: isDpad
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  body,
+                  const SizedBox(height: 24),
+                  updateButton,
+                  const SizedBox(height: 8),
+                  laterButton,
+                  const SizedBox(height: 8),
+                  skipButton,
+                ],
+              )
+            : body,
+        actionsAlignment: MainAxisAlignment.start,
+        actions: isDpad
+            ? const <Widget>[]
+            : [updateButton, laterButton, skipButton],
       ),
     );
   }

@@ -17,9 +17,14 @@ class OxplayerLoginAttemptStart {
 }
 
 class OxplayerUserBotToken {
-  const OxplayerUserBotToken({required this.token, required this.username});
+  const OxplayerUserBotToken({required this.token, required this.username, required this.isSessionPreferred});
   final String token;
   final String username;
+
+  /// True when the backend's resolveDeliveryReader will deliver to the account's linked Telegram
+  /// session rather than this bot — see auth_bot_token.go's readerKind. The native bridge must not
+  /// be switched to bot-mode in that case: nothing would ever land in the bot's own DM.
+  final bool isSessionPreferred;
 }
 
 /// Bot-token login: an alternative to TDLib phone/QR for users who don't want to give OXPlayer
@@ -93,6 +98,7 @@ class OxplayerMainBotLoginApi {
     return OxplayerUserBotToken(
       token: map['botToken'] as String,
       username: map['botUsername'] as String,
+      isSessionPreferred: map['readerKind'] == 'session',
     );
   }
 

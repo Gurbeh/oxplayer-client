@@ -22,12 +22,21 @@ enum OxplayerReaderSyncResult {
 
 /// Aligns the native Telegram session with who the API will copy into.
 ///
-/// Bot-token OX users get copies in `@personalBot`. A leftover phone/QR session stays
-/// `kind=ready`, so play waits 20s on the wrong account and retry PlaybackInfo returns 424.
+/// Mirrors apps/api/internal/server/telegram_delivery.go's resolveDeliveryReader precedence
+/// exactly: a linked Telegram session always wins over a connected personal bot, bot-token is
+/// only the active reader for accounts with no session. That precedence is decided server-side
+/// (auth_bot_token.go's readerKind, computed the same way resolveDeliveryReader picks) rather
+/// than re-derived here, so the two can never drift apart again — they did once: this used to
+/// force bot-mode purely on "does a personal bot exist", which was correct back when bot-token
+/// was checked first server-side, and silently went wrong the moment that server-side precedence
+/// flipped to session-first without a matching client change. A leftover phone/QR session stays
+/// `kind=ready` while the backend copies into a bot the native side never reads (or vice versa),
+/// so play waits the full delivery-wait timeout on the wrong account and retry PlaybackInfo
+/// returns 424 — permanently, since there is no live push coming to the account it is watching.
 ///
 /// Returns the outcome rather than throwing, and — importantly — rather than swallowing it. An
 /// earlier version caught everything and logged, which let playback proceed on the wrong account
-/// and present as a mysterious 20s stall. Callers on the play path must treat
+/// and present as a mysterious stall. Callers on the play path must treat
 /// [OxplayerReaderSyncResult.mismatched] as fatal; best-effort callers (prefetch, login panel) can
 /// ignore the result, which is why this reports instead of deciding.
 Future<OxplayerReaderSyncResult> oxplayerEnsureTdlibMatchesOxUser(String? accessToken) async {
@@ -44,19 +53,22 @@ Future<OxplayerReaderSyncResult> oxplayerEnsureTdlibMatchesOxUser(String? access
     _oxplayTdlibLog('delivery reader lookup failed: $e');
     return OxplayerReaderSyncResult.unknown;
   }
-  // No personal bot for this OX user: deliveries land in their own DM, which the user session
-  // already reads — UNLESS this device's native session is still logged in as a leftover
-  // personal bot from before the account's bot token was disconnected. A bot session can never
-  // read a DM that isn't its own (BOT_METHOD_INVALID on history, and it is a different Telegram
-  // account entirely), and there is no cached credential to silently switch back with — a real
-  // user login needs phone/code/2FA, unlike submitBotToken's static secret. So this is a hard
-  // mismatch, not a default-aligned case.
-  if (userBot == null) {
+
+  // No personal bot for this OX user, or the backend prefers the linked session anyway: deliveries
+  // land in the user's own DM, which a session-mode native bridge already reads — UNLESS this
+  // device's native session is still logged in as a leftover personal bot (from before the bot
+  // was disconnected, or from a stale switch this same sync forced under the old precedence). A
+  // bot session can never read a DM that isn't its own (BOT_METHOD_INVALID on history, and it is a
+  // different Telegram account entirely), and there is no cached credential to silently switch
+  // back with — a real user login needs phone/code/2FA, unlike submitBotToken's static secret. So
+  // that combination is a hard mismatch, not a default-aligned case.
+  final wantsBot = userBot != null && !userBot.isSessionPreferred;
+  if (!wantsBot) {
     final controller = OxplayerTdlibBridgeController.instance();
     if (controller.nativeSessionIsBot) {
       _oxplayTdlibLog(
-        'delivery reader MISMATCH: native session is still bot-mode but this OX account has no '
-        'personal bot anymore — re-login required',
+        'delivery reader MISMATCH: native session is still bot-mode but the backend delivers to '
+        'this account\'s Telegram session — re-login required',
       );
       return OxplayerReaderSyncResult.mismatched;
     }

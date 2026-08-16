@@ -15,7 +15,9 @@ import 'package:window_manager/window_manager.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 import 'package:fladder/oxplayer/services/ox_update_service.dart';
+import 'package:fladder/oxplayer/widgets/ox_dialog_focus_trap.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
+import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 
 const String kOxGithubSkippedVersionKey = 'ox_github_skipped_version';
 
@@ -321,79 +323,148 @@ abstract final class OxGitHubUpdateService {
   }
 }
 
-class _OxGitHubOptionalUpdateDialog extends StatelessWidget {
+class _OxGitHubOptionalUpdateDialog extends StatefulWidget {
   const _OxGitHubOptionalUpdateDialog({required this.prompt});
 
   final OxGitHubUpdatePrompt prompt;
 
   @override
+  State<_OxGitHubOptionalUpdateDialog> createState() =>
+      _OxGitHubOptionalUpdateDialogState();
+}
+
+class _OxGitHubOptionalUpdateDialogState
+    extends State<_OxGitHubOptionalUpdateDialog> {
+  final FocusNode _primaryActionFocus =
+      FocusNode(debugLabel: 'OxGitHubUpdatePrimaryAction');
+
+  @override
+  void dispose() {
+    _primaryActionFocus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _onDownload() async {
+    final prompt = widget.prompt;
+    final hasInAppInstall = OxGitHubUpdateService._supportsInAppInstall &&
+        (prompt.downloadUrl?.isNotEmpty ?? false);
+    if (hasInAppInstall) {
+      if (mounted) Navigator.of(context).pop();
+      OxGitHubUpdateService.showDownloadProgressDialog(prompt);
+    } else {
+      await OxGitHubUpdateService.openDownloadPage(
+        downloadUrl: prompt.downloadUrl,
+        releasePageUrl: prompt.releasePageUrl,
+      );
+      if (mounted) Navigator.of(context).pop();
+    }
+  }
+
+  Future<void> _onSkip() async {
+    final prompt = widget.prompt;
+    await OxGitHubUpdateService.skipVersion(
+      sharedPreferences: prompt.sharedPreferences,
+      skipKey: prompt.skipKey,
+    );
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final prompt = widget.prompt;
+    final isDpad = AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad;
     final changelog = prompt.changelog.trim();
     final preview = changelog.isEmpty
         ? ''
         : changelog.length > 400
             ? '${changelog.substring(0, 400).trim()}…'
             : changelog;
-    final hasInAppInstall = OxGitHubUpdateService._supportsInAppInstall &&
-        (prompt.downloadUrl?.isNotEmpty ?? false);
 
-    return AlertDialog(
-      title: const Text('Update available'),
-      content: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Version ${prompt.targetVersion} is available. You are on ${prompt.currentVersion}.',
-            ),
-            if (preview.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
+    final versionText = Text(
+      'Version ${prompt.targetVersion} is available. You are on ${prompt.currentVersion}.',
+    );
+    final changelogBlock = preview.isEmpty
+        ? null
+        : Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: ExcludeFocus(
+              child: Text(
                 preview,
                 style: theme.textTheme.bodySmall,
               ),
-            ],
-          ],
-        ),
+            ),
+          );
+
+    final downloadButton = isDpad
+        ? FilledButton(
+            focusNode: _primaryActionFocus,
+            autofocus: true,
+            onPressed: _onDownload,
+            child: const Text('Download'),
+          )
+        : TextButton(
+            focusNode: _primaryActionFocus,
+            autofocus: true,
+            onPressed: _onDownload,
+            child: const Text('Download'),
+          );
+    final laterButton = isDpad
+        ? OutlinedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Remind Me Later'),
+          )
+        : TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Remind Me Later'),
+          );
+    final skipButton = isDpad
+        ? OutlinedButton(
+            onPressed: _onSkip,
+            child: const Text('Skip This Version'),
+          )
+        : TextButton(
+            onPressed: _onSkip,
+            child: Text(
+              'Skip This Version',
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          );
+
+    return OxDialogFocusTrap(
+      primaryFocus: _primaryActionFocus,
+      child: AlertDialog(
+        title: const Text('Update available'),
+        content: isDpad
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  versionText,
+                  if (changelogBlock != null) changelogBlock,
+                  const SizedBox(height: 24),
+                  downloadButton,
+                  const SizedBox(height: 8),
+                  laterButton,
+                  const SizedBox(height: 8),
+                  skipButton,
+                ],
+              )
+            : SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    versionText,
+                    if (changelogBlock != null) changelogBlock,
+                  ],
+                ),
+              ),
+        actionsAlignment: MainAxisAlignment.start,
+        actions: isDpad
+            ? const <Widget>[]
+            : [downloadButton, laterButton, skipButton],
       ),
-      actionsAlignment: MainAxisAlignment.start,
-      actions: [
-        TextButton(
-          autofocus: true,
-          onPressed: () async {
-            if (hasInAppInstall) {
-              if (context.mounted) Navigator.of(context).pop();
-              OxGitHubUpdateService.showDownloadProgressDialog(prompt);
-            } else {
-              await OxGitHubUpdateService.openDownloadPage(
-                downloadUrl: prompt.downloadUrl,
-                releasePageUrl: prompt.releasePageUrl,
-              );
-              if (context.mounted) Navigator.of(context).pop();
-            }
-          },
-          child: const Text('Download'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Remind Me Later'),
-        ),
-        TextButton(
-          onPressed: () async {
-            await OxGitHubUpdateService.skipVersion(
-              sharedPreferences: prompt.sharedPreferences,
-              skipKey: prompt.skipKey,
-            );
-            if (context.mounted) Navigator.of(context).pop();
-          },
-          child: Text(
-            'Skip This Version',
-            style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -498,44 +569,46 @@ class _OxDownloadProgressDialogState extends State<_OxDownloadProgressDialog> {
 
     return PopScope(
       canPop: false,
-      child: AlertDialog(
-        title: Text(isError ? 'Update failed' : 'Downloading update'),
-        content: isError
-            ? const Text(
-                'The update could not be downloaded automatically. You can download it from the browser instead.')
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  LinearProgressIndicator(value: _progress),
-                  const SizedBox(height: 12),
-                  Text(
-                    _state == _OxUpdateDownloadState.installing
-                        ? 'Starting installer…'
-                        : '${((_progress ?? 0) * 100).toStringAsFixed(0)}%',
+      child: OxDialogFocusTrap(
+        child: AlertDialog(
+          title: Text(isError ? 'Update failed' : 'Downloading update'),
+          content: isError
+              ? const Text(
+                  'The update could not be downloaded automatically. You can download it from the browser instead.')
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LinearProgressIndicator(value: _progress),
+                    const SizedBox(height: 12),
+                    Text(
+                      _state == _OxUpdateDownloadState.installing
+                          ? 'Starting installer…'
+                          : '${((_progress ?? 0) * 100).toStringAsFixed(0)}%',
+                    ),
+                  ],
+                ),
+          actionsAlignment: MainAxisAlignment.start,
+          actions: isError
+              ? [
+                  TextButton(
+                    autofocus: true,
+                    onPressed: () async {
+                      Navigator.of(context).pop();
+                      await OxGitHubUpdateService.openDownloadPage(
+                        downloadUrl: widget.downloadUrl,
+                        releasePageUrl: widget.releasePageUrl,
+                      );
+                    },
+                    child: const Text('Open in Browser'),
                   ),
-                ],
-              ),
-        actionsAlignment: MainAxisAlignment.start,
-        actions: isError
-            ? [
-                TextButton(
-                  autofocus: true,
-                  onPressed: () async {
-                    Navigator.of(context).pop();
-                    await OxGitHubUpdateService.openDownloadPage(
-                      downloadUrl: widget.downloadUrl,
-                      releasePageUrl: widget.releasePageUrl,
-                    );
-                  },
-                  child: const Text('Open in Browser'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-              ]
-            : const [],
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                ]
+              : const [],
+        ),
       ),
     );
   }
