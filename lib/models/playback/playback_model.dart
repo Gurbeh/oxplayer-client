@@ -39,6 +39,8 @@ import 'package:fladder/oxplayer/oxplayer_provider_bots_bootstrap.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_subtitle.dart';
 import 'package:fladder/oxplayer/oxplayer_delivery_reader_sync.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart' show OxplayerTdlibBridgeException;
+import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
@@ -371,6 +373,12 @@ class PlaybackModelHelper {
     } catch (e, st) {
       log("Error creating playback model: ${e.toString()}");
       debugPrint('createPlaybackModel error: $e\n$st');
+      if (e is OxplayerTdlibBridgeException) {
+        // No BuildContext threaded down this far (some callers pass null) — FladderSnack falls
+        // back to the app-level stored context, same as the "your bot isn't connected" message
+        // startPlaybackSession throws today.
+        FladderSnack.show(e.message, context: context);
+      }
       return null;
     }
   }
@@ -435,7 +443,16 @@ class PlaybackModelHelper {
             reason: 'native_session_mismatch',
             itemId: item.id,
           );
-          return null;
+          // Throw rather than return null: a null model here previously fell through to
+          // _createOfflinePlaybackModel (via createPlaybackModel's `??`), which also has nothing
+          // and returns null too — the caller then sees an unexplained "unable to play" at best,
+          // or nothing at all if that call site has no generic null handling. Throwing surfaces a
+          // message the user can act on, via createPlaybackModel's catch below — same mechanism
+          // startPlaybackSession already uses for "your bot isn't connected".
+          throw OxplayerTdlibBridgeException(
+            "This device's Telegram sign-in is out of date. Go to Settings and log out, then sign "
+            "in again, so it can reconnect to your Telegram account.",
+          );
         }
       }
 
