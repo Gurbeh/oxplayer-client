@@ -375,6 +375,19 @@ interface OxTdlibBridgeApi {
    */
   fun currentAuthState(): OxTdlibAuthState
   /**
+   * Whether the CURRENT session — including one restored from disk at configure(), which never
+   * calls submitBotToken this process — is a bot rather than a phone/QR user account.
+   *
+   * Ground truth from the native side, not derived client-side: the Dart bridge controller used
+   * to infer this purely from whether IT had called submitBotToken during this run, which is
+   * wrong the moment a previously-connected bot session is silently restored on a warm app start
+   * (the normal case on every launch after the first). That made a reader-sync mismatch check
+   * (backend now delivering to the account's linked Telegram session, native still holding a
+   * stale restored bot session) never fire, and playback hung waiting on a push that could never
+   * reach that bot's own inbox. Synchronous — an in-memory read on the Go side.
+   */
+  fun isNativeSessionBot(): Boolean
+  /**
    * Current socket liveness; also pushed via OxTdlibBridgeEvents.onConnectionHealthChanged.
    * Synchronous — an in-memory read on the Go side, no round-trip.
    */
@@ -503,6 +516,21 @@ interface OxTdlibBridgeApi {
           channel.setMessageHandler { _, reply ->
             val wrapped: List<Any?> = try {
               listOf(api.currentAuthState())
+            } catch (exception: Throwable) {
+              TdlibBridgePigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.isNativeSessionBot$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              listOf(api.isNativeSessionBot())
             } catch (exception: Throwable) {
               TdlibBridgePigeonUtils.wrapError(exception)
             }

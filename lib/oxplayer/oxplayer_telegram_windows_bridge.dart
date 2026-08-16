@@ -100,6 +100,12 @@ class OxTelegramWindowsBridge {
     }
   }
 
+  /// Always false on Windows: the cshared FFI boundary doesn't expose gotd's AuthController.IsBotMode
+  /// (unlike the Android gomobile/Pigeon path — see mobile.Client.IsBotMode's doc). Desktop's
+  /// reader-sync mismatch detection still falls back to the caller-tracked bot-token flag, same as
+  /// before this fix; only Android had the confirmed silent-hang bug from a warm-restored bot session.
+  bool isNativeSessionBot() => false;
+
   OxTdlibAuthState currentAuthState() {
     final kind = _native.readCString(_native.currentAuthKind());
     final qr = _native.readCString(_native.currentAuthQr());

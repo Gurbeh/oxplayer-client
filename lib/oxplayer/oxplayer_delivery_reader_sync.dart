@@ -65,7 +65,10 @@ Future<OxplayerReaderSyncResult> oxplayerEnsureTdlibMatchesOxUser(String? access
   final wantsBot = userBot != null && !userBot.isSessionPreferred;
   if (!wantsBot) {
     final controller = OxplayerTdlibBridgeController.instance();
-    if (controller.nativeSessionIsBot) {
+    // Ground truth from native, not the Dart-tracked flag: a bot session silently restored from
+    // disk at this run's configure() never set that flag, which is exactly the case this check
+    // exists to catch — see isNativeSessionActuallyBot's doc.
+    if (await controller.isNativeSessionActuallyBot()) {
       _oxplayTdlibLog(
         'delivery reader MISMATCH: native session is still bot-mode but the backend delivers to '
         'this account\'s Telegram session — re-login required',

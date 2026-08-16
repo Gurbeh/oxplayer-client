@@ -14,6 +14,7 @@ class OxTelegramWindowsBridge {
   }
 
   OxTdlibAuthState currentAuthState() => state;
+  bool isNativeSessionBot() => false;
 
   Future<void> submitPhoneNumber(String phone) async => throw UnsupportedError('windows-only');
   Future<void> submitBotToken(String token) async => throw UnsupportedError('windows-only');

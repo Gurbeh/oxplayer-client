@@ -132,6 +132,22 @@ func (c *Client) EnsureConnected(sink AuthEventSink) error {
 	return c.inner.Configure(ctx, sinkAdapter{sink})
 }
 
+// IsBotMode reports whether the CURRENT session — including one restored from disk at Configure,
+// which never calls SubmitBotToken this process — is a bot rather than a phone/QR user account.
+// Synchronous, in-memory: AuthController.checkInitialStatus already sets this from getMe()'s Bot
+// field on every restore, so this is always accurate even on a cold app start. See
+// oxplayer_tdlib_bridge_controller.dart's nativeSessionIsBot, which used to derive this from
+// whether Dart itself had called submitBotToken THIS run — wrong on a warm restore, which is why
+// a reader-sync mismatch (backend now delivering to the account's session, native still holding a
+// stale restored bot session) went undetected and playback hung waiting for a push that could
+// never reach that bot's inbox.
+func (c *Client) IsBotMode() bool {
+	if c.inner == nil || c.inner.Auth == nil {
+		return false
+	}
+	return c.inner.Auth.IsBotMode()
+}
+
 func (c *Client) SubmitPhoneNumber(phone string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), authCallTimeout)
 	defer cancel()

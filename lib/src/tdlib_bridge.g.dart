@@ -421,6 +421,44 @@ class OxTdlibBridgeApi {
     }
   }
 
+  /// Whether the CURRENT session — including one restored from disk at configure(), which never
+  /// calls submitBotToken this process — is a bot rather than a phone/QR user account.
+  ///
+  /// Ground truth from the native side, not derived client-side: the Dart bridge controller used
+  /// to infer this purely from whether IT had called submitBotToken during this run, which is
+  /// wrong the moment a previously-connected bot session is silently restored on a warm app start
+  /// (the normal case on every launch after the first). That made a reader-sync mismatch check
+  /// (backend now delivering to the account's linked Telegram session, native still holding a
+  /// stale restored bot session) never fire, and playback hung waiting on a push that could never
+  /// reach that bot's own inbox. Synchronous — an in-memory read on the Go side.
+  Future<bool> isNativeSessionBot() async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.isNativeSessionBot$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as bool?)!;
+    }
+  }
+
   /// Current socket liveness; also pushed via OxTdlibBridgeEvents.onConnectionHealthChanged.
   /// Synchronous — an in-memory read on the Go side, no round-trip.
   Future<OxTdlibConnectionHealth> connectionHealth() async {

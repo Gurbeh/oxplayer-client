@@ -40,6 +40,13 @@ class OxTelegramClient(
      */
     fun connectionHealth(): String = native.connectionHealth()
 
+    /**
+     * Whether the CURRENT session is a bot, including one restored from disk at configure() —
+     * accurate on a cold app start unlike Dart's own submitBotToken-tracked flag. In-memory read
+     * on the Go side, so it stays off Dispatchers.IO and can answer a synchronous Pigeon call.
+     */
+    fun isBotMode(): Boolean = native.isBotMode()
+
     suspend fun submitPhoneNumber(phone: String) = withContext(Dispatchers.IO) { native.submitPhoneNumber(phone) }
 
     suspend fun submitBotToken(token: String) = withContext(Dispatchers.IO) { native.submitBotToken(token) }

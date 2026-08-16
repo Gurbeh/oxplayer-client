@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/widgets/ox_dialog_focus_trap.dart';
 import 'package:fladder/screens/shared/flat_button.dart';
 import 'package:fladder/theme.dart';
 import 'package:fladder/widgets/navigation_scaffold/components/navigation_body.dart';
@@ -164,6 +166,7 @@ class FocusButtonState extends State<FocusButton> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (OxplayerConfig.isEnabled && OxDialogFocusTrap.isActive) return;
       if (widget.autoFocus && !focusNode.hasFocus) {
         focusNode.requestFocus();
       }

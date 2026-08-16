@@ -130,8 +130,30 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
   bool get canStartPlayback =>
       _state.kind == OxTdlibAuthStateKind.ready && _health != OxTdlibConnectionHealth.degraded;
 
-  /// True when native TDLib is logged in with a personal bot token (not a user phone/QR session).
+  /// True when THIS RUN called submitBotToken (fresh login or a Dart-driven cache restore). False
+  /// on a warm app start where native silently resumed a persisted bot session from disk without
+  /// Dart's involvement — see [isNativeSessionActuallyBot] for the accurate check. Kept for the
+  /// existing UI-only call sites (settings badge, telemetry tag) where that staleness is harmless.
   bool get nativeSessionIsBot => _activeBotToken != null && _activeBotToken!.isNotEmpty;
+
+  /// Ground truth from the native side (mobile.Client.IsBotMode / gotd AuthController), accurate
+  /// even when the current session was restored from disk at configure() without Dart ever calling
+  /// submitBotToken this run — the case [nativeSessionIsBot] gets wrong. Use this, not the getter
+  /// above, for anything that decides whether playback can proceed: getting it wrong is what let a
+  /// stale restored bot session pass the reader-sync mismatch check and hang forever waiting on a
+  /// push the backend was sending to the account's linked Telegram session instead.
+  ///
+  /// Falls back to [nativeSessionIsBot] if the native call itself fails — no worse than the old
+  /// behavior, not a new failure mode.
+  Future<bool> isNativeSessionActuallyBot() async {
+    try {
+      if (_useWindows) return _windows!.isNativeSessionBot();
+      return await _api.isNativeSessionBot();
+    } catch (e) {
+      _log('isNativeSessionActuallyBot failed: $e');
+      return nativeSessionIsBot;
+    }
+  }
 
   Future<bool> hasCachedBotToken() async {
     if (nativeSessionIsBot) return true;

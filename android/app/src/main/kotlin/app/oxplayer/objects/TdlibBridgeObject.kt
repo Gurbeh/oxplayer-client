@@ -182,6 +182,8 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
 
     override fun currentAuthState(): OxTdlibAuthState = lastAuthState
 
+    override fun isNativeSessionBot(): Boolean = client?.isBotMode() ?: false
+
     override fun connectionHealth(): OxTdlibConnectionHealth = lastConnectionHealth
 
     override fun reconnect(callback: (Result<Unit>) -> Unit) {
