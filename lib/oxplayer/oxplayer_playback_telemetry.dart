@@ -4,9 +4,24 @@ import 'package:flutter/foundation.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'package:fladder/oxplayer/oxplayer_crashlytics.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
+import 'package:fladder/src/tdlib_bridge.g.dart' show OxTdlibAuthStateKind;
 
 /// Reports video playback failures and related server/stream HTTP to Sentry.
 abstract final class OxplayerPlaybackTelemetry {
+  /// 'bot' / 'session' / 'unauthenticated' — which Telegram identity this device's native
+  /// session is currently reading DMs as, read fresh at report time (not cached: it can flip
+  /// mid-session, e.g. ensureBotTokenSession switching a device over).
+  static String _telegramLoginKind() {
+    final controller = OxplayerTdlibBridgeController.instance();
+    if (controller.state.kind != OxTdlibAuthStateKind.ready) return 'unauthenticated';
+    return controller.nativeSessionIsBot ? 'bot' : 'session';
+  }
+
+  static void _applyLoginKindTag(Scope scope) {
+    scope.setTag('telegram_login_kind', _telegramLoginKind());
+  }
+
   static Future<void> reportFailure({
     required String stage,
     required String reason,
@@ -25,6 +40,7 @@ abstract final class OxplayerPlaybackTelemetry {
       'video playback failed: $reason',
       level: level,
       withScope: (scope) {
+        _applyLoginKindTag(scope);
         scope
           ..setTag('playback_failure', 'true')
           ..setTag('playback_stage', stage)
@@ -46,6 +62,35 @@ abstract final class OxplayerPlaybackTelemetry {
           if (httpStatus != null) 'http_status': httpStatus,
           'transient': transient,
           ...extra,
+        });
+      },
+    );
+  }
+
+  /// Reports an uncaught exception from playback model preparation (as opposed to [reportFailure],
+  /// which is for a known/named failure with no Dart exception object of its own).
+  static Future<void> reportException({
+    required String stage,
+    required Object exception,
+    StackTrace? stackTrace,
+    String? itemId,
+  }) async {
+    if (!Sentry.isEnabled) return;
+
+    await Sentry.captureException(
+      exception,
+      stackTrace: stackTrace,
+      withScope: (scope) {
+        _applyLoginKindTag(scope);
+        scope
+          ..setTag('playback_failure', 'true')
+          ..setTag('playback_stage', stage);
+        if (itemId != null && itemId.isNotEmpty) {
+          scope.setTag('item_id', itemId);
+        }
+        scope.setContexts('playback', {
+          'stage': stage,
+          if (itemId != null && itemId.isNotEmpty) 'item_id': itemId,
         });
       },
     );
@@ -92,6 +137,7 @@ abstract final class OxplayerPlaybackTelemetry {
     int? elapsedMs,
     bool transient,
   ) {
+    _applyLoginKindTag(scope);
     scope
       ..setTag('playback_failure', 'true')
       ..setTag('playback_stage', 'http')
@@ -208,6 +254,7 @@ abstract final class OxplayerPlaybackTelemetry {
       'playback volume anomaly: $reason',
       level: SentryLevel.warning,
       withScope: (scope) {
+        _applyLoginKindTag(scope);
         scope
           ..setTag('playback_anomaly', 'true')
           ..setTag('playback_stage', 'player_volume')

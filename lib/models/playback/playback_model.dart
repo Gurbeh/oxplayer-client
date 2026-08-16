@@ -34,6 +34,7 @@ import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
 import 'package:fladder/oxplayer/oxplayer_force_repair_interceptor.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_link_cache.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_media_source.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_provider_bots_bootstrap.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_subtitle.dart';
 import 'package:fladder/oxplayer/oxplayer_delivery_reader_sync.dart';
@@ -429,6 +430,11 @@ class PlaybackModelHelper {
         // will never arrive; see oxplayerEnsureTdlibMatchesOxUser's doc comment.
         if (readerSync == OxplayerReaderSyncResult.mismatched) {
           OxplayerStreamLog.event('playback_reader_mismatch', fields: {'itemId': item.id});
+          await OxplayerPlaybackTelemetry.reportFailure(
+            stage: 'reader_sync',
+            reason: 'native_session_mismatch',
+            itemId: item.id,
+          );
           return null;
         }
       }
@@ -484,6 +490,11 @@ class PlaybackModelHelper {
       playbackInfo ??= await fetchPlaybackInfo(forceRepair: false);
       if (playbackInfo == null) {
         OxplayerStreamLog.event('playback_info_null', fields: {'itemId': item.id});
+        await OxplayerPlaybackTelemetry.reportFailure(
+          stage: 'playback_info',
+          reason: 'null_response',
+          itemId: item.id,
+        );
         return null;
       }
 
@@ -665,6 +676,12 @@ class PlaybackModelHelper {
     } catch (e, st) {
       log(e.toString());
       debugPrint('_createServerPlaybackModel error: $e\n$st');
+      await OxplayerPlaybackTelemetry.reportException(
+        stage: 'create_server_playback_model',
+        exception: e,
+        stackTrace: st,
+        itemId: item.id,
+      );
       return null;
     }
   }
