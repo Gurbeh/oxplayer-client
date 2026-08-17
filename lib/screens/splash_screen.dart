@@ -74,7 +74,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
       if (OxplayerConfig.isEnabled) {
         _splashTiming.markSessionRestoreStarted();
-        final result = await oxplayerResolveSplashAuth(ref, lastUsedAccount);
+        late final OxplayerSplashAuthResult result;
+        try {
+          result = await oxplayerResolveSplashAuth(ref, lastUsedAccount)
+              .timeout(const Duration(seconds: 40));
+        } catch (_) {
+          result = OxplayerSplashAuthResult.needsLogin;
+          try {
+            await oxplayerLogoutLocallySkippingServer(ref.read, fallbackAccount: lastUsedAccount);
+          } catch (_) {}
+        }
         _splashTiming.markSessionRestoreEnded(result != OxplayerSplashAuthResult.needsLogin);
         if (!context.mounted) return;
         switch (result) {

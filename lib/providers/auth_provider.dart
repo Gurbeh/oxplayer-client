@@ -194,15 +194,23 @@ class AuthNotifier extends StateNotifier<LoginScreenModel> {
   Future<Response?> logOutUser() async {
     final currentUser = ref.read(userProvider);
     state = state.copyWith(serverLoginModel: null);
-    await ref.read(sharedUtilityProvider).removeAccount(currentUser);
+    try {
+      await ref.read(sharedUtilityProvider).removeAccount(currentUser).timeout(const Duration(seconds: 8));
+    } catch (_) {
+      if (currentUser != null) {
+        final saved = List<AccountModel>.from(ref.read(sharedUtilityProvider).getAccounts())
+          ..removeWhere((element) => element.sameIdentity(currentUser));
+        await ref.read(sharedUtilityProvider).saveAccounts(saved);
+      }
+    }
 
     try {
-      await ref.read(seerrApiProvider).logout();
+      await ref.read(seerrApiProvider).logout().timeout(const Duration(seconds: 5));
     } catch (e) {
       // Ignore logout errors for seerr
     }
     if (OxplayerConfig.isEnabled) {
-      await oxplayerLogoutTelegramSession();
+      unawaited(oxplayerLogoutTelegramSession());
     }
     clearAllProviders();
     return null;

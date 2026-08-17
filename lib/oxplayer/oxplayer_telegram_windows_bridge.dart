@@ -25,6 +25,18 @@ class OxTelegramWindowsBridge {
 
   OxTdlibAuthState get state => _state;
 
+  /// True when a previous gotd login left `session.bin` on disk. Splash uses this instead of
+  /// [configure] so a missing/legacy OX account does not block the UI isolate on Telegram DCs.
+  Future<bool> hasPersistedSessionFile() async {
+    try {
+      final support = await getApplicationSupportDirectory();
+      final file = File('${support.path}\\oxtelegram\\session.bin');
+      return await file.exists() && await file.length() > 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> configure(int apiId, String apiHash) async {
     if (_configured) return;
     final support = await getApplicationSupportDirectory();

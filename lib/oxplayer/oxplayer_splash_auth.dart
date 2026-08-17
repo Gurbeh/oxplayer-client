@@ -4,7 +4,6 @@ import 'package:fladder/models/account_model.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_session.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
-import 'package:fladder/providers/auth_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -37,21 +36,32 @@ Future<OxplayerSplashAuthResult> oxplayerResolveSplashAuth(
   WidgetRef ref,
   AccountModel account,
 ) async {
-  final sessionOk = await oxplayerRestoreSession(ref, account);
-  if (!sessionOk) return OxplayerSplashAuthResult.needsLogin;
-
-  if (OxplayerEnv.telegramDirectPlayConfigured && _oxTdlibSessionGateSupported()) {
-    final hasTelegramSession =
-        await OxplayerTdlibBridgeController.instance().hasReadyUserSession();
-    if (!hasTelegramSession) {
-      // Full OX logout (clears tokens + account). Does not wipe a missing Telegram session.
-      await ref.read(authProvider.notifier).logOutUser();
+  try {
+    final sessionOk = await oxplayerRestoreSession(ref, account);
+    if (!sessionOk) {
+      await oxplayerLogoutLocallySkippingServer(ref.read, fallbackAccount: account);
       return OxplayerSplashAuthResult.needsLogin;
     }
-  }
 
-  if (account.askForAuthOnLaunch && account.authMethod.shouldLock) {
-    return OxplayerSplashAuthResult.sessionWithLock;
+    if (OxplayerEnv.telegramDirectPlayConfigured && _oxTdlibSessionGateSupported()) {
+      final hasTelegramSession =
+          await OxplayerTdlibBridgeController.instance().hasReadyUserSession();
+      if (!hasTelegramSession) {
+        // Local-only: logOutUser awaits Sessions/Logout + Seerr + TDLib with no timeout
+        // and freezes splash when the API / Telegram DC does not answer (stale upgrade).
+        await oxplayerLogoutLocallySkippingServer(ref.read, fallbackAccount: account);
+        return OxplayerSplashAuthResult.needsLogin;
+      }
+    }
+
+    if (account.askForAuthOnLaunch && account.authMethod.shouldLock) {
+      return OxplayerSplashAuthResult.sessionWithLock;
+    }
+    return OxplayerSplashAuthResult.sessionReady;
+  } catch (_) {
+    try {
+      await oxplayerLogoutLocallySkippingServer(ref.read, fallbackAccount: account);
+    } catch (_) {}
+    return OxplayerSplashAuthResult.needsLogin;
   }
-  return OxplayerSplashAuthResult.sessionReady;
 }

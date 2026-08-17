@@ -9,6 +9,8 @@ class OxTelegramWindowsBridge {
   OxTdlibAuthState get state =>
       OxTdlibAuthState(kind: OxTdlibAuthStateKind.uninitialized);
 
+  Future<bool> hasPersistedSessionFile() async => false;
+
   Future<void> configure(int apiId, String apiHash) async {
     throw UnsupportedError('oxtelegram Windows host not available on this platform');
   }

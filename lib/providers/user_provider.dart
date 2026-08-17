@@ -306,7 +306,11 @@ class User extends _$User {
 
   Future<void> forceLogoutUser(AccountModel account) async {
     userState = account;
-    await api.sessionsLogoutPost();
+    try {
+      await api.sessionsLogoutPost().timeout(const Duration(seconds: 8));
+    } catch (_) {
+      // API down / stale token — still clear the local session so splash/login can proceed.
+    }
     userState = null;
   }
 

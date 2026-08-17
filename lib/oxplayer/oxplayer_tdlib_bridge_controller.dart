@@ -673,6 +673,15 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
   Future<bool> hasReadyUserSession({
     Duration readyTimeout = const Duration(seconds: 25),
   }) async {
+    // Windows configure() is a synchronous FFI call. Dart timers cannot fire while it
+    // blocks the UI isolate — splash freezes forever if Telegram DCs are unreachable
+    // (common on upgrade from a pre-TDLib login that still has a saved OX account).
+    // Session file presence is enough to decide splash: init the client after home.
+    if (_useWindows) {
+      final persisted = await _windows!.hasPersistedSessionFile();
+      _log('hasReadyUserSession: windows session.bin=$persisted (skip configure)');
+      return persisted;
+    }
     try {
       await ensureConfigured(readyTimeout: readyTimeout);
     } catch (e) {

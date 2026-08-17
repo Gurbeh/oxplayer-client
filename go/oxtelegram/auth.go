@@ -112,6 +112,8 @@ func (a *AuthController) emit(kind AuthStateKind, qrURL, hint, errMsg string) {
 // mirrors TdlibAuthController's "pull current state explicitly, don't rely only on the first
 // push" defensiveness, adapted to gotd/td's call/response model.
 func (a *AuthController) checkInitialStatus(ctx context.Context) {
+	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
 	status, err := a.tg.Auth().Status(ctx)
 	if err != nil {
 		a.emit(AuthFailed, "", "", err.Error())

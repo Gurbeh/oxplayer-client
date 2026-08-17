@@ -95,10 +95,14 @@ Future<bool> _restoreSession(OxplayerRead read, AccountModel incoming) async {
     }
 
     try {
-      final refreshed = await oxplayerTryRefreshSession(read).timeout(kOxSessionRestoreTimeout);
-      if (refreshed) return true;
-      // Transient refresh failure (5xx) — keep cached credentials.
-      if (read(userProvider) != null) return true;
+      final outcome = await _refreshGate.run(() => _refreshSession(read)).timeout(kOxSessionRestoreTimeout);
+      if (outcome == _RefreshOutcome.ok) return true;
+      if (outcome == _RefreshOutcome.transient) {
+        // 5xx / empty body — keep cached credentials (Fladder offline behaviour).
+        return true;
+      }
+      // 401/403 or no refresh token: stale upgrade session. Drop it so splash can reach login.
+      await oxplayerInvalidateLocalSession(read, account);
       return false;
     } on TimeoutException {
       // API briefly down (deploy) — keep cached session; client retries on next request.
@@ -114,7 +118,27 @@ Future<bool> _restoreSession(OxplayerRead read, AccountModel incoming) async {
 
 /// Attempts to exchange the stored refresh token for a new access token.
 Future<bool> oxplayerTryRefreshSession(OxplayerRead read) async {
-  return _refreshGate.run(() => _refreshSession(read));
+  final outcome = await _refreshGate.run(() => _refreshSession(read));
+  return outcome == _RefreshOutcome.ok;
+}
+
+/// Clears tokens and the saved account without waiting on Jellyfin/Seerr/Telegram.
+/// Splash uses this when a stored login is no longer valid — [authProvider.logOutUser]
+/// awaits `Sessions/Logout` with no timeout and will freeze the splash if the API is down.
+Future<void> oxplayerLogoutLocallySkippingServer(
+  OxplayerRead read, {
+  AccountModel? fallbackAccount,
+}) async {
+  final account = read(userProvider) ?? fallbackAccount;
+  if (account != null) {
+    await _sessionStore(read).clear(account);
+    final saved = List<AccountModel>.from(read(sharedUtilityProvider).getAccounts())
+      ..removeWhere((element) => element.sameIdentity(account));
+    await read(sharedUtilityProvider).saveAccounts(saved);
+  }
+  OxplayerImageAuth.clear();
+  read(authProvider.notifier).clearAllProviders();
+  read(oxplayerSessionRevokedProvider.notifier).state++;
 }
 
 Future<void> oxplayerInvalidateLocalSession(OxplayerRead read, AccountModel account) async {
@@ -133,12 +157,14 @@ void oxplayerAttachSessionRouter(WidgetRef ref, StackRouter router) {
   ref.read(oxplayerSessionRouterProvider.notifier).state = router;
 }
 
+enum _RefreshOutcome { ok, invalid, transient }
+
 final _RefreshGate _refreshGate = _RefreshGate();
 
 class _RefreshGate {
-  Future<bool>? _inFlight;
+  Future<_RefreshOutcome>? _inFlight;
 
-  Future<bool> run(Future<bool> Function() action) {
+  Future<_RefreshOutcome> run(Future<_RefreshOutcome> Function() action) {
     final existing = _inFlight;
     if (existing != null) return existing;
     final future = action().whenComplete(() => _inFlight = null);
@@ -147,18 +173,18 @@ class _RefreshGate {
   }
 }
 
-Future<bool> _refreshSession(OxplayerRead read) async {
+Future<_RefreshOutcome> _refreshSession(OxplayerRead read) async {
   final account = read(userProvider);
-  if (account == null) return false;
+  if (account == null) return _RefreshOutcome.invalid;
 
   final refreshToken = await _sessionStore(read).read(account);
   if (refreshToken == null) {
-    return false;
+    return _RefreshOutcome.invalid;
   }
 
   final credentials = account.credentials;
   if (credentials.url.isEmpty) {
-    return false;
+    return _RefreshOutcome.invalid;
   }
 
   final client = createJellyfinApiForAccountUnauthenticated(
@@ -175,7 +201,10 @@ Future<bool> _refreshSession(OxplayerRead read) async {
   final accessOk = response.isSuccessful && (response.body?.accessToken?.isNotEmpty ?? false);
 
   if (!accessOk) {
-    return false;
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      return _RefreshOutcome.invalid;
+    }
+    return _RefreshOutcome.transient;
   }
 
   final access = response.body!.accessToken!;
@@ -196,5 +225,5 @@ Future<bool> _refreshSession(OxplayerRead read) async {
     await _sessionStore(read).save(updated, newRefresh);
   }
 
-  return true;
+  return _RefreshOutcome.ok;
 }
