@@ -3,6 +3,10 @@
 gotd-only Telegram host for OXPlayer Windows (`c-shared` from `go/oxtelegram/cshared`).
 No TDLib. Provides auth, progressive download, and loopback HTTP Range bridge for libmpv.
 
+Rebuild whenever `go/oxtelegram/cshared` exports change. A stale committed DLL
+ships with `flutter build windows` and fails at runtime (`Failed to lookup symbol`).
+CI `build-windows` rebuilds this DLL before packaging.
+
 ## Rebuild
 
 Requires Go with CGO and MinGW-w64 `gcc` on PATH.

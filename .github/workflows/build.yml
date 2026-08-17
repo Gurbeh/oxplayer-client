@@ -356,6 +356,22 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/oxtelegram/go.mod
+          cache-dependency-path: go/oxtelegram/go.sum
+
+      - name: Rebuild oxtelegram.dll
+        shell: pwsh
+        run: |
+          choco install mingw -y --no-progress
+          $env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')
+          gcc --version
+          & "$env:GITHUB_WORKSPACE/windows/oxtelegram/build.ps1"
+          if (-not (Select-String -Path windows/oxtelegram/oxtelegram.h -Pattern 'ox_submit_bot_token' -Quiet)) {
+            throw 'oxtelegram.dll rebuild missing ox_submit_bot_token'
+          }
+
       - uses: ./.github/actions/oxplayer-infisical-secrets
         with:
           infisical-domain: ${{ secrets.INFISICAL_API_URL }}

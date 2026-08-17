@@ -582,10 +582,17 @@ class LibMPV extends BasePlayer {
           // *first* seek is attempted, so this initial seek is reliably rejected ("error running
           // command _command(seek, ...)") on a cold open — confirmed on-device via
           // ox_stream_seek_fn tracing: the failing command never reaches our seek_fn at all, and
-          // mpv only starts reading near EOF (then back near the start) right after. One retry
-          // once that index read has had time to land is enough.
-          await Future.delayed(const Duration(milliseconds: 700));
-          if ((_player?.state.position.inSeconds ?? 0) < startPosition.inSeconds - 5) {
+          // mpv only starts reading near EOF (then back near the start) right after.
+          //
+          // A single retry is not reliable: on-device logcat (2026-08-17) caught the *retry*
+          // seek also being rejected 700ms later, back-to-back with the first failure, and
+          // playback silently continued from 0 with no error surfaced to Dart — the stuck-
+          // playback watchdog never flags it either, since the video is actively playing, just
+          // from the wrong position. Keep retrying a few more times while the index finishes
+          // landing instead of giving up after one attempt.
+          for (var attempt = 0; attempt < 3; attempt++) {
+            await Future.delayed(const Duration(milliseconds: 700));
+            if ((_player?.state.position.inSeconds ?? 0) >= startPosition.inSeconds - 5) break;
             await _player?.seek(startPosition);
           }
         }

@@ -141,11 +141,18 @@ extern __declspec(dllexport) char* ox_current_auth_qr(void);
 extern __declspec(dllexport) char* ox_current_auth_hint(void);
 extern __declspec(dllexport) char* ox_current_auth_error(void);
 extern __declspec(dllexport) int ox_submit_phone(char* phone);
+extern __declspec(dllexport) int ox_submit_bot_token(char* token);
 extern __declspec(dllexport) int ox_submit_code(char* code);
 extern __declspec(dllexport) int ox_submit_password(char* password);
 extern __declspec(dllexport) int ox_request_qr(void);
 extern __declspec(dllexport) int ox_logout(void);
-extern __declspec(dllexport) char* ox_start_playback(char* channel, int64_t messageID);
+
+// providerBotID/messageID come from the PlaybackInfo Path (oxplayer-tg://{botId}/{msgId}); both are
+// 0 when the backend has nothing remembered and a fresh copy is in flight, in which case locator —
+// the ?loc= query param — is what identifies the incoming copy. See
+// oxtelegram.Client.ResolveVideoFile.
+//
+extern __declspec(dllexport) char* ox_start_playback(int64_t providerBotID, int64_t messageID, char* locatorC);
 
 // ox_stream_uri_for_current_playback returns "gotdstream://<id>" for the currently active
 // playback session set up by ox_start_playback (or NULL if none) — the URL to hand mpv's
@@ -154,6 +161,41 @@ extern __declspec(dllexport) char* ox_start_playback(char* channel, int64_t mess
 // mpv.Player, they are not meant to be mixed for a single load.
 //
 extern __declspec(dllexport) char* ox_stream_uri_for_current_playback(void);
+
+// ox_delivery_message_id_for_locator returns the DM message id this session read for locator, or 0.
+// Pairs with ox_delivery_provider_bot_id_for_locator: the Dart caller reports both to the backend
+// (POST /me/telegram-delivery) so the next play of the same file needs no Telegram copy at all.
+// Only the receiving side can know either — private-chat ids are numbered per side, and the server
+// round-robins across senders so it does not know which one won.
+//
+extern __declspec(dllexport) int64_t ox_delivery_message_id_for_locator(char* locatorC);
+
+// ox_delivery_provider_bot_id_for_locator returns the delivery bot whose DM held locator, or 0.
+//
+extern __declspec(dllexport) int64_t ox_delivery_provider_bot_id_for_locator(char* locatorC);
+
+// ox_arm_delivery_waiter registers interest in locator before the delivery request is sent, so a
+// copy that arrives while PlaybackInfo is still in flight is captured rather than raced for.
+//
+extern __declspec(dllexport) void ox_arm_delivery_waiter(char* locatorC);
+
+// ox_warm_delivery resolves the delivery message and records its id WITHOUT opening a download —
+// the warm-up path. Scrolling the dashboard warms a dozen titles at once, and starting a dozen
+// progressive downloads for videos nobody pressed play on would spend the user's data on bytes that
+// get thrown away. Resolving is enough: it makes the backend remember the id.
+//
+// Returns 0 on success, 1 on failure — the same convention as withAuth and every other status
+// export here (ox_last_error carries the detail).
+//
+extern __declspec(dllexport) int ox_warm_delivery(int64_t providerBotID, int64_t messageID, char* locatorC);
+
+// ox_ensure_provider_bots_ready starts, mutes and archives every delivery sender on this account so
+// delivery copies never land in the user's visible inbox. botsJSON is the array returned by the
+// backend's GET /telegram/provider-bots: [{"id":123,"username":"SomeBot"}].
+//
+// Returns 0 on success, 1 on failure — same convention as the other status exports.
+//
+extern __declspec(dllexport) int ox_ensure_provider_bots_ready(char* botsJSON);
 extern __declspec(dllexport) int ox_stop_playback(char* sessionURI);
 extern __declspec(dllexport) char* ox_fetch_webapp_init_data(char* bot, char* shortName, char* hostedURL, char* platform);
 

@@ -117,13 +117,12 @@ final class OxTelegramNative {
     if (!Platform.isWindows) {
       throw UnsupportedError('oxtelegram.dll is Windows-only');
     }
-    DynamicLibrary lib;
-    try {
-      lib = DynamicLibrary.open('oxtelegram.dll');
-    } catch (_) {
-      final exe = File(Platform.resolvedExecutable);
-      lib = DynamicLibrary.open('${exe.parent.path}\\oxtelegram.dll');
-    }
+    // Prefer the DLL next to the exe. Bare `oxtelegram.dll` follows Windows search
+    // order (PATH / leftover install) and can bind an older export set.
+    final besideExe = '${File(Platform.resolvedExecutable).parent.path}\\oxtelegram.dll';
+    final DynamicLibrary lib = File(besideExe).existsSync()
+        ? DynamicLibrary.open(besideExe)
+        : DynamicLibrary.open('oxtelegram.dll');
     return _instance = OxTelegramNative._(lib);
   }
 
