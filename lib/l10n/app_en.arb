@@ -3008,5 +3008,21 @@
   "oxplayerVariantLangKorean": "Korean",
   "@oxplayerVariantLangKorean": {},
   "oxplayerVariantLangChinese": "Chinese",
-  "@oxplayerVariantLangChinese": {}
+  "@oxplayerVariantLangChinese": {},
+  "oxplayerConnectingPhrase1": "Establishing a secure connection…",
+  "@oxplayerConnectingPhrase1": {},
+  "oxplayerConnectingPhrase2": "Generating encryption keys…",
+  "@oxplayerConnectingPhrase2": {},
+  "oxplayerConnectingPhrase3": "Exchanging cryptographic handshake…",
+  "@oxplayerConnectingPhrase3": {},
+  "oxplayerConnectingPhrase4": "Verifying your Telegram session…",
+  "@oxplayerConnectingPhrase4": {},
+  "oxplayerConnectingPhrase5": "Linking your delivery bot…",
+  "@oxplayerConnectingPhrase5": {},
+  "oxplayerConnectingPhrase6": "Synchronizing session data…",
+  "@oxplayerConnectingPhrase6": {},
+  "oxplayerConnectingPhrase7": "Almost there…",
+  "@oxplayerConnectingPhrase7": {},
+  "oxplayerConnectingPhrase8": "Finishing setup…",
+  "@oxplayerConnectingPhrase8": {}
 }

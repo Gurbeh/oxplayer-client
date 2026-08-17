@@ -2202,5 +2202,13 @@
     "oxplayerVariantLangRussian": "روسی",
     "oxplayerVariantLangJapanese": "ژاپنی",
     "oxplayerVariantLangKorean": "کره‌ای",
-    "oxplayerVariantLangChinese": "چینی"
+    "oxplayerVariantLangChinese": "چینی",
+    "oxplayerConnectingPhrase1": "در حال برقراری اتصال امن…",
+    "oxplayerConnectingPhrase2": "در حال تولید کلید رمزنگاری…",
+    "oxplayerConnectingPhrase3": "در حال تبادل کلید رمزنگاری…",
+    "oxplayerConnectingPhrase4": "در حال تأیید نشست تلگرام…",
+    "oxplayerConnectingPhrase5": "در حال اتصال بات دلیوری…",
+    "oxplayerConnectingPhrase6": "در حال همگام‌سازی اطلاعات نشست…",
+    "oxplayerConnectingPhrase7": "تقریباً تمام شد…",
+    "oxplayerConnectingPhrase8": "در حال نهایی‌سازی…"
 }

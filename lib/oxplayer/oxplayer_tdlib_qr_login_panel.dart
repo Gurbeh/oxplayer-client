@@ -9,8 +9,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:fladder/oxplayer/oxplayer_jellyfin_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_ox_login_kind_store.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_connecting_experience.dart';
 import 'package:fladder/oxplayer/oxplayer_test_account_qr_hold.dart';
-import 'package:fladder/oxplayer/oxplayer_telegram_connecting_notice.dart';
 import 'package:fladder/oxplayer/oxplayer_test_account_sign_in.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
 import 'package:fladder/theme.dart';
@@ -341,6 +341,15 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
         (liveUrl == null || liveUrl.isEmpty) &&
         (_shownQrUrl != null && _shownQrUrl!.isNotEmpty);
 
+    if (qrUrl == null || qrUrl.isEmpty) {
+      // No QR yet means the MTProto connection is still coming up. This used to be a bare
+      // spinner, which on a slow network sat silent long enough to look hung — see the
+      // experience widget's doc for why this needs the full screen, not just a notice.
+      if (_error == null) {
+        return const OxplayerTdlibConnectingExperience();
+      }
+    }
+
     if (state.kind == OxTdlibAuthStateKind.ready) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 24),
@@ -430,10 +439,7 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
             ),
             textAlign: TextAlign.center,
           ),
-        ] else if (_error == null)
-          // No QR yet means the MTProto connection is still coming up. This used to be a bare
-          // spinner, which on a slow network sat silent long enough to look hung.
-          const OxplayerTelegramConnectingNotice(),
+        ],
         // Inline 2FA only when no hand-off callback (phone sheet / TV switch to LoginPanel).
         if (state.kind == OxTdlibAuthStateKind.waitingForPassword &&
             widget.onNeedTwoFactorPassword == null) ...[

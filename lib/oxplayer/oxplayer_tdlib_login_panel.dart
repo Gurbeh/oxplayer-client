@@ -10,7 +10,7 @@ import 'package:fladder/oxplayer/oxplayer_jellyfin_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_ox_login_kind_store.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_qr_login_panel.dart';
-import 'package:fladder/oxplayer/oxplayer_telegram_connecting_notice.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_connecting_experience.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
 import 'package:fladder/theme.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
@@ -523,7 +523,7 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
     // to uninitialized because closed/failed are real outcomes with their own messaging, and the
     // transient kinds noted above must keep rendering the normal form.
     if (kind == OxTdlibAuthStateKind.uninitialized) {
-      return const OxplayerTelegramConnectingNotice();
+      return const OxplayerTdlibConnectingExperience();
     }
 
     if (kind == OxTdlibAuthStateKind.waitingForQrConfirmation && !_qrSheetOpen) {

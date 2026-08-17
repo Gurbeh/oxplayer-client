@@ -13,6 +13,7 @@ import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_main_bot_login_panel.dart';
 import 'package:fladder/oxplayer/oxplayer_pending_route.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_connecting_experience.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_login_panel.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_qr_login_panel.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
@@ -268,10 +269,15 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
               ],
             )
           : showBackToAccounts
-              ? FloatingActionButton(
-                  tooltip: context.localized.switchUser,
-                  onPressed: _backToAccountGrid,
-                  child: const Icon(IconsaxPlusLinear.arrow_left_2),
+              ? ValueListenableBuilder<bool>(
+                  valueListenable: OxplayerTdlibConnectingExperience.isActive,
+                  builder: (context, connecting, _) => connecting
+                      ? const SizedBox.shrink()
+                      : FloatingActionButton(
+                          tooltip: context.localized.switchUser,
+                          onPressed: _backToAccountGrid,
+                          child: const Icon(IconsaxPlusLinear.arrow_left_2),
+                        ),
                 )
               : null,
       body: SafeArea(
@@ -337,17 +343,29 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
                                         mainAxisSize: MainAxisSize.min,
                                         crossAxisAlignment: CrossAxisAlignment.stretch,
                                         children: [
-                                          if (showBackToAccounts) ...[
-                                            Align(
-                                              alignment: Alignment.centerLeft,
-                                              child: TextButton.icon(
-                                                onPressed: _backToAccountGrid,
-                                                icon: const Icon(IconsaxPlusLinear.arrow_left_2),
-                                                label: Text(context.localized.switchUser),
-                                              ),
+                                          if (showBackToAccounts)
+                                            ValueListenableBuilder<bool>(
+                                              valueListenable:
+                                                  OxplayerTdlibConnectingExperience.isActive,
+                                              builder: (context, connecting, _) => connecting
+                                                  ? const SizedBox.shrink()
+                                                  : Column(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                                      children: [
+                                                        Align(
+                                                          alignment: Alignment.centerLeft,
+                                                          child: TextButton.icon(
+                                                            onPressed: _backToAccountGrid,
+                                                            icon: const Icon(
+                                                                IconsaxPlusLinear.arrow_left_2),
+                                                            label: Text(context.localized.switchUser),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(height: 8),
+                                                      ],
+                                                    ),
                                             ),
-                                            const SizedBox(height: 8),
-                                          ],
                                           _useMainBot
                                               ? OxplayerMainBotLoginPanel(
                                                   onSuccess: _onLoginSuccess,

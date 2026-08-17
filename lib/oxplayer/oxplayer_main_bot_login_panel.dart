@@ -13,7 +13,7 @@ import 'package:fladder/oxplayer/oxplayer_login_attempt_api.dart';
 import 'package:fladder/oxplayer/oxplayer_main_bot_login_api.dart';
 import 'package:fladder/oxplayer/oxplayer_ox_login_kind_store.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
-import 'package:fladder/oxplayer/oxplayer_telegram_connecting_notice.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_connecting_experience.dart';
 import 'package:fladder/theme.dart';
 
 /// Sign-in via @main-bot instead of TDLib phone/QR — for users who don't want to give OXPlayer
@@ -181,11 +181,11 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    if (_finishing) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 32),
-        child: Center(child: CircularProgressIndicator()),
-      );
+    if (_finishing || _starting) {
+      // Both states are the same underlying wait from the user's perspective: _starting is
+      // before an attempt link can even be requested, _finishing is applying the bot token
+      // after approval — see the widget's doc for why this needs to be more than a spinner.
+      return const OxplayerTdlibConnectingExperience();
     }
 
     return Column(
@@ -203,11 +203,7 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 24),
-        if (_starting)
-          // Waiting on the connection before an attempt link can even be requested — say so
-          // rather than showing a silent spinner (see the notice's doc).
-          const OxplayerTelegramConnectingNotice(compact: true)
-        else if (_attempt != null) ...[
+        if (_attempt != null) ...[
           Center(
             child: Container(
               padding: const EdgeInsets.all(12),
