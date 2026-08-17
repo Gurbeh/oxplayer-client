@@ -75,7 +75,18 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
   void initState() {
     super.initState();
     _controller.addListener(_onStateChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _start());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // A leftover-but-valid `ready` Telegram session can already be the state at mount now
+      // (prepareForLoginScreen no longer force-resets one away — see its doc), in which case
+      // _start()'s QR request is moot and _onStateChanged's ready/exchange handling — normally
+      // only reached via a FUTURE transition its listener observes — needs a first, manual kick
+      // for a transition that already happened before this panel existed to listen for it.
+      if (_controller.state.kind == OxTdlibAuthStateKind.ready) {
+        _onStateChanged();
+        return;
+      }
+      _start();
+    });
   }
 
   @override
@@ -220,8 +231,7 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
       _expiryTimer?.cancel();
       _countdownTicker?.cancel();
       _confirmWatchdog?.cancel();
-      _oxExchangeStarted = true;
-      unawaited(_exchangeWithOxApi());
+      unawaited(_maybeStartOxExchange());
     }
     if (state.kind == OxTdlibAuthStateKind.failed) {
       final raw = state.errorMessage ?? 'Telegram auth failed';
@@ -266,6 +276,24 @@ class _OxplayerTdlibQrLoginPanelState extends ConsumerState<OxplayerTdlibQrLogin
       _log('recoverFreshQr failed: $e');
       if (mounted) setState(() => _error = oxTdlibAuthUserMessage(e));
     }
+  }
+
+  /// Guards the ready-triggered exchange against a restored *bot* session — see the phone-login
+  /// panel's identical guard (oxplayer_tdlib_login_panel.dart) for the full explanation. A bot
+  /// session landing here (this device's connected delivery bot restored instead of the real
+  /// user session) was never going to complete this exchange (fetchWebAppInitData is
+  /// user-account-only), so don't try and don't mark _oxExchangeStarted.
+  Future<void> _maybeStartOxExchange() async {
+    if (_oxExchangeStarted) return;
+    if (await _controller.isNativeSessionActuallyBot()) {
+      _log('ready state is a bot session, skipping exchange');
+      return;
+    }
+    if (!mounted || _controller.state.kind != OxTdlibAuthStateKind.ready || _oxExchangeStarted) {
+      return;
+    }
+    _oxExchangeStarted = true;
+    await _exchangeWithOxApi();
   }
 
   Future<void> _exchangeWithOxApi() async {

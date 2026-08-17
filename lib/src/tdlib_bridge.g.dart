@@ -517,6 +517,41 @@ class OxTdlibBridgeApi {
     }
   }
 
+  /// Kills and relaunches the whole app process (Android only).
+  ///
+  /// A stuck/failed native TDLib client can land in a state a plain in-memory reconfigure cannot
+  /// clear: go/oxtelegram/client.go's Configure() no-ops on "already have a live client object",
+  /// even one whose auth landed in `failed` — only a client object that never existed rebuilds
+  /// cleanly from the on-disk session. Killing the process is the only way to guarantee that from
+  /// here, since there is no "drop this client but keep the session file" call exposed yet (see
+  /// oxplayer_login_screen.dart's stuck-state UI). Session storage on disk is untouched, so the
+  /// relaunched process resumes the same signed-in session — this is not a logout.
+  ///
+  /// Never returns (the process exits); the return type exists only so Dart can await the call
+  /// being dispatched before the platform channel itself goes away.
+  Future<void> restartApp() async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.restartApp$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
+
   /// Phone/tablet flow, step 1. Async: waits on the real TdApi round-trip.
   Future<void> submitPhoneNumber(String phoneNumber) async {
     final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.submitPhoneNumber$pigeonVar_messageChannelSuffix';

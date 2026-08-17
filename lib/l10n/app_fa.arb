@@ -2074,6 +2074,8 @@
     "oxplayerDeleteAccountDialogBody": "حساب OXPlayer، کتابخانه و دستگاه‌های واردشده برای همیشه حذف می‌شود. بعداً می‌توانید با تلگرام به‌عنوان حساب جدید وارد شوید. این کار قابل بازگشت نیست.",
     "oxplayerDeleteAccountConfirm": "حذف حساب",
     "oxplayerDeleteAccountFailed": "حذف حساب انجام نشد. دوباره تلاش کنید یا از ربات تلگرام استفاده کنید.",
+    "oxplayerStuckSessionLogoutTitle": "خروج و شروع دوباره؟",
+    "oxplayerStuckSessionLogoutBody": "این کار اتصال تلگرام روی این دستگاه را ریست می‌کند و از حسابت خارج می‌شوی. باید دوباره وارد شوی.",
     "oxplayerReportIssue": "گزارش مشکل",
     "oxplayerReportIssueTitle": "گزارش مشکل پخش",
     "oxplayerReportIssueChooseCategory": "چه مشکلی پیش آمد؟",

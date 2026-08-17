@@ -41,6 +41,11 @@ class OxplayerLoginScreen extends ConsumerStatefulWidget {
 class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
   bool _bootstrapping = true;
   String? _bootstrapError;
+  /// True only when [_bootstrapError] came from the TDLib bridge itself (stuck initializing,
+  /// landed in a failed auth state, etc) — gates showing the explicit "log out" escape hatch,
+  /// since resetting Telegram auth does nothing for unrelated bootstrap failures (missing server
+  /// config, network errors, etc).
+  bool _bootstrapErrorIsStuckSession = false;
   bool _editUsersMode = false;
   /// TV only: false = QR-first, true = phone panel after remote select.
   bool _tvUsePhone = false;
@@ -57,6 +62,7 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
     setState(() {
       _bootstrapping = true;
       _bootstrapError = null;
+      _bootstrapErrorIsStuckSession = false;
     });
 
     await OxplayerDotenv.ensureLoaded();
@@ -110,12 +116,60 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
       setState(() {
         _bootstrapping = false;
         _bootstrapError = '$e';
+        _bootstrapErrorIsStuckSession = e is OxplayerTdlibBridgeException;
       });
       return;
     }
 
     if (!mounted) return;
     setState(() => _bootstrapping = false);
+  }
+
+  /// Retry action for a TDLib-originated error: restarts the whole app process when available
+  /// (see OxplayerTdlibBridgeController.restartApp's doc — a plain in-process retry can end up
+  /// doing nothing for a native client stuck in a `failed` auth state), falling back to a normal
+  /// in-place [_bootstrap] retry on platforms without a restart implementation.
+  Future<void> _retryTdlibError() async {
+    final controller = OxplayerTdlibBridgeController.instance();
+    if (!controller.canRestartApp) {
+      await _bootstrap();
+      return;
+    }
+    try {
+      await controller.restartApp();
+    } catch (_) {
+      if (!mounted) return;
+      await _bootstrap();
+    }
+  }
+
+  Future<void> _confirmForceLogoutStuckSession() async {
+    final loc = context.localized;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.oxplayerStuckSessionLogoutTitle),
+        content: Text(loc.oxplayerStuckSessionLogoutBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(loc.cancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(loc.logout),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await OxplayerTdlibBridgeController.instance().resetStuckSession();
+    if (!mounted) return;
+    await _bootstrap();
   }
 
   Future<void> _onLoginSuccess() async {
@@ -250,9 +304,19 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
                               ),
                               const SizedBox(height: 16),
                               FilledButton(
-                                onPressed: _bootstrap,
+                                onPressed: _bootstrapErrorIsStuckSession ? _retryTdlibError : _bootstrap,
                                 child: Text(context.localized.retry),
                               ),
+                              if (_bootstrapErrorIsStuckSession) ...[
+                                const SizedBox(height: 8),
+                                TextButton(
+                                  onPressed: _confirmForceLogoutStuckSession,
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Theme.of(context).colorScheme.error,
+                                  ),
+                                  child: Text(context.localized.logout),
+                                ),
+                              ],
                             ],
                           )
                         : Column(

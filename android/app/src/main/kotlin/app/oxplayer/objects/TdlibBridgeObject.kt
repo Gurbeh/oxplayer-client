@@ -10,6 +10,7 @@ import OxTdlibDeliveryRef
 import OxTdlibPlaybackSource
 import OxTdlibProviderBot
 import android.content.Context
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import app.oxplayer.tdlibbridge.auth.OxTelegramAuthController
@@ -251,6 +252,34 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
             sessionStorage?.clear()
             clearNativeSession()
         }
+    }
+
+    /**
+     * Kills and relaunches the app process — session storage on disk is untouched, this is not a
+     * logout. See restartApp's doc in pigeons/tdlib_bridge.dart for why a plain in-memory
+     * reconfigure cannot always recover a stuck/failed native client, and this can.
+     *
+     * Confirmed on-device (2026-08-17, Pixel 10 Pro / Android 16): scheduling the relaunch via
+     * AlarmManager + a PendingIntent — the usual "give the OS a moment before killing the
+     * process" trick — silently dropped the activity start: modern Android's background-activity-
+     * launch restrictions block a PendingIntent-fired Activity once the originating process is
+     * already dead, since by then there is no foreground/"recently interacted" grant left to
+     * exempt it. Starting the Activity directly and *synchronously*, while this call is still
+     * running inside the still-foreground button tap that triggered it, carries that exemption
+     * and does not need AlarmManager's delay at all.
+     */
+    override fun restartApp(callback: (Result<Unit>) -> Unit) {
+        callback(Result.success(Unit))
+        val intent = appContext.packageManager.getLaunchIntentForPackage(appContext.packageName)
+        if (intent == null) {
+            Log.e("OXPLAY_TDLIB", "restartApp: no launch intent for ${appContext.packageName}")
+            return
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        appContext.startActivity(intent)
+        Log.i("OXPLAY_TDLIB", "restartApp: launched fresh activity, exiting process")
+        android.os.Process.killProcess(android.os.Process.myPid())
+        Runtime.getRuntime().exit(0)
     }
 
     /** Drop the live client so the next [configure] starts a fresh auth machine. */

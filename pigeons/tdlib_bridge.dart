@@ -151,6 +151,21 @@ abstract class OxTdlibBridgeApi {
   @async
   void reconnect();
 
+  /// Kills and relaunches the whole app process (Android only).
+  ///
+  /// A stuck/failed native TDLib client can land in a state a plain in-memory reconfigure cannot
+  /// clear: go/oxtelegram/client.go's Configure() no-ops on "already have a live client object",
+  /// even one whose auth landed in `failed` — only a client object that never existed rebuilds
+  /// cleanly from the on-disk session. Killing the process is the only way to guarantee that from
+  /// here, since there is no "drop this client but keep the session file" call exposed yet (see
+  /// oxplayer_login_screen.dart's stuck-state UI). Session storage on disk is untouched, so the
+  /// relaunched process resumes the same signed-in session — this is not a logout.
+  ///
+  /// Never returns (the process exits); the return type exists only so Dart can await the call
+  /// being dispatched before the platform channel itself goes away.
+  @async
+  void restartApp();
+
   /// Phone/tablet flow, step 1. Async: waits on the real TdApi round-trip.
   @async
   void submitPhoneNumber(String phoneNumber);

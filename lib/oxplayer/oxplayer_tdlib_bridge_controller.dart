@@ -284,27 +284,24 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
       // `failed` is treated exactly like `uninitialized`, not like a configured state. It is what
       // native lands in when a cold-start RPC fails, and it used to be cached the same way `ready`
       // was: every later play logged "already configured kind=failed" and never retried, so the
-      // app stayed dead until it was force-killed (seen on Xiaomi). Re-submitting a cached bot
-      // token onto that client does not help either — the client itself is the thing that is
-      // broken, so the fix is a real reconfigure. Same failure shape, and same remedy, as the dead
-      // run loop handled in go/oxtelegram/client.go's Configure.
+      // app stayed dead until it was force-killed (seen on Xiaomi).
+      //
+      // This used to also force a real logOut() here first ("configure() is idempotent on already
+      // have a client, so without teardown it returns the same dead client straight back") — true
+      // when the connection itself is still alive (go/oxtelegram/client.go's Configure only
+      // rebuilds when the run loop actually died), but that teardown is the same destructive
+      // AuthLogOut RPC prepareForLoginScreen's stuck-at path used to call, and hits the same
+      // problem: it silently signs out an already-authenticated user to recover from what may
+      // just be a transient failure, with no confirmation. There is no non-destructive "drop this
+      // client object but keep the on-disk session" primitive exposed to Dart yet (only
+      // reconnect()/logOut()) — go/oxtelegram/mobile's Client.Close() is exactly that, but isn't
+      // wired through pigeons/tdlib_bridge.dart. Until it is, just reconfigure without the
+      // teardown: if the client really is dead this no-ops and `failed` surfaces as a normal
+      // thrown OxplayerTdlibBridgeException below (see prepareForLoginScreen), which shows Retry —
+      // and the user's own explicit "log out" action (resetStuckSession) is the deliberate,
+      // confirmed path if retries don't help.
       _log('ensureConfigured: cached configured=true but native reports ${polled.kind.name} — reconfiguring');
       _configured = false;
-      if (polled.kind == OxTdlibAuthStateKind.failed) {
-        // Tear the corpse down first: configure() on the native side is idempotent on "already
-        // have a client", so without this it would return the same dead client straight back.
-        try {
-          if (_useWindows) {
-            await _windows!.logOut();
-          } else {
-            await _api.logOut();
-          }
-        } catch (e) {
-          // Expected to fail sometimes — we are tearing down something already broken. The
-          // configure() below is what actually has to work.
-          _log('ensureConfigured: teardown before failed-state reconfigure threw: $e');
-        }
-      }
     }
     final apiId = OxplayerEnv.telegramApiId;
     final apiHash = OxplayerEnv.telegramApiHash;
@@ -377,44 +374,30 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
   /// Blocks the splash until TDLib is past setTdlibParameters.
   /// When [phoneFirst] is true (phone/tablet), aborts a leftover QR session so the
   /// phone field is usable immediately.
+  ///
+  /// Does not destroy an already-`ready` Telegram session on a hunch — it used to ("OX logout
+  /// does not always clear Telegram"), which is the same bug class as the stuck-timeout one
+  /// below: an uncertain/inferred signal treated as confirmed. The one legitimate case that
+  /// comment was guarding (an OX-triggered sign-out whose Telegram-side clear hasn't landed yet)
+  /// is now handled precisely, by awaiting [_pendingIntentionalSignOut] instead of guessing.
   Future<void> prepareForLoginScreen({bool phoneFirst = true}) async {
     _log('prepareForLoginScreen phoneFirst=$phoneFirst');
     _suppressBotSessionRestore = true;
     try {
-      try {
-        await ensureConfigured();
-      } on OxplayerTdlibBridgeException catch (e) {
-        if (!e.message.contains('stuck at')) rethrow;
-        // Native client often still alive after hot restart with stale UNINITIALIZED cache —
-        // force wipe + recreate once.
-        //
-        // TODO(known issue, 2026-08-17): this same path also fires on an ordinary cold launch
-        // whose first connect is merely slow (e.g. waking from background after several minutes)
-        // — confirmed on-device: a real, already-authenticated user got silently logged out by
-        // this exact branch after a 45s stuck timeout that had nothing to do with a hot restart.
-        // go/oxtelegram/client.go's watchRun already has a non-destructive reconnect for dropped
-        // connections ("never a reason to ask the user to log in again" — see its HealthDegraded
-        // doc) and this branch should defer to that instead of unilaterally calling logOut().
-        // Agreed direction (not yet implemented): drop the automatic logOut() here; surface a
-        // retry action instead, plus a separate explicit "log out" action the user can choose —
-        // and if they do, confirm with a modal ("are you sure?") before actually calling logOut().
-        _log('prepareForLoginScreen: stuck — forcing logOut + recreate');
-        _configured = false;
-        try {
-          if (_useWindows) {
-            await _windows!.logOut();
-          } else {
-            await _api.logOut();
-          }
-        } catch (logoutErr) {
-          _log('prepareForLoginScreen: logOut during recover: $logoutErr');
-        }
-        await ensureConfigured();
-      }
-      // OX logout does not always clear Telegram — AuthReady blocks QR/phone restart.
-      if (_state.kind == OxTdlibAuthStateKind.ready) {
-        _log('prepareForLoginScreen: Telegram still ready — reset for re-auth');
-        await resetForPhoneLogin();
+      // A "stuck at <kind>" OxplayerTdlibBridgeException from ensureConfigured propagates as-is
+      // — this used to auto-recover by force-calling logOut() on the real Telegram session, which
+      // also fires on an ordinary cold launch whose first connect is merely slow (e.g. waking from
+      // background after several minutes), silently signing out an already-authenticated user.
+      // Recovery is now the caller's call: show the error with a Retry action (re-runs this
+      // method) and a separate, user-confirmed "log out" action — see resetStuckSession().
+      await ensureConfigured();
+      // A logOutUser() elsewhere may still be mid-flight (see clearSessionAfterOxLogout's doc) —
+      // wait for it rather than guessing from whatever state Telegram happens to report right
+      // now, so the check below reflects where that sign-out actually left things.
+      final pendingSignOut = _pendingIntentionalSignOut;
+      if (pendingSignOut != null) {
+        _log('prepareForLoginScreen: awaiting in-flight intentional sign-out');
+        await pendingSignOut;
       }
       if (phoneFirst && _state.kind == OxTdlibAuthStateKind.waitingForQrConfirmation) {
         await resetForPhoneLogin();
@@ -429,15 +412,53 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
           'Telegram client did not finish initializing (stuck at ${_state.kind.name}). Try again.',
         );
       }
-      if (_state.kind == OxTdlibAuthStateKind.ready) {
-        throw OxplayerTdlibBridgeException(
-          'Telegram session was still signed in after reset. Tap Retry.',
-        );
-      }
+      // `ready` here (with no sign-out pending above) means Telegram genuinely still holds a
+      // valid session — arriving at the login screen despite that means something ELSE (a
+      // cleared OX account, e.g.) put us here, not a stale/leftover Telegram login. Destroying a
+      // real session to "fix" that used to be exactly the bug this rewrite closes (see this
+      // method's top-of-file doc): don't. OxplayerTdlibLoginPanel already watches for `ready` and
+      // completes the OX sign-in exchange itself once this returns and the panel mounts.
       _log('prepareForLoginScreen done kind=${_state.kind.name}');
     } finally {
       _suppressBotSessionRestore = false;
     }
+  }
+
+  /// User-confirmed reset of a native Telegram client that failed to finish initializing or
+  /// landed in a failed auth state (either surfaces as an OxplayerTdlibBridgeException from
+  /// prepareForLoginScreen). Only call this after the user has
+  /// explicitly opted into logging out via a destructive-action dialog — see
+  /// oxplayer_login_screen.dart's error-state UI. Callers must re-run prepareForLoginScreen
+  /// afterward (e.g. by re-invoking the same bootstrap that called it originally).
+  Future<void> resetStuckSession() async {
+    _log('resetStuckSession: user-confirmed logOut + recreate');
+    _configured = false;
+    try {
+      if (_useWindows) {
+        await _windows!.logOut();
+      } else {
+        await _api.logOut();
+      }
+    } catch (logoutErr) {
+      _log('resetStuckSession: logOut threw: $logoutErr');
+    }
+  }
+
+  /// True when [restartApp] has a real implementation to call (Android only — see
+  /// TdlibBridgeObject.kt's restartApp; Windows has no equivalent).
+  bool get canRestartApp => !_useWindows;
+
+  /// Kills and relaunches the whole app process — never returns on success. Session storage is
+  /// untouched (not a logout); see restartApp's doc in pigeons/tdlib_bridge.dart for why this,
+  /// not a plain reconfigure, is what actually recovers a stuck/failed native client reliably:
+  /// go/oxtelegram/client.go's Configure() no-ops on "already have a live client object" even one
+  /// whose auth landed in `failed`, so an in-process retry can end up doing nothing.
+  Future<void> restartApp() async {
+    if (!canRestartApp) {
+      throw OxplayerTdlibBridgeException('App restart is not available on this platform.');
+    }
+    _log('restartApp: requesting process restart');
+    await _api.restartApp();
   }
 
   /// Must stay above mobile.authCallTimeout (90s in go/oxtelegram/mobile/bind.go) or the native
@@ -704,14 +725,46 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
       _log('hasReadyUserSession: ready');
       return true;
     }
-    // No completed Telegram user session (or mid-login leftover).
+    if (kind == OxTdlibAuthStateKind.failed) {
+      // `failed` settles as a normal, non-throwing return from ensureConfigured (see
+      // waitUntilReadyForAuthInput's _isInteractiveAuthKind) — it means the native client
+      // couldn't determine its own state, not that this account was ever unauthenticated.
+      // Confirmed on-device (2026-08-17): the same slow-connect race that lands `failed` here
+      // hit this exact branch and, before this fix, made oxplayerResolveSplashAuth locally sign
+      // an already-authenticated user out on every cold start it lost that race. Same fail-open
+      // as a thrown exception above, for the same reason: never a reason to wipe OX tokens.
+      _log('hasReadyUserSession: failed — fail-open (not the same as no session)');
+      return true;
+    }
+    // No completed Telegram user session (or mid-login leftover) — a clean, non-error state.
     _log('hasReadyUserSession: not ready kind=${kind.name}');
     return false;
   }
 
+  /// Tracks an in-flight [clearSessionAfterOxLogout] so [prepareForLoginScreen] can deterministically
+  /// wait for a genuinely-intentional sign-out instead of guessing one happened from Telegram's
+  /// reported state — see prepareForLoginScreen's doc for the bug this replaced.
+  Future<void>? _pendingIntentionalSignOut;
+
   /// OX account sign-out: wipe Telegram session without re-warming the client.
   /// Login screen [prepareForLoginScreen] / [ensureConfigured] starts a fresh client later.
-  Future<void> clearSessionAfterOxLogout() async {
+  ///
+  /// `auth_provider.dart`'s logOutUser() calls this via oxplayerLogoutTelegramSession()
+  /// unawaited (a blocking Telegram logOut() would make the OX "log out" action feel frozen),
+  /// so the login screen can legitimately render before this finishes — see
+  /// [_pendingIntentionalSignOut].
+  Future<void> clearSessionAfterOxLogout() {
+    final future = _clearSessionAfterOxLogoutLocked();
+    _pendingIntentionalSignOut = future;
+    future.whenComplete(() {
+      if (identical(_pendingIntentionalSignOut, future)) {
+        _pendingIntentionalSignOut = null;
+      }
+    });
+    return future;
+  }
+
+  Future<void> _clearSessionAfterOxLogoutLocked() async {
     _log('clearSessionAfterOxLogout from kind=${_state.kind.name}');
     try {
       await logOut();

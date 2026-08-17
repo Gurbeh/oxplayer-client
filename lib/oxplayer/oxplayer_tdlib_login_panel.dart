@@ -68,6 +68,10 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
   /// Stay on 2FA UI if native briefly emits failed (wrong password) instead of waitingForPassword.
   bool _lockOnTwoFactor = false;
   String? _error;
+  /// True when [_error] is the "wrong Telegram identity connected" message from
+  /// _maybeStartOxExchange's bot-session guard — its recovery action is a reset
+  /// (resetForPhoneLogin), not a doomed retry of the same exchange.
+  bool _blockedByBotSession = false;
   bool _oxExchangeStarted = false;
   bool _qrSheetOpen = false;
   OxTdlibAuthStateKind? _lastKind;
@@ -87,6 +91,14 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _focusAuthField(_controller.state.kind, showIme: true);
+      // _onStateChanged only fires on a FUTURE transition — it never ran for whatever
+      // transition already landed this at `ready` before this panel existed to listen. That
+      // never happened before prepareForLoginScreen stopped force-resetting an already-`ready`
+      // Telegram session on mount (see its doc); now it's the normal case for a leftover valid
+      // session, and without this the panel just sits on "ready" forever with no OX exchange
+      // ever kicked off. Reuses _onStateChanged itself so the exchange-start guard
+      // (_oxExchangeStarted) stays the single source of truth — safe to call unconditionally.
+      _onStateChanged();
     });
   }
 
@@ -237,9 +249,43 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
     }
     if (kind == OxTdlibAuthStateKind.ready && !_oxExchangeStarted) {
       _dismissKeyboard();
-      _oxExchangeStarted = true;
-      unawaited(_exchangeWithOxApi());
+      unawaited(_maybeStartOxExchange());
     }
+  }
+
+  /// Guards the ready-triggered exchange against a restored *bot* session — this panel is the
+  /// personal Telegram account (phone/QR) sign-in, and fetchWebAppInitData below is a
+  /// user-account-only Telegram RPC (BOT_METHOD_INVALID for a bot caller). A bot session landing
+  /// here happens when this device's connected delivery bot (see /connectbot,
+  /// ensureBotSessionFromCacheIfNeeded) got restored instead of — or after losing — the real
+  /// user session; it was never going to complete this exchange, so don't try and don't mark
+  /// _oxExchangeStarted, and just let the phone-number form render normally.
+  ///
+  /// Uses isNativeSessionActuallyBot (native ground truth), not the Dart-cached flag — this
+  /// exact scenario is native silently restoring a persisted bot session without Dart ever
+  /// calling submitBotToken this run, which the cached flag gets wrong (see its own doc).
+  Future<void> _maybeStartOxExchange() async {
+    if (_oxExchangeStarted) return;
+    if (await _controller.isNativeSessionActuallyBot()) {
+      debugPrint('[ox-tdlib-auth] login panel: ready state is a bot session, skipping exchange');
+      // The `ready` case below always renders a bare success checkmark unless _error or
+      // _exchangingWithOxApi is set — without setting one of those, a bot session left the
+      // screen looking "done" with literally no way forward (confirmed live 2026-08-17: a
+      // green checkmark and nothing else, no phone form, no button). Surface it as the
+      // actionable error it actually is instead.
+      if (mounted) {
+        setState(() {
+          _error = 'This device has a different Telegram identity connected (not your account).';
+          _blockedByBotSession = true;
+        });
+      }
+      return;
+    }
+    if (!mounted || _controller.state.kind != OxTdlibAuthStateKind.ready || _oxExchangeStarted) {
+      return;
+    }
+    _oxExchangeStarted = true;
+    await _exchangeWithOxApi();
   }
 
   Future<void> _exchangeWithOxApi() async {
@@ -644,7 +690,11 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(IconsaxPlusBold.tick_circle, size: 48, color: theme.colorScheme.primary),
+              Icon(
+                _error != null ? IconsaxPlusBold.warning_2 : IconsaxPlusBold.tick_circle,
+                size: 48,
+                color: _error != null ? theme.colorScheme.error : theme.colorScheme.primary,
+              ),
               if (_exchangingWithOxApi) ...[
                 const SizedBox(height: 16),
                 const CircularProgressIndicator(),
@@ -661,10 +711,18 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
                 const SizedBox(height: 8),
                 TextButton(
                   onPressed: () {
+                    if (_blockedByBotSession) {
+                      setState(() {
+                        _error = null;
+                        _blockedByBotSession = false;
+                      });
+                      unawaited(_controller.resetForPhoneLogin());
+                      return;
+                    }
                     _oxExchangeStarted = true;
                     unawaited(_exchangeWithOxApi());
                   },
-                  child: const Text('Try again'),
+                  child: Text(_blockedByBotSession ? 'Log out and use phone number' : 'Try again'),
                 ),
               ],
             ],
