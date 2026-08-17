@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_image_auth.dart';
+import 'package:fladder/oxplayer/oxplayer_reader_kind_interceptor.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
 
 /// Client for the backend's Telegram delivery endpoints (apps/api's
@@ -38,7 +40,7 @@ abstract final class OxplayerTelegramDeliveryApi {
     try {
       final response = await _client.post(
         Uri.parse('$base/me/telegram-delivery'),
-        headers: _headers(token),
+        headers: await _headersWithReaderKind(token),
         body: jsonEncode({
           'locator': locator,
           'messageId': messageId,
@@ -63,7 +65,7 @@ abstract final class OxplayerTelegramDeliveryApi {
     try {
       await _client.delete(
         Uri.parse('$base/me/telegram-delivery/${Uri.encodeComponent(locator)}'),
-        headers: _headers(token),
+        headers: await _headersWithReaderKind(token),
       );
     } catch (e) {
       debugPrint('OXPLAY_TDLIB: delivery forget failed: $e');
@@ -118,6 +120,18 @@ abstract final class OxplayerTelegramDeliveryApi {
         'Accept': 'application/json',
         'Authorization': 'MediaBrowser Token="$token"',
       };
+
+  /// [_headers] plus [oxplayerReaderKindHeader] — report/forget must land under the kind THIS
+  /// device actually read with, not whichever kind the backend defaults to for the account. See
+  /// OxplayerReaderKindInterceptor's doc for why (multi-device accounts with both a session and a
+  /// bot connected).
+  static Future<Map<String, String>> _headersWithReaderKind(String token) async {
+    final isBot = await OxplayerTdlibBridgeController.instance().isNativeSessionActuallyBot();
+    return {
+      ..._headers(token),
+      oxplayerReaderKindHeader: isBot ? 'bot' : 'session',
+    };
+  }
 
   static OxTdlibProviderBot? _parseProviderBot(Map entry) {
     final id = _providerBotId(entry['id']);
