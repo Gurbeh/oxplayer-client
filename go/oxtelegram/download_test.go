@@ -120,6 +120,116 @@ func TestMergeRanges_adjacentAndOverlap(t *testing.T) {
 	}
 }
 
+func TestSaveLoadRanges_roundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "part")
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	d := &DownloadSession{
+		ref:    &VideoFileRef{Size: 10_000_000},
+		file:   f,
+		ranges: []byteRange{{start: 0, end: 3_000_000}, {start: 9_000_000, end: 10_000_000}},
+	}
+	d.mu.Lock()
+	d.saveRangesLocked()
+	d.mu.Unlock()
+
+	loaded := loadRanges(path, 10_000_000, 10_000_000)
+	if len(loaded) != 2 || loaded[0] != d.ranges[0] || loaded[1] != d.ranges[1] {
+		t.Fatalf("loaded=%+v want=%+v", loaded, d.ranges)
+	}
+}
+
+// A quick replay of the same title must skip re-fetching what OpenDownload already sees on disk
+// — this is what actually stops the redundant large-offset upload.getFile call that reliably
+// draws Telegram's FLOOD_WAIT on a cold resume seek (see saveRangesLocked's doc).
+func TestOpenDownload_reusesPersistedRangesAcrossSessions(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "part")
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const size int64 = 10_000_000
+	if err := f.Truncate(size); err != nil {
+		t.Fatal(err)
+	}
+
+	first := &DownloadSession{
+		ref:    &VideoFileRef{Size: size},
+		file:   f,
+		ranges: []byteRange{{start: 0, end: 3_000_000}, {start: 8_000_000, end: size}},
+	}
+	first.mu.Lock()
+	first.saveRangesLocked()
+	first.mu.Unlock()
+	f.Close()
+
+	// Simulates the OpenDownload path without a live Client: reopen the same cache file and
+	// reload coverage the way OpenDownload does.
+	reopened, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	info, err := reopened.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+	second := &DownloadSession{
+		ref:    &VideoFileRef{Size: size},
+		file:   reopened,
+		ranges: loadRanges(path, info.Size(), size),
+	}
+
+	if !second.coversLocked(8_500_000, size) {
+		t.Fatalf("replay should already cover the previous resume window: ranges=%+v", second.ranges)
+	}
+	if second.coversLocked(4_000_000, 5_000_000) {
+		t.Fatalf("replay must not claim coverage it never downloaded: ranges=%+v", second.ranges)
+	}
+}
+
+func TestLoadRanges_clampedToOnDiskAndTotalSize(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "part")
+	// A stale/oversized sidecar (crash mid-write, or a shorter re-resolved file) must never
+	// cause bytes to be served that were never actually downloaded — clamp, don't trust verbatim.
+	if err := os.WriteFile(rangesSidecarPath(path), []byte("0 5000000\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	loaded := loadRanges(path, 4_500_000, 4_200_000)
+	if len(loaded) != 1 || loaded[0].start != 0 || loaded[0].end != 4_200_000 {
+		t.Fatalf("loaded=%+v", loaded)
+	}
+}
+
+func TestSaveRangesLocked_removesSidecarWhenEmpty(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "part")
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	if err := os.WriteFile(rangesSidecarPath(path), []byte("0 100\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d := &DownloadSession{ref: &VideoFileRef{Size: 1000}, file: f}
+	d.mu.Lock()
+	d.saveRangesLocked()
+	d.mu.Unlock()
+
+	if _, err := os.Stat(rangesSidecarPath(path)); !os.IsNotExist(err) {
+		t.Fatalf("expected sidecar removed, stat err=%v", err)
+	}
+}
+
 func TestHolesLocked(t *testing.T) {
 	d := &DownloadSession{
 		ref:    &VideoFileRef{Size: 1000},

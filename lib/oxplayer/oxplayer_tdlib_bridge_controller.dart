@@ -387,6 +387,17 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
         if (!e.message.contains('stuck at')) rethrow;
         // Native client often still alive after hot restart with stale UNINITIALIZED cache —
         // force wipe + recreate once.
+        //
+        // TODO(known issue, 2026-08-17): this same path also fires on an ordinary cold launch
+        // whose first connect is merely slow (e.g. waking from background after several minutes)
+        // — confirmed on-device: a real, already-authenticated user got silently logged out by
+        // this exact branch after a 45s stuck timeout that had nothing to do with a hot restart.
+        // go/oxtelegram/client.go's watchRun already has a non-destructive reconnect for dropped
+        // connections ("never a reason to ask the user to log in again" — see its HealthDegraded
+        // doc) and this branch should defer to that instead of unilaterally calling logOut().
+        // Agreed direction (not yet implemented): drop the automatic logOut() here; surface a
+        // retry action instead, plus a separate explicit "log out" action the user can choose —
+        // and if they do, confirm with a modal ("are you sure?") before actually calling logOut().
         _log('prepareForLoginScreen: stuck — forcing logOut + recreate');
         _configured = false;
         try {

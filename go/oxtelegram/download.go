@@ -9,6 +9,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -79,7 +82,107 @@ func (c *Client) OpenDownload(ref *VideoFileRef, messageID int64, locator, cache
 	if err != nil {
 		return nil, fmt.Errorf("open cache file: %w", err)
 	}
-	return &DownloadSession{client: c, ref: ref, messageID: messageID, locator: locator, file: f}, nil
+	// Reload coverage bookkeeping for whatever this file already has on disk from a previous
+	// session (see saveRangesLocked's doc) — without this, a replay moments after the previous
+	// playback ended re-requests the exact same large-offset range from Telegram from scratch,
+	// which is what reliably triggers FLOOD_WAIT on a cold resume seek (confirmed on-device
+	// 2026-08-17: replaying the same title even 5s after stop hit FLOOD_WAIT on upload.getFile;
+	// switching to a different title never did).
+	var ranges []byteRange
+	if info, statErr := f.Stat(); statErr == nil && info.Size() > 0 {
+		ranges = loadRanges(path, info.Size(), ref.Size)
+	}
+	d := &DownloadSession{client: c, ref: ref, messageID: messageID, locator: locator, file: f, ranges: ranges}
+	if d.isFullyCompleteLocked() {
+		d.complete = true
+	}
+	return d, nil
+}
+
+// rangesSidecarPath is the coverage-bookkeeping file next to a .part cache file.
+func rangesSidecarPath(cacheFilePath string) string {
+	return cacheFilePath + ".ranges"
+}
+
+// loadRanges reads coverage persisted by a previous session's saveRangesLocked, clamped to what
+// is actually on disk (onDiskSize) and to the file's real size (totalSize) — a stale sidecar
+// (or one left over from a shorter/different file) must never cause bytes to be served that
+// were never actually downloaded. Sorts and merges the result so it satisfies the same
+// non-overlapping invariant mergeRangeLocked maintains, regardless of what the sidecar contained.
+func loadRanges(cacheFilePath string, onDiskSize, totalSize int64) []byteRange {
+	limit := onDiskSize
+	if totalSize > 0 && totalSize < limit {
+		limit = totalSize
+	}
+	if limit <= 0 {
+		return nil
+	}
+	data, err := os.ReadFile(rangesSidecarPath(cacheFilePath))
+	if err != nil {
+		return nil
+	}
+	var parsed []byteRange
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, " ", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		start, err1 := strconv.ParseInt(parts[0], 10, 64)
+		end, err2 := strconv.ParseInt(parts[1], 10, 64)
+		if err1 != nil || err2 != nil || start < 0 || end <= start {
+			continue
+		}
+		if end > limit {
+			end = limit
+		}
+		if start >= end {
+			continue
+		}
+		parsed = append(parsed, byteRange{start: start, end: end})
+	}
+	if len(parsed) == 0 {
+		return nil
+	}
+	sort.Slice(parsed, func(i, j int) bool { return parsed[i].start < parsed[j].start })
+	merged := make([]byteRange, 0, len(parsed))
+	merged = append(merged, parsed[0])
+	for _, r := range parsed[1:] {
+		last := &merged[len(merged)-1]
+		if r.start <= last.end {
+			if r.end > last.end {
+				last.end = r.end
+			}
+			continue
+		}
+		merged = append(merged, r)
+	}
+	return merged
+}
+
+// saveRangesLocked persists d.ranges next to the cache file so a future OpenDownload for the
+// same document (a replay of the same title, possibly seconds later) can trust and reuse bytes
+// already on disk instead of re-issuing the same upload.getFile calls to Telegram — see
+// OxTelegramFileFetcher.kt's close() doc, which already documents this as the intent; this is
+// what actually fulfills it. Caller must hold d.mu. Best effort: a failed write only costs the
+// next session its warm cache, not correctness.
+func (d *DownloadSession) saveRangesLocked() {
+	if d.file == nil {
+		return
+	}
+	path := rangesSidecarPath(d.file.Name())
+	if len(d.ranges) == 0 {
+		_ = os.Remove(path)
+		return
+	}
+	var b strings.Builder
+	for _, r := range d.ranges {
+		fmt.Fprintf(&b, "%d %d\n", r.start, r.end)
+	}
+	_ = os.WriteFile(path, []byte(b.String()), 0o600)
 }
 
 func (d *DownloadSession) LocalPath() string { return d.file.Name() }
@@ -304,6 +407,7 @@ func (d *DownloadSession) Cancel() {
 	d.mu.Lock()
 	conn := d.dcConn
 	d.dcConn = nil
+	d.saveRangesLocked()
 	f := d.file
 	d.mu.Unlock()
 
