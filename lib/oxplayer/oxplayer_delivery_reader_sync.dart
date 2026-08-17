@@ -4,6 +4,7 @@ import 'package:fladder/oxplayer/oxplayer_main_bot_login_api.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_link_cache.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
+import 'package:fladder/src/tdlib_bridge.g.dart' show OxTdlibAuthStateKind;
 
 /// Outcome of aligning the native Telegram session with the account the API copies into.
 enum OxplayerReaderSyncResult {
@@ -20,19 +21,27 @@ enum OxplayerReaderSyncResult {
   mismatched,
 }
 
-/// Aligns the native Telegram session with who the API will copy into.
+/// Confirms THIS device's native Telegram session is still a usable identity for the signed-in OX
+/// account, provisioning bot-mode on a fresh device that has no session yet.
 ///
-/// Mirrors apps/api/internal/server/telegram_delivery.go's resolveDeliveryReader precedence
-/// exactly: a linked Telegram session always wins over a connected personal bot, bot-token is
-/// only the active reader for accounts with no session. That precedence is decided server-side
-/// (auth_bot_token.go's readerKind, computed the same way resolveDeliveryReader picks) rather
-/// than re-derived here, so the two can never drift apart again — they did once: this used to
-/// force bot-mode purely on "does a personal bot exist", which was correct back when bot-token
-/// was checked first server-side, and silently went wrong the moment that server-side precedence
-/// flipped to session-first without a matching client change. A leftover phone/QR session stays
-/// `kind=ready` while the backend copies into a bot the native side never reads (or vice versa),
-/// so play waits the full delivery-wait timeout on the wrong account and retry PlaybackInfo
-/// returns 424 — permanently, since there is no live push coming to the account it is watching.
+/// The backend no longer has one "correct" reader per account — apps/api's resolveTelegramDelivery
+/// now picks per REQUEST from readerKindHeader (see OxplayerReaderKindInterceptor), because the
+/// same account is routinely used from multiple devices in different modes at once: e.g. a phone
+/// that did QR login (session) and an older TV that only ever ran /connectbot (bot). Both are
+/// valid simultaneously. So this no longer compares native's mode against the account's "default"
+/// — it only asks whether native's CURRENT identity (whatever it is) still exists for this
+/// account:
+///  - native is bot-mode: fine as long as the account still has a connected personal bot.
+///  - native holds a real phone/QR session: always fine once linked — a session identity doesn't
+///    stop being valid just because the account also has a bot connected elsewhere.
+///  - native has no ready identity yet (fresh device): bootstrap bot-mode if the account has a
+///    bot to provision (the only silent option — a real session needs interactive phone/QR/2FA).
+///
+/// Getting this wrong used to fail in two different directions on this exact multi-device
+/// scenario: comparing against the account's default (session, since 2026-08-16's backend change)
+/// flagged a device that was CORRECTLY running bot-mode as a mismatch and blocked every play on
+/// it, even though the account's bot was still connected and the new per-request header would
+/// have routed to it just fine.
 ///
 /// Returns the outcome rather than throwing, and — importantly — rather than swallowing it. An
 /// earlier version caught everything and logged, which let playback proceed on the wrong account
@@ -54,32 +63,34 @@ Future<OxplayerReaderSyncResult> oxplayerEnsureTdlibMatchesOxUser(String? access
     return OxplayerReaderSyncResult.unknown;
   }
 
-  // No personal bot for this OX user, or the backend prefers the linked session anyway: deliveries
-  // land in the user's own DM, which a session-mode native bridge already reads — UNLESS this
-  // device's native session is still logged in as a leftover personal bot (from before the bot
-  // was disconnected, or from a stale switch this same sync forced under the old precedence). A
-  // bot session can never read a DM that isn't its own (BOT_METHOD_INVALID on history, and it is a
-  // different Telegram account entirely), and there is no cached credential to silently switch
-  // back with — a real user login needs phone/code/2FA, unlike submitBotToken's static secret. So
-  // that combination is a hard mismatch, not a default-aligned case.
-  final wantsBot = userBot != null && !userBot.isSessionPreferred;
-  if (!wantsBot) {
-    final controller = OxplayerTdlibBridgeController.instance();
+  final controller = OxplayerTdlibBridgeController.instance();
+
+  if (controller.state.kind == OxTdlibAuthStateKind.ready) {
     // Ground truth from native, not the Dart-tracked flag: a bot session silently restored from
-    // disk at this run's configure() never set that flag, which is exactly the case this check
-    // exists to catch — see isNativeSessionActuallyBot's doc.
+    // disk at this run's configure() never set that flag — see isNativeSessionActuallyBot's doc.
     if (await controller.isNativeSessionActuallyBot()) {
+      if (userBot != null) return OxplayerReaderSyncResult.aligned;
+      // A bot session can never read a DM that isn't its own (BOT_METHOD_INVALID on history, and
+      // it is a different Telegram account entirely), and there is no cached credential to
+      // silently switch back with — a real user login needs phone/code/2FA, unlike
+      // submitBotToken's static secret. So a bot-mode device with no bot left on the account is a
+      // hard mismatch, not a default-aligned case.
       _oxplayTdlibLog(
-        'delivery reader MISMATCH: native session is still bot-mode but the backend delivers to '
-        'this account\'s Telegram session — re-login required',
+        'delivery reader MISMATCH: native session is still bot-mode but this OX account has no '
+        'personal bot anymore — re-login required',
       );
       return OxplayerReaderSyncResult.mismatched;
     }
+    // A real phone/QR session is always a valid identity once linked, independent of whether the
+    // account also has a bot connected on some other device.
     return OxplayerReaderSyncResult.aligned;
   }
 
+  // No ready identity on this device yet. Nothing to silently provision without a personal bot —
+  // the caller's own ready-check surfaces the real "log in" prompt.
+  if (userBot == null) return OxplayerReaderSyncResult.aligned;
+
   try {
-    final controller = OxplayerTdlibBridgeController.instance();
     await controller.ensureConfigured();
     await controller.ensureBotTokenSession(userBot.token);
     _oxplayTdlibLog('delivery reader = personal bot @${userBot.username}');
