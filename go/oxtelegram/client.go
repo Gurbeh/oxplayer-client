@@ -434,6 +434,16 @@ func (c *Client) Configure(ctx context.Context, sink AuthEventSink) error {
 		// Required for QR: UpdateLoginToken must reach qrlogin.OnLoginToken. Default
 		// (nil handler) sets NoUpdates=true and drops the scan signal.
 		UpdateHandler: dispatcher,
+		// gotd defaults MigrationTimeout to 15s (telegram/options.go). A DC migration is a full
+		// second handshake to a different data-centre, not a round trip — confirmed on-device
+		// (2026-08-17) that a bare connect alone already costs 15-18s on a TV/mobile link, so the
+		// 15s default reliably starves the migration itself and every bot-token login on a
+		// migrated account fails with "migrate to dc: context deadline exceeded", regardless of
+		// authCallTimeout below (that only bounds the outer call — this is gotd's own inner
+		// sub-timeout for the migration step and was never being overridden). Matches
+		// authCallTimeout's existing 90s budget in mobile/bind.go so the outer deadline stays the
+		// binding one.
+		MigrationTimeout: 90 * time.Second,
 	})
 
 	runCtx, cancel := context.WithCancel(context.Background())

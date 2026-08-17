@@ -506,7 +506,8 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
     private fun onAuthStateChanged(state: TdlibAuthState) {
         val mapped = state.toPigeon()
         lastAuthState = mapped
-        Log.i("ox-tdlib-auth", "native auth → ${mapped.kind}")
+        val suffix = mapped.errorMessage?.let { " ($it)" } ?: ""
+        Log.i("ox-tdlib-auth", "native auth → ${mapped.kind}$suffix")
         // Pigeon BasicMessageChannel.send → FlutterJNI requires @UiThread / main.
         runOnMain { events?.onAuthStateChanged(mapped) { } }
     }
