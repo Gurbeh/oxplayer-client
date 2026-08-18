@@ -4,6 +4,8 @@ import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
+import 'package:fladder/oxplayer/oxplayer_slider_image.dart';
+import 'package:fladder/oxplayer/oxplayer_tv_image_sizes.dart';
 import 'package:fladder/oxplayer/oxplayer_tv_ui_limits.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/screens/shared/media/banner_play_button.dart';
@@ -112,7 +114,10 @@ class _CarouselBannerState extends ConsumerState<CarouselBanner> {
                                     },
                               child: Stack(
                                 children: [
-                                  FladderImage(image: item.bannerImage),
+                                  FladderImage(
+                                    image: oxplayerSliderImage(item),
+                                    decodeHeight: OxplayerTvImageSizes.decodeHeroHeight,
+                                  ),
                                   Container(
                                     decoration: BoxDecoration(
                                       gradient: LinearGradient(

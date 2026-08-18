@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/models/item_base_model.dart';
+import 'package:fladder/oxplayer/oxplayer_slider_image.dart';
+import 'package:fladder/oxplayer/oxplayer_tv_image_sizes.dart';
 import 'package:fladder/screens/shared/media/banner_play_button.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/fladder_image.dart';
@@ -187,7 +189,8 @@ class _MediaBannerState extends ConsumerState<MediaBanner> {
                                   padding: const EdgeInsets.all(1),
                                   child: FladderImage(
                                     fit: BoxFit.cover,
-                                    image: currentItem.bannerImage,
+                                    image: oxplayerSliderImage(currentItem),
+                                    decodeHeight: OxplayerTvImageSizes.decodeHeroHeight,
                                   ),
                                 ),
                               ),

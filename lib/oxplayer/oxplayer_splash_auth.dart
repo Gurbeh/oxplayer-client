@@ -47,10 +47,10 @@ Future<OxplayerSplashAuthResult> oxplayerResolveSplashAuth(
       final hasTelegramSession =
           await OxplayerTdlibBridgeController.instance().hasReadyUserSession();
       if (!hasTelegramSession) {
-        // Local-only: logOutUser awaits Sessions/Logout + Seerr + TDLib with no timeout
-        // and freezes splash when the API / Telegram DC does not answer (stale upgrade).
-        await oxplayerLogoutLocallySkippingServer(ref.read, fallbackAccount: account);
-        return OxplayerSplashAuthResult.needsLogin;
+        // Keep OX tokens. `adb install -r` / TV Keystore often leaves TDLib in
+        // WAITING_FOR_QR; wiping here forced QR login after every rebuild.
+        debugPrint('OX_IMAGE phase=splash_tdlib_not_ready keep_ox_session=true');
+        return OxplayerSplashAuthResult.sessionReady;
       }
     }
 

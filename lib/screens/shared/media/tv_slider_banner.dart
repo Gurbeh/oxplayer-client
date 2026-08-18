@@ -15,6 +15,8 @@ import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/fladder_image.dart';
 import 'package:fladder/util/focus_provider.dart';
 import 'package:fladder/oxplayer/oxplayer_catalog_interest_status.dart';
+import 'package:fladder/oxplayer/oxplayer_slider_image.dart';
+import 'package:fladder/oxplayer/oxplayer_tv_image_sizes.dart';
 import 'package:fladder/oxplayer/oxplayer_tv_ui_limits.dart';
 import 'package:fladder/util/item_base_model/item_base_model_extensions.dart';
 import 'package:fladder/util/item_base_model/play_item_helpers.dart';
@@ -174,9 +176,9 @@ class _FocusedFullBannerState extends ConsumerState<TVSliderBanner> {
               },
               child: FladderImage(
                 key: ValueKey(_currentItem.id),
-                image: _currentItem.tvPosterLarge,
+                image: oxplayerSliderImage(_currentItem),
                 fit: BoxFit.cover,
-                decodeHeight: 360,
+                decodeHeight: OxplayerTvImageSizes.decodeHeroHeight,
               ),
             ),
           ),

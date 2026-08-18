@@ -9,8 +9,8 @@ void main() {
       maxHeight: 2000,
       cap: OxplayerTvImageSizes.backdrop,
     );
-    expect(w, 640);
-    expect(h, 360);
+    expect(w, 1920);
+    expect(h, 1080);
   });
 
   test('clamps poster request above TV primary cap', () {
@@ -36,5 +36,15 @@ void main() {
   test('maps logo type to logo cap', () {
     final cap = OxplayerTvImageSizes.forImageType(ImageType.logo);
     expect(cap, OxplayerTvImageSizes.logo);
+  });
+
+  test('keeps default FladderImage decodeHeight at grid cap', () {
+    expect(OxplayerTvImageSizes.clampDecodeHeight(520), 360);
+  });
+
+  test('allows explicit hero decodeHeight', () {
+    expect(OxplayerTvImageSizes.clampDecodeHeight(720), 360);
+    expect(OxplayerTvImageSizes.clampDecodeHeight(1080), 1080);
+    expect(OxplayerTvImageSizes.clampDecodeHeight(1440), 1080);
   });
 }
