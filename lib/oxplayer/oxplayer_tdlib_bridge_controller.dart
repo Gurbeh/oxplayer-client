@@ -104,6 +104,17 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
   /// would never appear (checkmark only).
   bool _suppressBotSessionRestore = false;
 
+  /// True for the one reconnect cycle immediately following THIS device's own logOut() —
+  /// [OxplayerTdlibConnectingExperience] reads this once at mount to pick logout-flavored copy
+  /// ("Signing you out…") instead of the generic connect narrative, since the same widget covers
+  /// both a cold app start and a post-logout reconnect and the two read very differently to
+  /// someone who just tapped Log out. Set synchronously by [clearSessionAfterOxLogout] (see its
+  /// doc for why it can't wait for the native `closed` event); cleared once the reconnect surfaces
+  /// real interactive UI (QR/code/password/ready/failed) so a later, unrelated reconnect doesn't
+  /// inherit stale copy.
+  bool _justLoggedOut = false;
+  bool get justLoggedOut => _justLoggedOut;
+
   bool get _useWindows => _windows != null;
 
   OxTdlibAuthState get state => _state;
@@ -165,6 +176,39 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
   /// True once TDLib finished setTdlibParameters and is ready for phone/QR/code/password.
   bool get isReadyForAuthInput => _isInteractiveAuthKind(_state.kind);
 
+  /// True while a human-facing login flow (phone/code/2FA/QR) is actively waiting on user input,
+  /// OR could be about to start one (freshly configured, about to request a QR/phone step) —
+  /// narrower than "not ready", which also covers the legitimate "nobody is doing anything with
+  /// this client right now" case that a silent bot-token bootstrap is meant for. Callers that
+  /// might otherwise repoint the shared native client onto a different identity (e.g.
+  /// oxplayerEnsureTdlibMatchesOxUser's bot-token bootstrap, which — per ensureBotTokenSession's
+  /// doc — tears down or redirects whatever session is currently there) must check this first, or
+  /// they race a login screen that is actively mid-flow on the same client.
+  ///
+  /// [waitingForPhoneNumber] is included even though it's also the natural "fresh device" resting
+  /// state: confirmed live (2026-08-18) that the race isn't limited to the QR-shown window — an
+  /// unrelated dashboard-prefetch call landed in this exact window (state still
+  /// waitingForPhoneNumber, a QR request already in flight from the login screen but not yet
+  /// reflected) and still corrupted the session, with the QR goroutine's still-running refresh
+  /// timer failing moments later with BOT_METHOD_INVALID. The one caller this costs
+  /// (oxplayer_main_bot_login_panel's opportunistic bot-link right after its own sign-in) already
+  /// documents itself as best-effort with a playback-time re-check, so skipping it here is safe.
+  bool get isInteractiveLoginInProgress {
+    switch (_state.kind) {
+      case OxTdlibAuthStateKind.waitingForPhoneNumber:
+      case OxTdlibAuthStateKind.waitingForCode:
+      case OxTdlibAuthStateKind.waitingForPassword:
+      case OxTdlibAuthStateKind.waitingForQrConfirmation:
+        return true;
+      case OxTdlibAuthStateKind.uninitialized:
+      case OxTdlibAuthStateKind.ready:
+      case OxTdlibAuthStateKind.failed:
+      case OxTdlibAuthStateKind.loggingOut:
+      case OxTdlibAuthStateKind.closed:
+        return false;
+    }
+  }
+
   static bool _isInteractiveAuthKind(OxTdlibAuthStateKind kind) {
     switch (kind) {
       case OxTdlibAuthStateKind.waitingForPhoneNumber:
@@ -199,6 +243,15 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
     if (state.kind == OxTdlibAuthStateKind.uninitialized ||
         state.kind == OxTdlibAuthStateKind.closed) {
       _configured = false;
+    }
+    if (_justLoggedOut &&
+        state.kind != OxTdlibAuthStateKind.uninitialized &&
+        state.kind != OxTdlibAuthStateKind.loggingOut &&
+        state.kind != OxTdlibAuthStateKind.closed &&
+        state.kind != OxTdlibAuthStateKind.waitingForPhoneNumber) {
+      // Real interactive UI is about to show (QR/code/password/ready/failed) — this reconnect
+      // cycle is over. [clearSessionAfterOxLogout] is what sets this true in the first place.
+      _justLoggedOut = false;
     }
     notifyListeners();
   }
@@ -753,7 +806,15 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
   /// unawaited (a blocking Telegram logOut() would make the OX "log out" action feel frozen),
   /// so the login screen can legitimately render before this finishes — see
   /// [_pendingIntentionalSignOut].
+  ///
+  /// Sets [_justLoggedOut] synchronously, right here, rather than reactively off the native
+  /// `closed` event: that event arrives only after the unawaited logOut() RPC round-trips, by
+  /// which point the login screen (and its connecting-experience widget) has often already
+  /// mounted and captured a stale "not a logout" reading. Confirmed live (2026-08-18): the
+  /// connecting screen kept showing generic connect copy after a real Settings → Log out because
+  /// of exactly that race.
   Future<void> clearSessionAfterOxLogout() {
+    _justLoggedOut = true;
     final future = _clearSessionAfterOxLogoutLocked();
     _pendingIntentionalSignOut = future;
     future.whenComplete(() {

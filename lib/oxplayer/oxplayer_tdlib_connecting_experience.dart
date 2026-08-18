@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:fladder/oxplayer/ox_splash_brand.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/util/localization_helper.dart';
 
 /// Full-screen "we are actually working" experience shown while the first Telegram MTProto
@@ -19,6 +20,12 @@ import 'package:fladder/util/localization_helper.dart';
 /// oxplayer_tdlib_bridge_controller.dart) and always resolves to either success (the caller stops
 /// rendering this) or a thrown OxplayerTdlibBridgeException the caller's own error UI handles with
 /// Retry — so there is no state this screen could trap someone in longer than that ceiling.
+///
+/// This exact reconnect also happens right after the user taps Log out (native tears down the
+/// session, then has to establish a brand new one before the login screen can even show a QR/phone
+/// form) — showing the same "signing you in" narrative there read as wrong to someone who just
+/// asked to sign OUT. See [OxplayerTdlibBridgeController.justLoggedOut]: this widget picks a
+/// distinct logout-flavored phrase set for that one reconnect cycle.
 class OxplayerTdlibConnectingExperience extends StatefulWidget {
   const OxplayerTdlibConnectingExperience({super.key});
 
@@ -45,8 +52,25 @@ class _OxplayerTdlibConnectingExperienceState extends State<OxplayerTdlibConnect
   int _charCount = 0;
   bool _visible = true;
 
+  /// Captured once at mount, not re-read per build: this reconnect either was or wasn't
+  /// logout-triggered for its whole duration, and re-checking mid-animation could otherwise flip
+  /// the phrase list out from under an in-progress typewriter cycle.
+  late final bool _isPostLogout = OxplayerTdlibBridgeController.instance().justLoggedOut;
+
   List<String> _phrases(BuildContext context) {
     final loc = context.localized;
+    if (_isPostLogout) {
+      return [
+        loc.oxplayerLoggingOutPhrase1,
+        loc.oxplayerLoggingOutPhrase2,
+        loc.oxplayerLoggingOutPhrase3,
+        loc.oxplayerLoggingOutPhrase4,
+        loc.oxplayerLoggingOutPhrase5,
+        loc.oxplayerLoggingOutPhrase6,
+        loc.oxplayerLoggingOutPhrase7,
+        loc.oxplayerLoggingOutPhrase8,
+      ];
+    }
     return [
       loc.oxplayerConnectingPhrase1,
       loc.oxplayerConnectingPhrase2,

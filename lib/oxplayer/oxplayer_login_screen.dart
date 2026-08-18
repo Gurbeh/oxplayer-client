@@ -105,12 +105,22 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
     // Warm TDLib during the same splash — do not show login UI until past setTdlibParameters.
     try {
       final phoneFirst = !_isTv(context);
-      await OxplayerTdlibBridgeController.instance().prepareForLoginScreen(
+      final controller = OxplayerTdlibBridgeController.instance();
+      await controller.prepareForLoginScreen(
         phoneFirst: phoneFirst,
       );
-      // TV defaults to QR; kick off token while splash still covers the screen.
-      if (!phoneFirst) {
-        await OxplayerTdlibBridgeController.instance().requestQrLogin();
+      // TV defaults to QR; kick off token while splash still covers the screen. Only from a
+      // state requestQrLogin() actually accepts — prepareForLoginScreen deliberately leaves an
+      // already-`ready` session alone (see its doc), and calling requestQrLogin() on that throws
+      // "Cannot start QR login from state=ready", which this catch below then misreports as a
+      // stuck-session error. Confirmed live (2026-08-18): a cached bot-token session landing on
+      // `ready` here hit exactly that. The panel that mounts next already handles `ready` itself
+      // (re-checks current state in its own initState), so skipping here is enough.
+      final kind = controller.state.kind;
+      final canStartQr = kind == OxTdlibAuthStateKind.waitingForPhoneNumber ||
+          kind == OxTdlibAuthStateKind.waitingForQrConfirmation;
+      if (!phoneFirst && canStartQr) {
+        await controller.requestQrLogin();
       }
     } catch (e) {
       if (!mounted) return;

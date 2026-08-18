@@ -2206,9 +2206,17 @@
     "oxplayerConnectingPhrase1": "در حال برقراری اتصال امن…",
     "oxplayerConnectingPhrase2": "در حال تولید کلید رمزنگاری…",
     "oxplayerConnectingPhrase3": "در حال تبادل کلید رمزنگاری…",
-    "oxplayerConnectingPhrase4": "در حال تأیید نشست تلگرام…",
-    "oxplayerConnectingPhrase5": "در حال اتصال بات دلیوری…",
+    "oxplayerConnectingPhrase4": "در حال هماهنگ‌سازی نشست انتقال…",
+    "oxplayerConnectingPhrase5": "در حال آماده‌سازی کانال دلیوری…",
     "oxplayerConnectingPhrase6": "در حال همگام‌سازی اطلاعات نشست…",
     "oxplayerConnectingPhrase7": "تقریباً تمام شد…",
-    "oxplayerConnectingPhrase8": "در حال نهایی‌سازی…"
+    "oxplayerConnectingPhrase8": "در حال نهایی‌سازی…",
+    "oxplayerLoggingOutPhrase1": "در حال خروج از حساب…",
+    "oxplayerLoggingOutPhrase2": "در حال پاک‌سازی نشست تلگرام…",
+    "oxplayerLoggingOutPhrase3": "در حال برقراری اتصال تازه…",
+    "oxplayerLoggingOutPhrase4": "در حال تولید کلید رمزنگاری…",
+    "oxplayerLoggingOutPhrase5": "در حال هماهنگ‌سازی نشست انتقال…",
+    "oxplayerLoggingOutPhrase6": "در حال آماده‌سازی برای ورود…",
+    "oxplayerLoggingOutPhrase7": "تقریباً تمام شد…",
+    "oxplayerLoggingOutPhrase8": "در حال نهایی‌سازی…"
 }

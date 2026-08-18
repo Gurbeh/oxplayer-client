@@ -12,8 +12,9 @@ enum OxplayerReaderSyncResult {
   /// switch succeeded, or this OX user has no personal bot and the user session is correct.
   aligned,
 
-  /// Could not determine which reader is required (the lookup call failed). The native session may
-  /// well be correct; there is no evidence either way.
+  /// Could not determine which reader is required — either the lookup call failed, or a
+  /// phone/QR/2FA login is actively in progress on this device and the check was skipped rather
+  /// than race it. The native session may well be correct; there is no evidence either way.
   unknown,
 
   /// A switch was required and failed. The native session is reading the WRONG inbox, so any
@@ -89,6 +90,16 @@ Future<OxplayerReaderSyncResult> oxplayerEnsureTdlibMatchesOxUser(String? access
   // No ready identity on this device yet. Nothing to silently provision without a personal bot —
   // the caller's own ready-check surfaces the real "log in" prompt.
   if (userBot == null) return OxplayerReaderSyncResult.aligned;
+
+  if (controller.isInteractiveLoginInProgress) {
+    // A phone/QR/2FA flow is actively waiting on user input right now (the login screen owns the
+    // native client) — ensureBotTokenSession would tear down or redirect that SAME shared client
+    // out from under it (see its doc). Confirmed live: a background caller (dashboard prefetch)
+    // reaching this branch while a QR scan was in flight left the connection bot-authenticated
+    // moments after a successful sign-in, and the QR goroutine's still-running refresh timer then
+    // failed with BOT_METHOD_INVALID. Nothing to align yet; let the login screen finish its flow.
+    return OxplayerReaderSyncResult.unknown;
+  }
 
   try {
     await controller.ensureConfigured();
