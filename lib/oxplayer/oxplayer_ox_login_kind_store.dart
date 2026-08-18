@@ -16,6 +16,7 @@ enum OxplayerOxLoginKind {
 
 abstract final class OxplayerOxLoginKindStore {
   static const _keyPrefix = 'ox_login_kind_';
+  static const _currentKey = 'ox_login_kind_current';
 
   static Future<void> save({
     required String accountId,
@@ -25,6 +26,7 @@ abstract final class OxplayerOxLoginKindStore {
     if (id.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('$_keyPrefix$id', kind.name);
+    await prefs.setString(_currentKey, kind.name);
   }
 
   static Future<OxplayerOxLoginKind?> read(String? accountId) async {
@@ -32,6 +34,23 @@ abstract final class OxplayerOxLoginKindStore {
     if (id.isEmpty) return null;
     final prefs = await SharedPreferences.getInstance();
     return OxplayerOxLoginKind.tryParse(prefs.getString('$_keyPrefix$id'));
+  }
+
+  /// Last saved kind on this device, even before native TDLib is bot-ready.
+  /// PlaybackInfo interceptor uses this so a main-bot code login does not get
+  /// routed to kind=session while the personal-bot session is still applying.
+  static Future<OxplayerOxLoginKind?> readCurrent() async {
+    final prefs = await SharedPreferences.getInstance();
+    return OxplayerOxLoginKind.tryParse(prefs.getString(_currentKey));
+  }
+
+  /// Copies the per-account kind onto [_currentKey] so PlaybackInfo can read it
+  /// after an APK upgrade that introduced the current key.
+  static Future<void> promoteToCurrent(String? accountId) async {
+    final kind = await read(accountId);
+    if (kind == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_currentKey, kind.name);
   }
 
   /// Stored kind wins. Else: personal-bot token ≈ bot login; TDLib ready as a user ≈ session.

@@ -6,6 +6,7 @@ import 'package:chopper/chopper.dart';
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/account_model.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_ox_login_kind_store.dart';
 import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
 import 'package:fladder/oxplayer/oxplayer_image_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_seerr_auto_config.dart';
@@ -54,6 +55,7 @@ String? _readRefreshHeader(Response<dynamic> response) {
 Future<bool> oxplayerRestoreSession(WidgetRef ref, AccountModel account) async {
   final ok = await _restoreSession(ref.read, account);
   if (ok && OxplayerEnv.isEnabled) {
+    await OxplayerOxLoginKindStore.promoteToCurrent(account.id);
     await oxplayerConfigureSeerrFromServer(ref);
   }
   return ok;
