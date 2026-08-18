@@ -289,14 +289,12 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: _bootstrapping
-                    ? Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _loginLogo(holdEnabled: false),
-                          const SizedBox(height: 24),
-                          const CircularProgressIndicator(),
-                        ],
-                      )
+                    // This is where prepareForLoginScreen()/requestQrLogin() actually run (see
+                    // _bootstrap) — the same 15-20s TDLib connect the panels' own connecting
+                    // state covers, just earlier. Without this, that whole stretch showed a bare
+                    // spinner and the panels' animated version rarely got a chance to appear at
+                    // all, because _bootstrapping only clears after this work already finished.
+                    ? const OxplayerTdlibConnectingExperience()
                     : _bootstrapError != null
                         ? Column(
                             mainAxisSize: MainAxisSize.min,
