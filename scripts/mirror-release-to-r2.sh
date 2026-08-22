@@ -35,6 +35,9 @@ if ((${#FILES[@]} == 0)); then
     "OXPlayer-Android-${VERSION}-x86_64.apk"
     "OXPlayer-Windows-${VERSION}-Setup.exe"
     "OXPlayer-Windows-${VERSION}.zip"
+    "OXPlayer-iOS-${VERSION}.ipa"
+    "OXPlayer-macOS-${VERSION}.dmg"
+    "OXPlayer-Linux-${VERSION}.AppImage"
   )
 fi
 
